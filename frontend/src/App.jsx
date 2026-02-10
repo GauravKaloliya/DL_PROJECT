@@ -316,10 +316,10 @@ export default function App() {
     if (!demographics.place || demographics.place.trim().length < 2) {
       errors.place = "Place/Location is required";
     }
-    if (!demographics.language || demographics.language.trim().length < 2) {
+    if (!demographics.language) {
       errors.language = "Native language is required";
     }
-    if (!demographics.experience || demographics.experience.trim().length < 2) {
+    if (!demographics.experience) {
       errors.experience = "Prior experience is required";
     }
     if (!consentChecked) {
@@ -599,31 +599,53 @@ export default function App() {
               
               <div className={`form-field ${formErrors.language ? 'error' : ''}`}>
                 <label>Native language</label>
-                <input
-                  type="text"
-                  placeholder="e.g., English"
+                <select
                   value={demographics.language}
                   onChange={(event) => {
                     setDemographics((prev) => ({ ...prev, language: event.target.value }));
                     if (formErrors.language) setFormErrors(prev => ({ ...prev, language: null }));
                   }}
                   className={formErrors.language ? 'error-input' : ''}
-                />
+                >
+                  <option value="">Select native language</option>
+                  <option value="English">English</option>
+                  <option value="Spanish">Spanish</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Portuguese">Portuguese</option>
+                  <option value="Italian">Italian</option>
+                  <option value="Russian">Russian</option>
+                  <option value="Other">Other</option>
+                </select>
                 {formErrors.language && <span className="error-text">{formErrors.language}</span>}
               </div>
               
               <div className={`form-field ${formErrors.experience ? 'error' : ''}`}>
                 <label>Prior experience</label>
-                <input
-                  type="text"
-                  placeholder="e.g., photography, art"
+                <select
                   value={demographics.experience}
                   onChange={(event) => {
                     setDemographics((prev) => ({ ...prev, experience: event.target.value }));
                     if (formErrors.experience) setFormErrors(prev => ({ ...prev, experience: null }));
                   }}
                   className={formErrors.experience ? 'error-input' : ''}
-                />
+                >
+                  <option value="">Select prior experience</option>
+                  <option value="None">None</option>
+                  <option value="Photography">Photography</option>
+                  <option value="Art/Design">Art/Design</option>
+                  <option value="Computer Vision">Computer Vision</option>
+                  <option value="Image Processing">Image Processing</option>
+                  <option value="Graphic Design">Graphic Design</option>
+                  <option value="Video Editing">Video Editing</option>
+                  <option value="3D Modeling">3D Modeling</option>
+                  <option value="UI/UX Design">UI/UX Design</option>
+                  <option value="Animation">Animation</option>
+                  <option value="Other">Other</option>
+                </select>
                 {formErrors.experience && <span className="error-text">{formErrors.experience}</span>}
               </div>
             </div>
@@ -647,9 +669,11 @@ export default function App() {
               {formErrors.consent && <span className="error-text consent-error">{formErrors.consent}</span>}
             </div>
             
-            <button className="primary" onClick={handleConsentStart}>
-              Start Study
-            </button>
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+              <button className="primary" onClick={handleConsentStart}>
+                Start
+              </button>
+            </div>
           </div>
         )}
 

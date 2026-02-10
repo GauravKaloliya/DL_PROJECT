@@ -971,6 +971,12 @@ body.dark .toast.warning {
   text-align: center;
 }
 
+.auth-form .primary {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 .form-group {
   text-align: center;
 }
@@ -1229,44 +1235,50 @@ body.dark .error-message {
   border: 2px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
+  border-collapse: collapse;
 }
 
-.table-header {
-  display: flex;
+.data-table thead {
   background: var(--primary);
-  color: white;
-  font-weight: 600;
-  min-width: fit-content;
 }
 
-.table-row {
-  display: flex;
-  border-top: 1px solid var(--border);
-  min-width: fit-content;
+.data-table thead .table-header {
+  display: table-row;
 }
 
-.table-row:hover {
+.data-table tbody .table-row {
+  display: table-row;
+}
+
+.data-table tbody .table-row:hover {
   background: rgba(24, 119, 242, 0.05);
 }
 
-.table-cell {
+.data-table th.table-cell {
+  color: white;
+  font-weight: 600;
+}
+
+.data-table th.table-cell,
+.data-table td.table-cell {
   padding: 12px;
-  flex: 1;
-  min-width: 150px;
-  max-width: 300px;
+  text-align: left;
   border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 150px;
+  max-width: 300px;
 }
 
-.table-cell.header {
+.data-table th.table-cell {
   padding: 16px 12px;
-  font-weight: 600;
 }
 
-.table-cell:last-child {
+.data-table th.table-cell:last-child,
+.data-table td.table-cell:last-child {
   border-right: none;
 }
 
@@ -1655,88 +1667,4 @@ body.dark .reset-confirm {
 .nav-link.active {
   background: var(--primary);
   color: white;
-}
-
-/* JSON Upload Styles */
-.json-upload-section {
-  margin: 24px 0;
-  padding: 20px 0;
-  border-top: 1px solid var(--border);
-}
-
-.json-upload-divider {
-  text-align: center;
-  margin: 16px 0;
-  position: relative;
-}
-
-.json-upload-divider::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--border);
-  z-index: 1;
-}
-
-.json-upload-divider span {
-  background: var(--panel);
-  padding: 0 16px;
-  color: var(--muted);
-  font-size: 14px;
-  font-weight: 600;
-  position: relative;
-  z-index: 2;
-}
-
-.json-upload {
-  text-align: center;
-  padding: 20px;
-  background: rgba(24, 119, 242, 0.03);
-  border-radius: 12px;
-  border: 2px dashed var(--border);
-  transition: all 0.3s ease;
-}
-
-.json-upload:hover {
-  border-color: var(--primary);
-  background: rgba(24, 119, 242, 0.05);
-}
-
-.json-upload-label {
-  display: inline-block;
-  padding: 16px 24px;
-  background: var(--primary);
-  color: white;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 14px;
-  transition: all 0.3s ease;
-  margin-bottom: 12px;
-}
-
-.json-upload-label:hover {
-  background: #166fe5;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.3);
-}
-
-.json-upload-help {
-  color: var(--muted);
-  font-size: 14px;
-  margin: 12px 0 8px 0;
-}
-
-.json-upload-format {
-  color: var(--text);
-  font-size: 12px;
-  margin: 0;
-  font-family: 'Courier New', monospace;
-  background: var(--bg);
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
 }
