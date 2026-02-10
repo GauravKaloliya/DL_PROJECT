@@ -210,70 +210,7 @@ export default function AdminPanel() {
     }
   };
 
-  const handleJsonFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.json')) {
-      setError('Please select a JSON file');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const text = await file.text();
-      const credentials = JSON.parse(text);
-
-      if (!credentials.username || !credentials.api_key) {
-        setError('JSON file must contain "username" and "api_key" fields');
-        return;
-      }
-
-      // Set the credentials and attempt login
-      setLoginUsername(credentials.username);
-      setLoginApiKey(credentials.api_key);
-
-      // Automatically trigger login with the loaded credentials
-      const response = await fetch(`${API_BASE}/api/admin/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          username: credentials.username, 
-          api_key: credentials.api_key 
-        })
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSessionToken(data.session_token);
-        setApiKey(data.api_key);
-        setUser(data.user);
-        setIsAuthenticated(true);
-
-        // Store in sessionStorage
-        sessionStorage.setItem("adminSessionToken", data.session_token);
-        sessionStorage.setItem("adminApiKey", data.api_key);
-        sessionStorage.setItem("adminUser", JSON.stringify(data.user));
-
-        addToast("Login successful with loaded credentials!", "success");
-      } else {
-        setError(data.error || "Invalid credentials from JSON file");
-      }
-    } catch (err) {
-      if (err instanceof SyntaxError) {
-        setError('Invalid JSON file format');
-      } else {
-        setError('Failed to process JSON file: ' + err.message);
-      }
-    } finally {
-      setLoading(false);
-      // Reset the file input
-      event.target.value = '';
-    }
-  };
-  
-// Registration functionality removed
+  // Registration functionality removed
   
   const handleLogout = async () => {
     try {
@@ -284,18 +221,24 @@ export default function AdminPanel() {
     } catch (err) {
       console.error("Logout error:", err);
     }
-    
+
     // Clear session
     sessionStorage.removeItem("adminSessionToken");
     sessionStorage.removeItem("adminApiKey");
     sessionStorage.removeItem("adminUser");
-    
+    sessionStorage.removeItem("adminStats");
+    sessionStorage.removeItem("adminCsvData");
+    sessionStorage.removeItem("adminActiveTab");
+
+    // Clear all state
     setIsAuthenticated(false);
     setSessionToken("");
     setApiKey("");
     setUser(null);
     setStats(null);
     setCsvData([]);
+    setError(null);
+    setLoading(false);
     navigate("/admin");
   };
   
@@ -465,31 +408,6 @@ export default function AdminPanel() {
             </button>
           </form>
 
-          <div className="json-upload-section">
-            <div className="json-upload-divider">
-              <span>OR</span>
-            </div>
-            <div className="json-upload">
-              <label htmlFor="json-file-upload" className="json-upload-label">
-                📄 Upload JSON Credentials File
-              </label>
-              <input
-                id="json-file-upload"
-                type="file"
-                accept=".json"
-                onChange={handleJsonFileUpload}
-                disabled={loading}
-                style={{ display: 'none' }}
-              />
-              <p className="json-upload-help">
-                Select a JSON file containing your credentials
-              </p>
-              <p className="json-upload-format">
-                Format: {"{"}"username": "your_username", "api_key": "your_api_key"{"}"}
-              </p>
-            </div>
-          </div>
-          
           <div className="auth-switch">
             <button className="ghost" onClick={() => navigate('/')}>
               Back to Home
@@ -745,24 +663,26 @@ export default function AdminPanel() {
               </div>
             ) : filteredData.length > 0 ? (
               <div className="data-table-container">
-                <div className="data-table">
-                  <div className="table-header">
-                    {getTableHeaders().map((key) => (
-                      <div key={key} className="table-cell header">{key}</div>
-                    ))}
-                  </div>
-                  <div className="table-body">
+                <table className="data-table">
+                  <thead>
+                    <tr className="table-header">
+                      {getTableHeaders().map((key) => (
+                        <th key={key} className="table-cell header">{key}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
                     {currentItems.map((row, index) => (
-                      <div key={index} className="table-row">
+                      <tr key={index} className="table-row">
                         {getTableHeaders().map((key, i) => (
-                          <div key={i} className="table-cell">
+                          <td key={i} className="table-cell">
                             {String(row[key] || "").substring(0, 50)}{String(row[key] || "").length > 50 ? "..." : ""}
-                          </div>
+                          </td>
                         ))}
-                      </div>
+                      </tr>
                     ))}
-                  </div>
-                </div>
+                  </tbody>
+                </table>
 
                 {totalPages > 1 && (
                   <div className="pagination">
