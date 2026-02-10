@@ -467,6 +467,9 @@ def validate_session(session_token):
 @app.route("/api/images/random")
 def random_image():
     image_type = request.args.get("type", "normal")
+    # Support 'practice' as an alias for 'survey' for backward compatibility
+    if image_type == "practice":
+        image_type = "survey"
     if image_type not in {"normal", "survey", "attention"}:
         return jsonify({"error": "Invalid type"}), 400
 
