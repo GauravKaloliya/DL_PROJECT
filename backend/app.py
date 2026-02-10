@@ -35,6 +35,12 @@ CSV_HEADERS = [
     "too_fast_flag",
     "user_agent",
     "ip_hash",
+    "nasa_mental",
+    "nasa_physical",
+    "nasa_temporal",
+    "nasa_performance",
+    "nasa_effort",
+    "nasa_frustration",
 ]
 
 app = Flask(__name__)
@@ -166,6 +172,12 @@ def submit():
         "too_fast_flag": too_fast_flag,
         "user_agent": request.headers.get("User-Agent", ""),
         "ip_hash": get_ip_hash(),
+        "nasa_mental": payload.get("nasa_mental", ""),
+        "nasa_physical": payload.get("nasa_physical", ""),
+        "nasa_temporal": payload.get("nasa_temporal", ""),
+        "nasa_performance": payload.get("nasa_performance", ""),
+        "nasa_effort": payload.get("nasa_effort", ""),
+        "nasa_frustration": payload.get("nasa_frustration", ""),
     }
 
     with CSV_PATH.open("a", newline="", encoding="utf-8") as file:
