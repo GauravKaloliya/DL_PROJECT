@@ -436,16 +436,6 @@ export default function App() {
     setStage("finished");
   };
 
-  const downloadData = () => {
-    const blob = new Blob([JSON.stringify(submissions, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `session-${sessionId}.json`;
-    link.click();
-    URL.revokeObjectURL(url);
-  };
-
   const currentInstruction = trial?.is_attention ? attentionInstruction[trial.image_id] : null;
 
   return (
@@ -599,8 +589,8 @@ export default function App() {
                   className={formErrors.gender ? 'error-input' : ''}
                 >
                   <option value="">Select gender</option>
-                  <option value="female">Female</option>
                   <option value="male">Male</option>
+                  <option value="female">Female</option>
                   <option value="non-binary">Non-binary</option>
                   <option value="prefer-not-say">Prefer not to say</option>
                   <option value="other">Other</option>
@@ -807,20 +797,21 @@ export default function App() {
 
         {stage === "finished" && (
           <div className="panel">
-            <h2>Thank you for completing C.O.G.N.I.T. survey</h2>
-            <p>
-              You have completed {mainCompleted} main trials and {surveyCompleted} survey trials! 🎉
-              Your responses have been recorded. If you would like a copy of your data, download it
-              below
-            </p>
-            <p className="debrief">
-              Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
-              examines how people describe visual scenes. Your responses
-              will help improve language understanding models ✨
-            </p>
-            <button className="primary" onClick={downloadData} disabled={submissions.length === 0}>
-              Download my data 📥
-            </button>
+            <div style={{ textAlign: 'center' }}>
+              <h2>Thank you for completing C.O.G.N.I.T. survey</h2>
+              <p>
+                You have completed {surveyCompleted} survey trials! 🎉
+                Your responses have been recorded.
+              </p>
+              <p className="debrief">
+                Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
+                examines how people describe visual scenes. Your responses
+                will help improve language understanding models ✨
+              </p>
+              <button className="primary" onClick={handleFinishEarly} style={{ marginTop: '20px' }}>
+                Finish
+              </button>
+            </div>
           </div>
         )}
         <div className="branding-footer" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
