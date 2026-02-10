@@ -136,8 +136,35 @@ def submit():
 
     try:
         rating = int(rating)
+        if not 1 <= rating <= 10:
+            raise ValueError
     except (TypeError, ValueError):
-        return jsonify({"error": "rating must be an integer"}), 400
+        return jsonify({"error": "rating must be an integer between 1-10"}), 400
+
+    # Validate NASA-TLX ratings (1-5 scale)
+    nasa_fields = [
+        "nasa_mental",
+        "nasa_physical", 
+        "nasa_temporal",
+        "nasa_performance",
+        "nasa_effort",
+        "nasa_frustration"
+    ]
+    for field in nasa_fields:
+        value = payload.get(field)
+        if value is None:
+            return jsonify({"error": f"{field} is required"}), 400
+        try:
+            value = int(value)
+            if not 1 <= value <= 5:
+                raise ValueError
+        except (TypeError, ValueError):
+            return jsonify({"error": f"{field} must be an integer between 1-5"}), 400
+
+    # Validate comments
+    feedback = (payload.get("feedback") or "").strip()
+    if len(feedback) < 5:
+        return jsonify({"error": "comments must be at least 5 characters"}), 400
 
     is_practice = bool(payload.get("is_practice"))
     is_attention = bool(payload.get("is_attention"))
@@ -164,7 +191,7 @@ def submit():
         "description": description,
         "word_count": word_count,
         "rating": rating,
-        "feedback": payload.get("feedback", ""),
+        "feedback": feedback,
         "time_spent_seconds": time_spent_seconds,
         "is_practice": is_practice,
         "is_attention": is_attention,

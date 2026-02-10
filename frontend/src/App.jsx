@@ -118,7 +118,7 @@ export default function App() {
   const [sessionId] = useState(() => getStoredValue("sessionId", createId()));
   const [trial, setTrial] = useState(null);
   const [description, setDescription] = useState("");
-  const [rating, setRating] = useState(5);
+  const [rating, setRating] = useState(0);
   const [comments, setComments] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
@@ -134,14 +134,14 @@ export default function App() {
   const [trialStartTime, setTrialStartTime] = useState(Date.now());
   const nextTimeout = useRef(null);
 
-  // NASA-TLX ratings (1-20 scale)
+  // NASA-TLX ratings (1-5 scale, 0 = not rated)
   const [nasaRatings, setNasaRatings] = useState({
-    mental: 10,
-    physical: 5,
-    temporal: 5,
-    performance: 10,
-    effort: 8,
-    frustration: 3
+    mental: 0,
+    physical: 0,
+    temporal: 0,
+    performance: 0,
+    effort: 0,
+    frustration: 0
   });
 
   const wordCount = useMemo(() => {
@@ -200,8 +200,16 @@ export default function App() {
       const data = await response.json();
       setTrial(data);
       setDescription("");
-      setRating(5);
+      setRating(0);
       setComments("");
+      setNasaRatings({
+        mental: 0,
+        physical: 0,
+        temporal: 0,
+        performance: 0,
+        effort: 0,
+        frustration: 0
+      });
       setIsZoomed(false);
       setTrialStartTime(Date.now());
       setPracticeFeedbackReady(false);
@@ -237,6 +245,10 @@ export default function App() {
 
   const handleConsentStart = () => {
     if (!consentChecked) return;
+    if (!demographics.ageGroup || !demographics.language.trim() || !demographics.experience.trim()) {
+      addToast("Please fill in all demographic fields 💕", "error");
+      return;
+    }
     startPractice();
   };
 
@@ -244,6 +256,18 @@ export default function App() {
     if (!trial || submitting) return;
     if (wordCount < MIN_WORDS) {
       addToast(`Almost there! ✨ Please write at least ${MIN_WORDS} words.`, "error");
+      return;
+    }
+    if (rating === 0) {
+      addToast("Please provide a general rating 💕", "error");
+      return;
+    }
+    if (Object.values(nasaRatings).some(r => r === 0)) {
+      addToast("Please rate all NASA-TLX dimensions 🌸", "error");
+      return;
+    }
+    if (comments.trim().length < 5) {
+      addToast("Please add at least 5 characters in comments ✨", "error");
       return;
     }
     setSubmitting(true);
@@ -354,7 +378,7 @@ export default function App() {
       <div className="app">
         <header className="header">
           <div>
-            <h1>Image Description Study 🌸</h1>
+            <h1>C.O.G.N.I.T. 🌸</h1>
             <p className="subtitle">Describe each image with as much detail as possible ✨</p>
           </div>
           <div className="header-actions">
@@ -375,7 +399,7 @@ export default function App() {
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Welcome! 🌸</h2>
+            <h2>Welcome to C.O.G.N.I.T.! 🌸</h2>
             <p>
               By participating, you consent to having your descriptions stored anonymously for research
               purposes. You may stop at any time 💕
@@ -390,14 +414,14 @@ export default function App() {
             </label>
             <div className="form-grid">
               <div>
-                <label>Age group (optional) 🎂</label>
+                <label>Age group (required) 🎂</label>
                 <select
                   value={demographics.ageGroup}
                   onChange={(event) =>
                     setDemographics((prev) => ({ ...prev, ageGroup: event.target.value }))
                   }
                 >
-                  <option value="">Prefer not to say</option>
+                  <option value="">Select age group</option>
                   <option value="18-24">18-24</option>
                   <option value="25-34">25-34</option>
                   <option value="35-44">35-44</option>
@@ -406,7 +430,7 @@ export default function App() {
                 </select>
               </div>
               <div>
-                <label>Native language (optional) 🌍</label>
+                <label>Native language (required) 🌍</label>
                 <input
                   type="text"
                   placeholder="e.g., English"
@@ -417,7 +441,7 @@ export default function App() {
                 />
               </div>
               <div>
-                <label>Prior experience (optional) 📸</label>
+                <label>Prior experience (required) 📸</label>
                 <input
                   type="text"
                   placeholder="e.g., photography, art"
@@ -526,14 +550,15 @@ export default function App() {
 
         {stage === "finished" && (
           <div className="panel">
-            <h2>Thank you! 🌸</h2>
+            <h2>Thank you for completing C.O.G.N.I.T.! 🌸</h2>
             <p>
               You have completed {mainCompleted} main trials and {practiceCompleted} practice trials! 🎉
               Your responses have been recorded. If you would like a copy of your data, download it
               below 💕
             </p>
             <p className="debrief">
-              Debrief: This study examines how people describe visual scenes. Your anonymous responses
+              Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
+              examines how people describe visual scenes. Your anonymous responses
               will help improve language understanding models ✨
             </p>
             <button className="primary" onClick={downloadData} disabled={submissions.length === 0}>
@@ -592,6 +617,9 @@ function TrialForm({
     { key: "frustration", label: "Frustration", description: "How insecure or irritated were you?" }
   ];
 
+  const allNasaRated = Object.values(nasaRatings).every(r => r > 0);
+  const commentsValid = comments.trim().length >= 5;
+
   return (
     <div className="trial">
       {instruction && <div className="banner info">{instruction.text}</div>}
@@ -623,58 +651,82 @@ function TrialForm({
           Minimum: {minWords} words ✨
         </span>
       </div>
+      
+      {/* Effort Rating - Radio buttons */}
+      <div className="field effort-rating">
+        <label>General rating {rating > 0 ? `${rating}/10` : "(required)"} 💪</label>
+        <div className="rating-scale">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
+            <label key={val} className="rating-option">
+              <input
+                type="radio"
+                name="effort-rating"
+                value={val}
+                checked={rating === val}
+                onChange={() => onRating(val)}
+              />
+              <span className="rating-label">{val}</span>
+            </label>
+          ))}
+        </div>
+        <div className="rating-labels">
+          <span>Very Low</span>
+          <span>Very High</span>
+        </div>
+      </div>
+
+      {/* Comments - Required */}
       <label className="field">
-        Effort rating: {rating} / 10 💪
-        <input
-          type="range"
-          min="1"
-          max="10"
-          value={rating}
-          onChange={(event) => onRating(Number(event.target.value))}
-        />
-      </label>
-      <label className="field">
-        Optional comments 💬
+        Comments (required, min 5 chars) 💬
         <textarea
           value={comments}
           onChange={(event) => onComments(event.target.value)}
           placeholder="Share any additional notes..."
         />
       </label>
+
+      {/* NASA-TLX Rating Scale */}
       <div className="nasa-tlx">
-        <h3>Task Experience 🌟</h3>
+        <h3>Task Experience {allNasaRated ? "✅" : "(required)"} 🌟</h3>
         <p className="nasa-tlx-description">
-          Please rate your experience with this task on a scale of 1-20 💕
+          Please rate your experience with this task on a scale of 1-5 💕
         </p>
         {nasaDimensions.map((dimension) => (
-          <div key={dimension.key} className="nasa-slider-group">
+          <div key={dimension.key} className="nasa-item">
             <label>{dimension.label}</label>
-            <p className="description">{dimension.description}</p>
-            <input
-              type="range"
-              min="1"
-              max="20"
-              value={nasaRatings[dimension.key]}
-              onChange={(event) =>
-                onNasaRatingChange({
-                  ...nasaRatings,
-                  [dimension.key]: Number(event.target.value)
-                })
-              }
-            />
-            <div className="nasa-scale-labels">
-              <span>Low (1)</span>
-              <span className="value-display">{nasaRatings[dimension.key]}</span>
-              <span>High (20)</span>
+            <p className="nasa-desc">{dimension.description}</p>
+            <div className="rating-scale">
+              {[1, 2, 3, 4, 5].map((val) => (
+                <label key={val} className="rating-option">
+                  <input
+                    type="radio"
+                    name={dimension.key}
+                    value={val}
+                    checked={nasaRatings[dimension.key] === val}
+                    onChange={() =>
+                      onNasaRatingChange({
+                        ...nasaRatings,
+                        [dimension.key]: val
+                      })
+                    }
+                  />
+                  <span className="rating-label">{val}</span>
+                </label>
+              ))}
+            </div>
+            <div className="rating-labels">
+              <span>Low</span>
+              <span>High</span>
             </div>
           </div>
         ))}
       </div>
+
       <div className="actions">
         <button
           className={`primary ${submitting ? "wiggle" : ""}`}
           onClick={onSubmit}
-          disabled={submitting || wordCount < minWords || fetchingImage}
+          disabled={submitting || wordCount < minWords || fetchingImage || rating === 0 || !allNasaRated || !commentsValid}
         >
           {submitting ? "Submitting... 🌸" : "Submit! 💗"}
         </button>
