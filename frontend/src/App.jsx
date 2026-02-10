@@ -15,6 +15,10 @@ const attentionInstruction = {
   "attention/attention-circle.svg": {
     text: "🎯 Special task: Include the word \"circle\" in your description!",
     expected: "circle"
+  },
+  "attention/attention-ocean.svg": {
+    text: "🌊 Special task: Include the word \"ocean\" in your description!",
+    expected: "ocean"
   }
 };
 
@@ -477,7 +481,9 @@ export default function App() {
         {stage === "trial" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>Progress {mainCompleted} / {MAIN_TARGET} 💗</span>
+              <span>
+                Progress {Math.min(mainCompleted + 1, MAIN_TARGET)} / {MAIN_TARGET} 💗
+              </span>
               <button className="ghost" onClick={handleFinishEarly}>
                 Finish / Stop 💕
               </button>
@@ -611,7 +617,7 @@ function TrialForm({
         />
       </label>
       <div className="counts">
-        <span>Words: {wordCount} 📝</span>
+        <span>Words: {wordCount} / Min {minWords} 📝</span>
         <span>Characters: {charCount} ⌨️</span>
         <span className={wordCount >= minWords ? "ok" : "warning"}>
           Minimum: {minWords} words ✨
@@ -635,43 +641,40 @@ function TrialForm({
           placeholder="Share any additional notes..."
         />
       </label>
-      {!trial.is_practice && (
-        <div className="nasa-tlx">
-          <h3>Task Experience 🌟</h3>
-          <p className="nasa-tlx-description">
-            Please rate your experience with this task on a scale of 1-20 💕
-          </p>
-          {nasaDimensions.map((dimension) => (
-            <div key={dimension.key} className="nasa-slider-group">
-              <label>{dimension.label}</label>
-              <p className="description">{dimension.description}</p>
-              <input
-                type="range"
-                min="1"
-                max="20"
-                value={nasaRatings[dimension.key]}
-                onChange={(event) =>
-                  onNasaRatingChange({
-                    ...nasaRatings,
-                    [dimension.key]: Number(event.target.value)
-                  })
-                }
-              />
-              <div className="nasa-scale-labels">
-                <span>Low (1)</span>
-                <span className="value-display">{nasaRatings[dimension.key]}</span>
-                <span>High (20)</span>
-              </div>
+      <div className="nasa-tlx">
+        <h3>Task Experience 🌟</h3>
+        <p className="nasa-tlx-description">
+          Please rate your experience with this task on a scale of 1-20 💕
+        </p>
+        {nasaDimensions.map((dimension) => (
+          <div key={dimension.key} className="nasa-slider-group">
+            <label>{dimension.label}</label>
+            <p className="description">{dimension.description}</p>
+            <input
+              type="range"
+              min="1"
+              max="20"
+              value={nasaRatings[dimension.key]}
+              onChange={(event) =>
+                onNasaRatingChange({
+                  ...nasaRatings,
+                  [dimension.key]: Number(event.target.value)
+                })
+              }
+            />
+            <div className="nasa-scale-labels">
+              <span>Low (1)</span>
+              <span className="value-display">{nasaRatings[dimension.key]}</span>
+              <span>High (20)</span>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
       <div className="actions">
         <button
-          className="primary"
+          className={`primary ${submitting ? "wiggle" : ""}`}
           onClick={onSubmit}
           disabled={submitting || wordCount < minWords || fetchingImage}
-          className={submitting ? "wiggle" : ""}
         >
           {submitting ? "Submitting... 🌸" : "Submit! 💗"}
         </button>
