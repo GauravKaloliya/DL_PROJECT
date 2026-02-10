@@ -36,7 +36,7 @@ CSV_HEADERS = [
     "rating",
     "feedback",
     "time_spent_seconds",
-    "is_practice",
+    "is_survey",
     "is_attention",
     "attention_passed",
     "too_fast_flag",
@@ -111,8 +111,6 @@ def init_db():
             password_hash TEXT NOT NULL,
             email TEXT UNIQUE,
             api_key TEXT UNIQUE,
-            email_verified BOOLEAN DEFAULT 0,
-            verification_token TEXT,
             role TEXT DEFAULT 'admin',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
@@ -166,10 +164,7 @@ def _migrate_admin_users_table(cursor):
     existing_columns = {row[1] for row in cursor.fetchall()}
     
     # Define columns that should exist
-    required_columns = {
-        'email_verified': 'BOOLEAN DEFAULT 0',
-        'verification_token': 'TEXT',
-    }
+    required_columns = {}
     
     # Add missing columns
     for col_name, col_def in required_columns.items():
@@ -193,7 +188,7 @@ def _create_default_admin_user(cursor):
     
     cursor.execute(
         """INSERT INTO admin_users 
-           (username, password_hash, email, email_verified, is_active) 
+           (username, password_hash, email, is_active) 
            VALUES (?, ?, ?, 1, 1)""",
         ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
@@ -203,10 +198,6 @@ def _create_default_admin_user(cursor):
         "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
         (cursor.lastrowid, 'system_create', 'Default admin user created', 'system')
     )
-
-
-# Email verification functionality removed
-
 
 def hash_password(password):
     """Hash password using SHA-256"""
@@ -221,13 +212,13 @@ def authenticate_admin(username, password):
     try:
         # Username/password authentication
         cursor.execute(
-            "SELECT id, password_hash, role, is_active, email_verified FROM admin_users WHERE username = ?",
+            "SELECT id, password_hash, role, is_active FROM admin_users WHERE username = ?",
             (username,)
         )
         user = cursor.fetchone()
         
-        if user and user[3] and user[4]:  # Check active and verified
-            user_id, stored_hash, role, is_active, email_verified = user
+        if user and user[3]:  # Check active status
+            user_id, stored_hash, role, is_active = user
             # Verify password
             input_hash = hash_password(password)
             if input_hash == stored_hash:
@@ -355,7 +346,7 @@ def build_image_payload(image_path: Path, image_type: str):
     return {
         "image_id": image_id,
         "image_url": image_url,
-        "is_practice": image_type == "practice",
+        "is_survey": image_type == "survey",
         "is_attention": image_type == "attention",
     }
 
@@ -476,7 +467,7 @@ def validate_session(session_token):
 @app.route("/api/images/random")
 def random_image():
     image_type = request.args.get("type", "normal")
-    if image_type not in {"normal", "practice", "attention"}:
+    if image_type not in {"normal", "survey", "attention"}:
         return jsonify({"error": "Invalid type"}), 400
 
     images = list_images(image_type)
@@ -525,7 +516,7 @@ def submit():
     if len(feedback) < 5:
         return jsonify({"error": "comments must be at least 5 characters"}), 400
 
-    is_practice = bool(payload.get("is_practice"))
+    is_survey = bool(payload.get("is_survey"))
     is_attention = bool(payload.get("is_attention"))
 
     attention_expected = (payload.get("attention_expected") or "").strip().lower()
@@ -552,7 +543,7 @@ def submit():
         "rating": rating,
         "feedback": feedback,
         "time_spent_seconds": time_spent_seconds,
-        "is_practice": is_practice,
+        "is_survey": is_survey,
         "is_attention": is_attention,
         "attention_passed": attention_passed,
         "too_fast_flag": too_fast_flag,
@@ -710,12 +701,12 @@ def api_docs():
                         "method": "GET",
                         "description": "Get a random image for the study",
                         "parameters": [
-                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, practice, attention)", "default": "normal"}
+                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, survey, attention)", "default": "normal"}
                         ],
                         "response": {
                             "image_id": "string",
                             "image_url": "string",
-                            "is_practice": "boolean",
+                            "is_survey": "boolean",
                             "is_attention": "boolean"
                         }
                     },
@@ -737,7 +728,7 @@ def api_docs():
                             "rating": "integer (required, 1-10)",
                             "feedback": "string (required, min 5 chars)",
                             "time_spent_seconds": "number (required)",
-                            "is_practice": "boolean (required)",
+                            "is_survey": "boolean (required)",
                             "is_attention": "boolean (required)",
                             "attention_expected": "string",
                             "username": "string",
@@ -957,7 +948,7 @@ def api_docs():
                     "rating": "integer (1-10)",
                     "feedback": "string (participant comments)",
                     "time_spent_seconds": "number",
-                    "is_practice": "boolean",
+                    "is_survey": "boolean",
                     "is_attention": "boolean",
                     "attention_passed": "boolean",
                     "too_fast_flag": "boolean",
@@ -1117,13 +1108,6 @@ def security_audit():
             ]
         }
     })
-
-
-# Registration endpoint removed - using default credentials
-
-
-# Email verification endpoints removed
-
 
 @app.route("/api/admin/login", methods=["POST"])
 @limiter.limit("10 per minute")
