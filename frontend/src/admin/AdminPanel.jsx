@@ -203,7 +203,7 @@ export default function AdminPanel() {
     return sessionStorage.getItem("adminActiveTab") || "dashboard";
   });
   
-  // Data explorer state
+  // Data analysis state
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState("timestamp");
   const [sortDirection, setSortDirection] = useState("desc");
@@ -490,7 +490,7 @@ export default function AdminPanel() {
   // Get column headers for table (excluding certain fields)
   const getTableHeaders = () => {
     if (csvData.length === 0) return [];
-    const excludedFields = ['username', 'gender', 'place', 'native_language', 'rating', 'is_practice', 'is_attention', 'attention_passed'];
+    const excludedFields = ['username', 'gender', 'place', 'native_language', 'rating', 'is_survey', 'is_attention', 'attention_passed'];
     return Object.keys(csvData[0]).filter(key => !excludedFields.includes(key));
   };
   
@@ -540,19 +540,16 @@ export default function AdminPanel() {
               Back to Home
             </button>
           </div>
-          <div className="branding-footer">
-            Created by Gaurav Kaloliya
+          <div className="branding-footer" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
+              Created by Gaurav Kaloliya
+          </div>
+          <div className="branding-header" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
+            <strong>Gaurav Kaloliya</strong> - Founder of C.O.G.N.I.T. 
           </div>
         </div>
       </div>
     );
   }
-  
-  // Register form removed
-  
-// Verification form removed
-  
-  // Render admin panel
   return (
     <div className="admin-panel" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
       <div className="admin-header">
@@ -577,7 +574,7 @@ export default function AdminPanel() {
           className={activeTab === "data" ? "active" : ""}
           onClick={() => setActiveTab("data")}
         >
-          Data Explorer
+          Data Analysis
         </button>
         <button
           className={activeTab === "settings" ? "active" : ""}
@@ -590,7 +587,19 @@ export default function AdminPanel() {
       <div className="admin-content">
         {activeTab === "dashboard" && (
           <div className="dashboard">
-            <h2>Statistics Overview</h2>
+            <div className="quick-actions">
+              <h2>Statistics Overview</h2>
+              <div className="action-buttons">
+                <button className="primary" onClick={downloadCsv}>Download CSV</button>
+                <button className="ghost refresh-btn" onClick={fetchStats} title="Refresh Stats">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
             {loading ? (
               <div className="loading">Loading statistics...</div>
             ) : stats ? (
@@ -630,7 +639,7 @@ export default function AdminPanel() {
 
             {chartData && stats && stats.total_submissions > 0 ? (
               <div className="charts-section">
-                <h3>Demographic Distribution</h3>
+                <h3>Participant Distribution</h3>
                 <div className="chart-grid">
                   <div className="chart-card">
                     <h4>Top Participants</h4>
@@ -733,26 +742,12 @@ export default function AdminPanel() {
                 <p>No chart data available. Submit some responses to see visualizations.</p>
               </div>
             )}
-
-            <div className="quick-actions">
-              <h3>Quick Actions</h3>
-              <div className="action-buttons">
-                <button className="primary" onClick={downloadCsv}>Download CSV</button>
-                <button className="ghost refresh-btn" onClick={fetchStats} title="Refresh Stats">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
           </div>
         )}
 
         {activeTab === "data" && (
-          <div className="data-explorer">
-            <h2>Data Explorer</h2>
+          <div className="data-analysis">
+            <h2>Data Analysis</h2>
             
             <div className="data-controls">
               <div className="search-box">
@@ -876,13 +871,12 @@ export default function AdminPanel() {
             }}
           />
         )}
-
       </div>
-      <div className="branding-footer" style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
-        Created by Gaurav Kaloliya
+      <div className="branding-footer" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
+          Created by Gaurav Kaloliya
       </div>
       <div className="branding-header" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
-        <strong>Gaurav Kaloliya</strong> - Innovating Cognitive Research Tools
+        <strong>Gaurav Kaloliya</strong> - Founder of C.O.G.N.I.T. 
       </div>
     </div>
   );

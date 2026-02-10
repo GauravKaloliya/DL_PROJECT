@@ -144,13 +144,13 @@ export default function App() {
   const [comments, setComments] = useState(getStoredValue("comments", ""));
   const [submitting, setSubmitting] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [practiceCompleted, setPracticeCompleted] = useState(getStoredValue("practiceCompleted", 0));
+  const [surveyCompleted, setSurveyCompleted] = useState(getStoredValue("surveyCompleted", 0));
   const [mainCompleted, setMainCompleted] = useState(getStoredValue("mainCompleted", 0));
   const [attentionRemaining, setAttentionRemaining] = useState(getStoredValue("attentionRemaining", ATTENTION_TARGET));
   const [submissions, setSubmissions] = useState(getStoredValue("submissions", []));
   const [toasts, setToasts] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
-  const [practiceFeedbackReady, setPracticeFeedbackReady] = useState(false);
+  const [surveyFeedbackReady, setSurveyFeedbackReady] = useState(false);
   const [readyForNext, setReadyForNext] = useState(false);
   const [fetchingImage, setFetchingImage] = useState(false);
   const [trialStartTime, setTrialStartTime] = useState(Date.now());
@@ -220,8 +220,8 @@ export default function App() {
   }, [comments]);
 
   useEffect(() => {
-    saveStoredValue("practiceCompleted", practiceCompleted);
-  }, [practiceCompleted]);
+    saveStoredValue("surveyCompleted", surveyCompleted);
+  }, [surveyCompleted]);
 
   useEffect(() => {
     saveStoredValue("mainCompleted", mainCompleted);
@@ -275,7 +275,7 @@ export default function App() {
       setComments("");
       setIsZoomed(false);
       setTrialStartTime(Date.now());
-      setPracticeFeedbackReady(false);
+      setSurveyFeedbackReady(false);
       setReadyForNext(false);
     } catch (error) {
       addToast(error.message || "Failed to load image", "error");
@@ -284,9 +284,9 @@ export default function App() {
     }
   }, [addToast, sessionId]);
 
-  const startPractice = async () => {
-    setStage("practice");
-    await fetchImage("practice");
+  const startSurvey = async () => {
+    setStage("survey");
+    await fetchImage("survey");
   };
 
   const startMain = async () => {
@@ -334,7 +334,7 @@ export default function App() {
       addToast("Please fill in all required fields correctly 💕", "error");
       return;
     }
-    startPractice();
+    startSurvey();
   };
 
   const handleSubmit = async () => {
@@ -364,7 +364,7 @@ export default function App() {
       feedback: comments,
       time_spent_seconds: timeSpentSeconds,
       word_count: wordCount,
-      is_practice: trial.is_practice,
+      is_survey: trial.is_survey,
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
       username: demographics.username,
@@ -396,9 +396,9 @@ export default function App() {
       setTimeout(() => setShowConfetti(false), 1200);
       setSubmissions((prev) => [...prev, { ...payload, attention_passed: result.attention_passed }]);
 
-      if (trial.is_practice) {
-        setPracticeCompleted((prev) => prev + 1);
-        setPracticeFeedbackReady(true);
+      if (trial.is_survey) {
+        setSurveyCompleted((prev) => prev + 1);
+        setSurveyFeedbackReady(true);
       } else {
         setMainCompleted((prev) => prev + 1);
         if (trial.is_attention) {
@@ -423,8 +423,8 @@ export default function App() {
   const handleNext = async () => {
     clearNextTimeout();
     setReadyForNext(false);
-    if (stage === "practice") {
-      await fetchImage("practice");
+    if (stage === "survey") {
+      await fetchImage("survey");
       return;
     }
     if (mainCompleted >= MAIN_TARGET) {
@@ -502,13 +502,13 @@ export default function App() {
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Research Study Consent Form</h2>
+            <h2>Research Consent Form</h2>
             <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
-              <strong>C.O.G.N.I.T. Study: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
+              <strong>C.O.G.N.I.T.: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
             </p>
             
             <div className="welcome-info">
-              <h3>Purpose of the Study</h3>
+              <h3>Purpose of the Research</h3>
               <p>
                 This research aims to understand how individuals perceive, interpret, and describe visual content. 
                 Your participation will contribute to advancing knowledge in cognitive science, computer vision, 
@@ -521,14 +521,14 @@ export default function App() {
                 <li>View a series of images presented on your screen</li>
                 <li>Provide detailed written descriptions of each image (minimum 30 words)</li>
                 <li>Rate each image on a scale of 1-10 based on visual complexity</li>
-                <li>Complete a brief practice session before the main study</li>
+                <li>Complete a brief survey session before the main research</li>
                 <li>Share any additional observations or comments about the images</li>
               </ul>
               
               <h3>Time and Duration</h3>
               <p>
-                The study takes approximately 15-20 minutes to complete. You may take breaks between images as needed. 
-                You have the option to exit the study at any point without penalty. Your progress is automatically saved.
+                The survey takes approximately 15-20 minutes to complete. You may take breaks between images as needed. 
+                You have the option to exit the survey at any point without penalty. Your progress is automatically saved.
               </p>
               
               <h3>Benefits and Risks</h3>
@@ -536,35 +536,28 @@ export default function App() {
                 <strong>Benefits:</strong> You will contribute to scientific research that may lead to better 
                 image understanding technologies and accessibility tools. There is no monetary compensation for participation.
               </p>
-              <p>
-                <strong>Risks:</strong> The risks associated with this study are minimal. Some images may contain 
-                mildly complex visual scenes. If you feel uncomfortable at any time, you may stop immediately.
-              </p>
               
               <h3>Data Privacy and Confidentiality</h3>
               <ul>
                 <li>All responses are collected anonymously and stored securely</li>
                 <li>No personally identifiable information will be published or shared</li>
-                <li>Your IP address is hashed and cannot be traced back to you</li>
                 <li>Data will be used solely for academic research purposes</li>
                 <li>Aggregated results may be published in research papers or presented at conferences</li>
               </ul>
               
               <h3>Your Rights</h3>
               <p>
-                Participation in this study is entirely voluntary. You have the right to:
+                Participation in this survey is entirely voluntary. You have the right to:
               </p>
               <ul>
                 <li>Decline to participate without any consequences</li>
-                <li>Withdraw from the study at any time without penalty</li>
-                <li>Skip any question you do not wish to answer</li>
-                <li>Request deletion of your data (contact the research team)</li>
-              </ul>
+                <li>Withdraw from the survey at any time without penalty</li>
+                </ul>
               
               <h3>Contact Information</h3>
               <p>
-                If you have any questions about this study, please contact the research team at 
-                <strong>research@cognit-study.org</strong>. For questions about your rights as a research participant, 
+                If you have any questions about this survey, please contact the research team at 
+                <strong> research@cognit.org</strong>. For questions about your rights as a research participant, 
                 contact the Institutional Review Board.
               </p>
               
@@ -575,8 +568,8 @@ export default function App() {
               <ul>
                 <li>You are at least 18 years of age</li>
                 <li>You have read and understood this consent form</li>
-                <li>You agree to participate in this research study voluntarily</li>
-                <li>You understand that your responses will be collected anonymously</li>
+                <li>You agree to participate in this research survey voluntarily</li>
+                <li>You understand that your responses will be collected</li>
               </ul>
             </div>
             
@@ -586,7 +579,7 @@ export default function App() {
                 <label>Username</label>
                 <input
                   type="text"
-                  placeholder="Enter your preferred username"
+                  placeholder="Enter your username"
                   value={demographics.username}
                   onChange={(event) => {
                     setDemographics((prev) => ({ ...prev, username: event.target.value }));
@@ -638,7 +631,7 @@ export default function App() {
                 <label>Place/Location</label>
                 <input
                   type="text"
-                  placeholder="e.g., New York, USA"
+                  placeholder="e.g., India"
                   value={demographics.place}
                   onChange={(event) => {
                     setDemographics((prev) => ({ ...prev, place: event.target.value }));
@@ -665,7 +658,7 @@ export default function App() {
                   <option value="French">French</option>
                   <option value="German">German</option>
                   <option value="Chinese">Chinese</option>
-                  <option value="Japanese">Japanese</option>
+                  <option value="Japanese">Hindi</option>
                   <option value="Korean">Korean</option>
                   <option value="Portuguese">Portuguese</option>
                   <option value="Italian">Italian</option>
@@ -686,7 +679,6 @@ export default function App() {
                   className={formErrors.experience ? 'error-input' : ''}
                 >
                   <option value="">Select prior experience</option>
-                  <option value="None">None</option>
                   <option value="Photography">Photography</option>
                   <option value="Art/Design">Art/Design</option>
                   <option value="Computer Vision">Computer Vision</option>
@@ -713,10 +705,10 @@ export default function App() {
                 id="consent-check"
               />
               <label htmlFor="consent-check">
-                <strong>I consent to participate in this research study</strong>
+                <strong>I consent to participate in this research survey</strong>
                 <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
                   I confirm that I am 18 years or older, I have read and understood the consent form, 
-                  and I agree to participate voluntarily. I understand my responses will be collected anonymously 
+                  and I agree to participate voluntarily. I understand my responses will be collected 
                   and used for research purposes only.
                 </p>
               </label>
@@ -725,23 +717,23 @@ export default function App() {
             
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
               <button className="primary" onClick={handleConsentStart}>
-                Start Study
+                Start Survey
               </button>
             </div>
           </div>
         )}
 
-        {stage === "practice" && trial && (
+        {stage === "survey" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>Practice Session 🎯</span>
+              <span>Survey Session</span>
             </div>
-            {practiceFeedbackReady ? (
+            {surveyFeedbackReady ? (
               <div className="guidance">
-                <h2>Practice Complete! 🎉</h2>
+                <h2>Survey Complete! 🎉</h2>
                 <p>
-                  Great job on your practice trial! You can now choose to continue with more practice 
-                  images or proceed to the main study.
+                  Great job on your survey trial! You can now choose to continue with more survey 
+                  images or finish the session.
                 </p>
                 <p style={{ color: 'var(--muted)', margin: '16px 0' }}>
                   <em>Tip: Aim to describe colors, textures, relationships, and any notable objects. 
@@ -749,10 +741,7 @@ export default function App() {
                 </p>
                 <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
                   <button className="ghost" onClick={handleNext}>
-                    Continue Practice 💕
-                  </button>
-                  <button className="primary" onClick={startMain}>
-                    Start Main Study ➡️
+                    Continue Survey
                   </button>
                 </div>
               </div>
@@ -786,22 +775,9 @@ export default function App() {
         {stage === "trial" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>
-                Progress {Math.min(mainCompleted + 1, MAIN_TARGET)} / {MAIN_TARGET} 💗
-              </span>
               <button className="ghost" onClick={handleFinishEarly}>
-                Finish / Stop 💕
+                Finish
               </button>
-            </div>
-            <div className="progress-bar">
-              {Array.from({ length: MAIN_TARGET }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`progress-heart ${i < mainCompleted ? "filled" : ""}`}
-                >
-                  💗
-                </span>
-              ))}
             </div>
             <TrialForm
               trial={trial}
@@ -830,15 +806,15 @@ export default function App() {
 
         {stage === "finished" && (
           <div className="panel">
-            <h2>Thank you for completing C.O.G.N.I.T.! 🌸</h2>
+            <h2>Thank you for completing C.O.G.N.I.T. survey</h2>
             <p>
-              You have completed {mainCompleted} main trials and {practiceCompleted} practice trials! 🎉
+              You have completed {mainCompleted} main trials and {surveyCompleted} survey trials! 🎉
               Your responses have been recorded. If you would like a copy of your data, download it
-              below 💕
+              below
             </p>
             <p className="debrief">
               Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
-              examines how people describe visual scenes. Your anonymous responses
+              examines how people describe visual scenes. Your responses
               will help improve language understanding models ✨
             </p>
             <button className="primary" onClick={downloadData} disabled={submissions.length === 0}>
@@ -850,7 +826,7 @@ export default function App() {
           Created by Gaurav Kaloliya
         </div>
         <div className="branding-header" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
-          <strong>Gaurav Kaloliya</strong> - Innovating Cognitive Research Tools
+          <strong>Gaurav Kaloliya</strong> - Founder of C.O.G.N.I.T. 
         </div>
       </div>
       <Confetti show={showConfetti} />
@@ -907,7 +883,7 @@ function TrialForm({
         </button>
       </div>
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
-        <img src={imageSrc} alt="Study prompt" onClick={onToggleZoom} />
+        <img src={imageSrc} alt="Prompt" onClick={onToggleZoom} />
         <button className="zoom-toggle" onClick={onToggleZoom}>
           {isZoomed ? "Reset zoom 🔍" : "Zoom 🔍"}
         </button>
@@ -915,7 +891,7 @@ function TrialForm({
       <div className="meta">
         <span className="timer">Time: {elapsed}s ⏱️</span>
         {trial.is_attention && <span className="tag attention">Attention check 💝</span>}
-        {trial.is_practice && <span className="tag practice">Practice 🎯</span>}
+        {trial.is_survey && <span className="tag survey">Survey 🎯</span>}
       </div>
       <label className="field">
         Description 📝
@@ -974,16 +950,16 @@ function TrialForm({
           onClick={onSubmit}
           disabled={submitting || wordCount < minWords || fetchingImage || rating === 0 || !commentsValid}
         >
-          {submitting ? "Submitting... 🌸" : "Submit! 💗"}
+          {submitting ? "Submitting... 🌸" : "Submit"}
         </button>
         {showNext && (
           <button className="ghost" onClick={onNext}>
-            Next ➡️
+            Next
           </button>
         )}
       </div>
       {showFinish && (
-        <p className="hint">You can stop at any time using the Finish / Stop button above 💕</p>
+        <p className="hint">You can stop at any time using the Finish button above 💕</p>
       )}
     </div>
   );
