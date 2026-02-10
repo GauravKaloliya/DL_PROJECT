@@ -108,11 +108,11 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine);
   const [stage, setStage] = useState("consent");
   const [consentChecked, setConsentChecked] = useState(false);
-  const [demographics, setDemographics] = useState(
-    getStoredValue("demographics", {
-      ageGroup: "",
-      language: "",
-      experience: ""
+  const [userData, setUserData] = useState(
+    getStoredValue("userData", {
+      name: "",
+      email: "",
+      phone: ""
     })
   );
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
@@ -159,8 +159,8 @@ export default function App() {
   }, [participantId, sessionId]);
 
   useEffect(() => {
-    saveStoredValue("demographics", demographics);
-  }, [demographics]);
+    saveStoredValue("userData", userData);
+  }, [userData]);
 
   useEffect(() => {
     saveStoredValue("darkMode", darkMode);
@@ -248,10 +248,25 @@ export default function App() {
 
   const handleConsentStart = () => {
     if (!consentChecked) return;
-    if (!demographics.ageGroup || !demographics.language.trim() || !demographics.experience.trim()) {
-      addToast("Please fill in all required demographic fields 💕", "error");
+    if (!userData.name.trim() || !userData.email.trim() || !userData.phone.trim()) {
+      addToast("Please fill in all required contact information 💕", "error");
       return;
     }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(userData.email)) {
+      addToast("Please enter a valid email address ✨", "error");
+      return;
+    }
+    
+    // Phone validation (basic)
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    if (!phoneRegex.test(userData.phone.replace(/[\s\-\(\)]/g, ''))) {
+      addToast("Please enter a valid phone number 📱", "error");
+      return;
+    }
+    
     startPractice();
   };
 
@@ -289,9 +304,9 @@ export default function App() {
       is_practice: trial.is_practice,
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
-      age_group: demographics.ageGroup,
-      native_language: demographics.language,
-      prior_experience: demographics.experience,
+      user_name: userData.name,
+      user_email: userData.email,
+      user_phone: userData.phone,
       nasa_mental: nasaRatings.mental,
       nasa_physical: nasaRatings.physical,
       nasa_temporal: nasaRatings.temporal,
@@ -394,6 +409,9 @@ export default function App() {
             <button className="ghost" onClick={() => navigate("/admin")}>
               Admin 🛠️
             </button>
+            <button className="ghost" onClick={() => navigate("/api/docs")}>
+              API Docs 📖
+            </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
               {online ? "Online ✨" : "Offline 💕"}
             </div>
@@ -429,40 +447,35 @@ export default function App() {
             </div>
             <div className="form-grid">
               <div>
-                <label>Age group (required) 🎂</label>
-                <select
-                  value={demographics.ageGroup}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, ageGroup: event.target.value }))
-                  }
-                >
-                  <option value="">Select age group</option>
-                  <option value="18-24">18-24</option>
-                  <option value="25-34">25-34</option>
-                  <option value="35-44">35-44</option>
-                  <option value="45-54">45-54</option>
-                  <option value="55+">55+</option>
-                </select>
-              </div>
-              <div>
-                <label>Native language (required) 🌍</label>
+                <label>Name (required) 👤</label>
                 <input
                   type="text"
-                  placeholder="e.g., English"
-                  value={demographics.language}
+                  placeholder="Enter your full name"
+                  value={userData.name}
                   onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, language: event.target.value }))
+                    setUserData((prev) => ({ ...prev, name: event.target.value }))
                   }
                 />
               </div>
               <div>
-                <label>Prior experience (required) 📸</label>
+                <label>Email (required) 📧</label>
                 <input
-                  type="text"
-                  placeholder="e.g., photography, art"
-                  value={demographics.experience}
+                  type="email"
+                  placeholder="Enter your email address"
+                  value={userData.email}
                   onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, experience: event.target.value }))
+                    setUserData((prev) => ({ ...prev, email: event.target.value }))
+                  }
+                />
+              </div>
+              <div>
+                <label>Phone number (required) 📱</label>
+                <input
+                  type="tel"
+                  placeholder="Enter your phone number"
+                  value={userData.phone}
+                  onChange={(event) =>
+                    setUserData((prev) => ({ ...prev, phone: event.target.value }))
                   }
                 />
               </div>
@@ -700,19 +713,26 @@ function TrialForm({
         />
       </label>
 
-      {/* NASA-TLX Rating Scale */}
-      <div className="nasa-tlx">
-        <h3>Task Experience {allNasaRated ? "✅" : "(required)"} 🌟</h3>
-        <p className="nasa-tlx-description">
-          Please rate your experience with this task on a scale of 1-5 💕
-        </p>
+      {/* NASA-TLX Rating Scale - Enhanced */}
+      <div className="nasa-tlx enhanced">
+        <div className="nasa-header">
+          <h3>Please rate your experience with this task on a scale of 1-5 💕</h3>
+          <p className="nasa-tlx-subtitle">
+            Rate each dimension based on how you felt during this task
+          </p>
+        </div>
         {nasaDimensions.map((dimension) => (
-          <div key={dimension.key} className="nasa-item">
-            <label>{dimension.label}</label>
+          <div key={dimension.key} className="nasa-item enhanced">
+            <div className="nasa-item-header">
+              <label className="nasa-dimension-label">{dimension.label}</label>
+              <span className="nasa-value-display">
+                {nasaRatings[dimension.key] > 0 ? `${nasaRatings[dimension.key]}/5` : "Not rated"}
+              </span>
+            </div>
             <p className="nasa-desc">{dimension.description}</p>
-            <div className="rating-scale">
+            <div className="rating-scale enhanced">
               {[1, 2, 3, 4, 5].map((val) => (
-                <label key={val} className="rating-option">
+                <label key={val} className="rating-option enhanced">
                   <input
                     type="radio"
                     name={dimension.key}
@@ -725,11 +745,11 @@ function TrialForm({
                       })
                     }
                   />
-                  <span className="rating-label">{val}</span>
+                  <span className="rating-label enhanced">{val}</span>
                 </label>
               ))}
             </div>
-            <div className="rating-labels">
+            <div className="rating-labels enhanced">
               <span>Low</span>
               <span>High</span>
             </div>
