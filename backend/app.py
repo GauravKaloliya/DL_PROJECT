@@ -152,6 +152,9 @@ def init_db():
     # Run migrations to add missing columns if they don't exist
     _migrate_admin_users_table(cursor)
     
+    # Create default admin user if it doesn't exist
+    _create_default_admin_user(cursor)
+    
     conn.commit()
     conn.close()
 
@@ -177,6 +180,37 @@ def _migrate_admin_users_table(cursor):
             except sqlite3.OperationalError:
                 # Column might already exist or there's another issue
                 pass
+
+
+def _create_default_admin_user(cursor):
+    """Create default admin user if it doesn't exist"""
+    # Check if default user already exists
+    cursor.execute("SELECT id FROM admin_users WHERE username = ?", ("Gaurav",))
+    if cursor.fetchone():
+        return  # User already exists
+    
+    # Create default admin user
+    default_api_key = "$2a$10$9mF8ySltm8uFbamU/d4xXeQXIVt2h9G9voD1ayzSnFhESk.z1dviG"
+    default_password_hash = hash_password("default_password")  # This won't be used since we authenticate via API key
+    
+    cursor.execute(
+        """INSERT INTO admin_users 
+           (username, password_hash, email, api_key, email_verified, is_active) 
+           VALUES (?, ?, ?, ?, 1, 1)""",
+        ("Gaurav", default_password_hash, "gaurav@admin.com", default_api_key)
+    )
+    
+    # Log the creation
+    cursor.execute(
+        "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+        (cursor.lastrowid, 'system_create', 'Default admin user created', 'system')
+    )
+    
+    # Also ensure the API key is set correctly if user exists but has wrong API key
+    cursor.execute("SELECT id, api_key FROM admin_users WHERE username = ?", ("Gaurav",))
+    user = cursor.fetchone()
+    if user and user[1] != default_api_key:
+        cursor.execute("UPDATE admin_users SET api_key = ? WHERE username = ?", (default_api_key, "Gaurav"))
 
 
 def generate_api_key():
@@ -1051,66 +1085,7 @@ def security_audit():
     })
 
 
-@app.route("/api/admin/register", methods=["POST"])
-@limiter.limit("5 per hour")
-def admin_register():
-    """Admin registration endpoint with API key generation"""
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    email = data.get("email", "").strip()
-    password = data.get("password", "")
-    
-    # Validation
-    if not username or len(username) < 3:
-        return jsonify({"error": "Username must be at least 3 characters"}), 400
-    if not email or "@" not in email:
-        return jsonify({"error": "Valid email is required"}), 400
-    if not password or len(password) < 8:
-        return jsonify({"error": "Password must be at least 8 characters"}), 400
-    
-    # Generate API key
-    api_key = generate_api_key()
-    password_hash = hash_password(password)
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        # Check if username or email already exists
-        cursor.execute("SELECT id FROM admin_users WHERE username = ? OR email = ?", (username, email))
-        if cursor.fetchone():
-            return jsonify({"error": "Username or email already exists"}), 409
-        
-        # Insert new user (email_verified = 1 by default)
-        cursor.execute(
-            """INSERT INTO admin_users 
-               (username, password_hash, email, api_key, email_verified, is_active) 
-               VALUES (?, ?, ?, ?, 1, 1)""",
-            (username, password_hash, email, api_key)
-        )
-        
-        user_id = cursor.lastrowid
-        
-        # Log registration
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (user_id, 'register', 'User registered', ip_address)
-        )
-        
-        conn.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Registration successful. You can now login.",
-            "username": username,
-            "api_key": api_key
-        })
-        
-    except sqlite3.IntegrityError:
-        return jsonify({"error": "Username or email already exists"}), 409
-    finally:
-        conn.close()
+# Registration endpoint removed - using default credentials
 
 
 # Email verification endpoints removed
