@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const MIN_WORDS = 30;
@@ -133,6 +134,8 @@ export default function App() {
   const [fetchingImage, setFetchingImage] = useState(false);
   const [trialStartTime, setTrialStartTime] = useState(Date.now());
   const nextTimeout = useRef(null);
+  
+  const navigate = useNavigate();
 
   // NASA-TLX ratings (1-5 scale, 0 = not rated)
   const [nasaRatings, setNasaRatings] = useState({
@@ -384,6 +387,9 @@ export default function App() {
           <div className="header-actions">
             <button className="ghost" onClick={() => setDarkMode((prev) => !prev)}>
               {darkMode ? "Light mode ☀️" : "Dark mode 🌙"}
+            </button>
+            <button className="ghost" onClick={() => navigate("/admin")}>
+              Admin 🛠️
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
               {online ? "Online ✨" : "Offline 💕"}
