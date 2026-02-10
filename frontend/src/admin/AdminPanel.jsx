@@ -425,7 +425,7 @@ export default function AdminPanel() {
   };
   
   // Render login form
-  if (!isAuthenticated && authMode === "login") {
+  if (!isAuthenticated) {
     return (
       <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
         <div className="login-panel">
@@ -494,6 +494,9 @@ export default function AdminPanel() {
             <button className="ghost" onClick={() => navigate('/')}>
               Back to Home
             </button>
+          </div>
+          <div className="branding-footer">
+            Created by Gaurav Kaloliya
           </div>
         </div>
       </div>
@@ -794,6 +797,9 @@ export default function AdminPanel() {
           </div>
         )}
 
+      </div>
+      <div className="branding-footer" style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
+        Created by Gaurav Kaloliya
       </div>
     </div>
   );

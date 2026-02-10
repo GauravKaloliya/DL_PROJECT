@@ -690,6 +690,7 @@ export default function App() {
                 showNext={false}
                 onNext={handleNext}
                 showFinish={false}
+                onBack={() => setStage("consent")}
               />
             )}
           </div>
@@ -735,6 +736,7 @@ export default function App() {
               showNext={readyForNext}
               onNext={handleNext}
               showFinish={true}
+              onBack={() => setStage("consent")}
             />
           </div>
         )}
@@ -757,6 +759,9 @@ export default function App() {
             </button>
           </div>
         )}
+        <div className="branding-footer" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
+          Created by Gaurav Kaloliya
+        </div>
       </div>
       <Confetti show={showConfetti} />
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />
@@ -783,7 +788,8 @@ function TrialForm({
   fetchingImage,
   showNext,
   onNext,
-  showFinish
+  showFinish,
+  onBack
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -802,6 +808,14 @@ function TrialForm({
   return (
     <div className="trial">
       {instruction && <div className="banner info">{instruction.text}</div>}
+      <div className="back-button-container">
+        <button className="ghost back-button" onClick={onBack} title="Back to Consent">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          </svg>
+          Back
+        </button>
+      </div>
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
         <img src={imageSrc} alt="Study prompt" onClick={onToggleZoom} />
         <button className="zoom-toggle" onClick={onToggleZoom}>

@@ -213,6 +213,9 @@ fetch('${API_BASE}/api/images/random?type=normal', {
             </pre>
           </div>
         </div>
+        <div style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
+          Created by Gaurav Kaloliya
+        </div>
       </div>
     </div>
   );

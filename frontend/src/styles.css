@@ -474,6 +474,20 @@ textarea {
   gap: 18px;
 }
 
+.back-button-container {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 12px;
+}
+
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  font-size: 14px;
+}
+
 .image-container {
   position: relative;
   border-radius: 24px;
@@ -1014,6 +1028,14 @@ body.dark .error-message {
   color: var(--muted);
   margin-bottom: 12px;
   font-size: 14px;
+}
+
+.branding-footer {
+  text-align: center;
+  margin-top: 20px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .user-info {
