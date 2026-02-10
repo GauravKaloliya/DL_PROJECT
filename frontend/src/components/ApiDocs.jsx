@@ -143,7 +143,7 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><strong>Image Management:</strong> Fetch random images for the study by type (normal, practice, attention)</li>
+              <li><strong>Image Management:</strong> Fetch random images for the study by type (normal, survey, attention)</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions and ratings</li>
               <li><strong>Demographic Collection:</strong> Capture participant information including username, age, gender, and language</li>
               <li><strong>Admin Dashboard:</strong> Access statistics, export data, and manage the platform</li>
@@ -232,12 +232,12 @@ export default function ApiDocs() {
               path="/api/images/random"
               description="Retrieve a random image for the study"
               parameters={[
-                { name: 'type', type: 'string', required: false, description: 'Image type: normal, practice, or attention', default: 'normal' }
+                { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
               ]}
               response={{
                 "image_id": "normal/image1.jpg",
                 "image_url": "/api/images/normal/image1.jpg",
-                "is_practice": false,
+                "is_survey": false,
                 "is_attention": false
               }}
             />
@@ -255,7 +255,7 @@ export default function ApiDocs() {
                 "rating": "integer (required, 1-10)",
                 "feedback": "string (required, min 5 chars)",
                 "time_spent_seconds": "number (required)",
-                "is_practice": "boolean (required)",
+                "is_survey": "boolean (required)",
                 "is_attention": "boolean (required)",
                 "attention_expected": "string (for attention checks)",
                 "username": "string",
@@ -347,7 +347,7 @@ const submission = {
   rating: 8,
   feedback: 'Interesting image',
   time_spent_seconds: 45,
-  is_practice: false,
+  is_survey: false,
   is_attention: false,
   username: 'john_doe',
   gender: 'male',
@@ -383,7 +383,7 @@ submission = {
     'rating': 8,
     'feedback': 'Interesting image',
     'time_spent_seconds': 45,
-    'is_practice': False,
+    'is_survey': False,
     'is_attention': False,
     'username': 'john_doe',
     'gender': 'male',
@@ -415,7 +415,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
     "rating": 8,
     "feedback": "Great image",
     "time_spent_seconds": 45,
-    "is_practice": false,
+    "is_survey": false,
     "is_attention": false,
     "username": "john_doe"
   }'

@@ -340,15 +340,13 @@ def list_images(image_type: str):
     ]
 
 
-def build_image_payload(image_path: Path, image_type: str, is_practice: bool = False):
+def build_image_payload(image_path: Path, image_type: str):
     image_id = f"{image_type}/{image_path.name}"
     image_url = f"/api/images/{image_id}"
-    practice_flag = is_practice or image_type == "survey"
     return {
         "image_id": image_id,
         "image_url": image_url,
-        "is_survey": practice_flag,
-        "is_practice": practice_flag,
+        "is_survey": image_type == "survey",
         "is_attention": image_type == "attention",
     }
 
@@ -469,16 +467,15 @@ def validate_session(session_token):
 @app.route("/api/images/random")
 def random_image():
     requested_type = request.args.get("type", "normal")
-    if requested_type not in {"normal", "survey", "attention", "practice"}:
+    if requested_type not in {"normal", "survey", "attention"}:
         return jsonify({"error": "Invalid type"}), 400
 
-    image_type = "survey" if requested_type == "practice" else requested_type
-    images = list_images(image_type)
+    images = list_images(requested_type)
     if not images:
-        return jsonify({"error": f"No images available for {image_type}"}), 404
+        return jsonify({"error": f"No images available for {requested_type}"}), 404
 
     image_path = random.choice(images)
-    payload = build_image_payload(image_path, image_type, is_practice=requested_type == "practice")
+    payload = build_image_payload(image_path, requested_type)
     return jsonify(payload)
 
 
@@ -519,7 +516,7 @@ def submit():
     if len(feedback) < 5:
         return jsonify({"error": "comments must be at least 5 characters"}), 400
 
-    is_survey = bool(payload.get("is_survey")) or bool(payload.get("is_practice"))
+    is_survey = bool(payload.get("is_survey"))
     is_attention = bool(payload.get("is_attention"))
 
     attention_expected = (payload.get("attention_expected") or "").strip().lower()
@@ -704,13 +701,12 @@ def api_docs():
                         "method": "GET",
                         "description": "Get a random image for the study",
                         "parameters": [
-                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, survey, practice, attention)", "default": "normal"}
+                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, survey, attention)", "default": "normal"}
                         ],
                         "response": {
                             "image_id": "string",
                             "image_url": "string",
                             "is_survey": "boolean",
-                            "is_practice": "boolean",
                             "is_attention": "boolean"
                         }
                     },
@@ -733,7 +729,6 @@ def api_docs():
                             "feedback": "string (required, min 5 chars)",
                             "time_spent_seconds": "number (required)",
                             "is_survey": "boolean (required)",
-                            "is_practice": "boolean (optional)",
                             "is_attention": "boolean (required)",
                             "attention_expected": "string",
                             "username": "string",

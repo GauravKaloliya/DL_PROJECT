@@ -10,7 +10,7 @@ This project contains a React + Vite frontend and a Flask backend that serve an 
 
 - `frontend/`: React + Vite application
 - `backend/`: Flask API and CSV storage
-- `backend/images/`: Local images grouped into `normal/`, `practice/`, and `attention/`
+- `backend/images/`: Local images grouped into `normal/`, `survey/`, and `attention/`
 
 ## Backend Setup
 
@@ -70,7 +70,7 @@ The frontend runs on `http://localhost:5173` and proxies API requests to the bac
 Place images inside the following folders:
 
 - `backend/images/normal/`
-- `backend/images/practice/`
+- `backend/images/survey/`
 - `backend/images/attention/`
 
 Sample SVGs are included to get you started.
