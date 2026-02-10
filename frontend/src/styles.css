@@ -170,6 +170,63 @@ body.dark .banner.info {
   margin: 20px 0;
 }
 
+/* Consent Form Grid - 3 columns on desktop */
+.consent-form-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  margin: 20px 0;
+}
+
+@media (max-width: 900px) {
+  .consent-form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .consent-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-field label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.form-field.error label {
+  color: #c9444a;
+}
+
+.error-input {
+  border-color: #c9444a !important;
+  background-color: rgba(201, 68, 74, 0.05) !important;
+}
+
+.error-text {
+  color: #c9444a;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.consent-error {
+  margin-top: 8px;
+  display: block;
+}
+
+.consent-checkbox.error {
+  border-color: #c9444a;
+  background: rgba(201, 68, 74, 0.05);
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -640,55 +697,6 @@ body.dark .toast.warning {
   100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
 }
 
-/* NASA-TLX Rating Scale Styles */
-.nasa-tlx {
-  background: rgba(24, 119, 242, 0.05);
-  border-radius: 16px;
-  padding: 20px;
-  margin: 20px 0;
-  border: 2px solid var(--border);
-  transition: background 0.3s ease, border-color 0.3s ease;
-}
-
-.nasa-tlx h3 {
-  margin: 0 0 16px 0;
-  color: var(--primary);
-  font-size: 18px;
-}
-
-.nasa-tlx-description {
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 20px;
-}
-
-.nasa-item {
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.nasa-item:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
-}
-
-.nasa-item label {
-  display: block;
-  font-weight: 700;
-  margin-bottom: 6px;
-  color: var(--text);
-  font-size: 15px;
-}
-
-.nasa-desc {
-  font-size: 13px;
-  color: var(--muted);
-  font-weight: 400;
-  margin-bottom: 12px;
-  font-style: italic;
-}
-
 /* Rating Scale */
 .rating-scale {
   display: flex;
@@ -1046,6 +1054,42 @@ body.dark .error-message {
   min-width: 300px;
 }
 
+.filters-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: rgba(24, 119, 242, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.filters-section h4 {
+  margin: 0 0 16px 0;
+  color: var(--primary);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.filter-group select,
+.filter-group input {
+  width: 100%;
+}
+
 .data-table-container {
   overflow-x: auto;
   margin-top: 20px;
@@ -1318,6 +1362,63 @@ body.dark .reset-confirm {
   padding: 40px;
   color: var(--muted);
   font-style: italic;
+}
+
+/* Chart Styles */
+.charts-section {
+  margin-top: 32px;
+}
+
+.charts-section h3 {
+  color: var(--primary);
+  margin: 24px 0 16px 0;
+  font-size: 20px;
+}
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.chart-card {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+}
+
+.chart-card h4 {
+  color: var(--text);
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  text-align: center;
+}
+
+.no-data-message {
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+  background: rgba(24, 119, 242, 0.05);
+  border-radius: 16px;
+  border: 2px dashed var(--border);
+  margin: 20px 0;
+}
+
+.no-data-message p {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.no-data-message .hint {
+  font-size: 14px;
+  font-style: italic;
+}
+
+.no-data-message button {
+  margin-top: 16px;
 }
 
 /* Navigation Styles */
