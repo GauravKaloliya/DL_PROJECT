@@ -306,6 +306,36 @@ def get_admin_user_by_api_key(api_key):
     return get_user_by_api_key(api_key)
 
 
+def validate_session(session_token):
+    """Validate session token and return user info"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if session exists and is not expired
+        cursor.execute(
+            """SELECT u.id, u.username, u.role, u.is_active 
+               FROM admin_users u 
+               JOIN admin_sessions s ON u.id = s.user_id 
+               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
+            (session_token, datetime.now(timezone.utc).isoformat())
+        )
+        user = cursor.fetchone()
+        
+        if user:
+            user_id, username, role, is_active = user
+            return {
+                "id": user_id,
+                "username": username,
+                "role": role,
+                "is_active": is_active
+            }
+        return None
+        
+    finally:
+        conn.close()
+
+
 def list_images(image_type: str):
     folder = IMAGES_DIR / image_type
     if not folder.exists():
@@ -1344,4 +1374,7 @@ def admin_me():
 if __name__ == "__main__":
     ensure_csv()
     init_db()
-    app.run(debug=True)
+    print("Starting C.O.G.N.I.T. backend server...")
+    print("API Documentation available at: http://localhost:5000/api/docs")
+    print("API available at: http://localhost:5000/api/")
+    app.run(debug=True, host='0.0.0.0', port=5000)
