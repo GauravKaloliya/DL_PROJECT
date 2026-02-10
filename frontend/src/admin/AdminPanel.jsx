@@ -48,21 +48,14 @@ export default function AdminPanel() {
   const location = useLocation();
   
   // Auth state
-  const [authMode, setAuthMode] = useState("login"); // "login", "register"
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [user, setUser] = useState(null);
   
   // Login form state
-  const [loginUsername, setLoginUsername] = useState("");
-  const [loginApiKey, setLoginApiKey] = useState("");
-  
-  // Register form state
-  const [regUsername, setRegUsername] = useState("");
-  const [regEmail, setRegEmail] = useState("");
-  const [regPassword, setRegPassword] = useState("");
-  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  const [loginUsername, setLoginUsername] = useState("Gaurav");
+  const [loginApiKey, setLoginApiKey] = useState("$2a$10$9mF8ySltm8uFbamU/d4xXeQXIVt2h9G9voD1ayzSnFhESk.z1dviG");
   
   // Data state
   const [stats, setStats] = useState(() => {
@@ -280,72 +273,7 @@ export default function AdminPanel() {
     }
   };
   
-  const handleRegister = async (e) => {
-    e.preventDefault();
-    setError(null);
-    
-    // Validation
-    if (!regUsername.trim() || regUsername.length < 3) {
-      setError("Username must be at least 3 characters");
-      return;
-    }
-    if (!regEmail.trim() || !regEmail.includes("@")) {
-      setError("Valid email is required");
-      return;
-    }
-    if (!regPassword || regPassword.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-    if (regPassword !== regConfirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/api/admin/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: regUsername,
-          email: regEmail,
-          password: regPassword
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        // Download API key as JSON file
-        const apiKeyData = {
-          username: data.username,
-          api_key: data.api_key,
-          created_at: new Date().toISOString()
-        };
-        const blob = new Blob([JSON.stringify(apiKeyData, null, 2)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `API_KEY_${data.username}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        
-        setAuthMode("login");
-        addToast("Registration successful! You can now login.", "success");
-      } else {
-        setError(data.error || "Registration failed");
-      }
-    } catch (err) {
-      setError("Failed to register. Please check your connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-// Email verification removed
+// Registration functionality removed
   
   const handleLogout = async () => {
     try {
@@ -563,10 +491,6 @@ export default function AdminPanel() {
           </div>
           
           <div className="auth-switch">
-            <p>Don't have an account?</p>
-            <button className="ghost" onClick={() => { setAuthMode("register"); setError(null); }}>
-              Register
-            </button>
             <button className="ghost" onClick={() => navigate('/')}>
               Back to Home
             </button>
@@ -576,82 +500,7 @@ export default function AdminPanel() {
     );
   }
   
-  // Render register form
-  if (!isAuthenticated && authMode === "register") {
-    return (
-      <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
-        <div className="login-panel">
-          <div className="login-header">
-            <h1>Register Account</h1>
-            <p>Create a new admin account with your own API key</p>
-          </div>
-          
-          {error && <div className="error-message">{error}</div>}
-          
-          <form onSubmit={handleRegister} className="auth-form">
-            <div className="form-group">
-              <label>Username</label>
-              <input
-                type="text"
-                value={regUsername}
-                onChange={(e) => setRegUsername(e.target.value)}
-                placeholder="Choose a username (min 3 chars)"
-                autoFocus
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-              />
-            </div>
-            <div className="form-group">
-              <label>Email</label>
-              <input
-                type="email"
-                value={regEmail}
-                onChange={(e) => setRegEmail(e.target.value)}
-                placeholder="Enter your email"
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-              />
-            </div>
-            <div className="form-group">
-              <label>Password</label>
-              <input
-                type="password"
-                value={regPassword}
-                onChange={(e) => setRegPassword(e.target.value)}
-                placeholder="Create a password (min 8 chars)"
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-              />
-            </div>
-            <div className="form-group">
-              <label>Confirm Password</label>
-              <input
-                type="password"
-                value={regConfirmPassword}
-                onChange={(e) => setRegConfirmPassword(e.target.value)}
-                placeholder="Confirm your password"
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-              />
-            </div>
-            <button type="submit" className="primary" disabled={loading}>
-              {loading ? "Creating Account..." : "Register"}
-            </button>
-          </form>
-          
-          <div className="auth-switch">
-            <p>Already have an account?</p>
-            <button className="ghost" onClick={() => { setAuthMode("login"); setError(null); }}>
-              Login
-            </button>
-            <button className="ghost" onClick={() => navigate('/')}>
-              Back to Home
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Register form removed
   
 // Verification form removed
   

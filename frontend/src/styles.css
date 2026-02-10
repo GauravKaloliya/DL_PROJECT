@@ -1035,6 +1035,12 @@ body.dark .error-message {
   margin-bottom: 24px;
 }
 
+.admin-actions {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+
 .admin-header h1 {
   color: var(--primary);
   margin: 0;
@@ -1208,11 +1214,13 @@ body.dark .error-message {
   background: var(--primary);
   color: white;
   font-weight: 600;
+  min-width: fit-content;
 }
 
 .table-row {
   display: flex;
   border-top: 1px solid var(--border);
+  min-width: fit-content;
 }
 
 .table-row:hover {
@@ -1223,8 +1231,12 @@ body.dark .error-message {
   padding: 12px;
   flex: 1;
   min-width: 150px;
+  max-width: 300px;
   border-right: 1px solid var(--border);
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .table-cell.header {
