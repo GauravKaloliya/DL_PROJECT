@@ -4,7 +4,6 @@ import App from "./App.jsx";
 import AdminPanel from "./admin/AdminPanel.jsx";
 import NotFound from "./components/NotFound.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
-import EmailVerification from "./components/EmailVerification.jsx";
 import ApiDocs from "./components/ApiDocs.jsx";
 
 // Allow copy/paste only in input fields
@@ -61,7 +60,6 @@ function MainApp() {
         <Route path="/" element={<App />} />
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/admin/*" element={<AdminPanel />} />
-        <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/api/docs" element={<ApiDocs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
