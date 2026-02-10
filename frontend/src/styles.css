@@ -499,6 +499,7 @@ textarea {
   align-items: center;
   max-height: 420px;
   transition: all 0.3s ease;
+  min-height: 300px;
 }
 
 .image-container:hover {
@@ -510,11 +511,48 @@ textarea {
   max-height: 420px;
   transition: transform 0.3s ease;
   cursor: zoom-in;
+  position: relative;
+  z-index: 5;
 }
 
 .image-container.zoomed img {
   transform: scale(1.5);
   cursor: zoom-out;
+}
+
+.image-loading {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(24, 119, 242, 0.05);
+  color: var(--primary);
+  font-weight: 600;
+  z-index: 10;
+}
+
+.image-error {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(201, 68, 74, 0.05);
+  color: #c9444a;
+  font-weight: 600;
+  z-index: 10;
+}
+
+body.dark .image-error {
+  background: rgba(201, 68, 74, 0.1);
+  color: #ff8fa3;
 }
 
 .zoom-toggle {

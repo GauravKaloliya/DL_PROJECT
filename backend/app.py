@@ -184,12 +184,12 @@ def _create_default_admin_user(cursor):
         return  # User already exists
     
     # Create default admin user with password-based authentication
-    default_password_hash = hash_password("admin123")
+    default_password_hash = hash_password("Gaurav@0809")
     
     cursor.execute(
         """INSERT INTO admin_users 
            (username, password_hash, email, is_active) 
-           VALUES (?, ?, ?, 1, 1)""",
+           VALUES (?, ?, ?, 1)""",
         ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
     
