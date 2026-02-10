@@ -112,12 +112,7 @@ export default function App() {
     getStoredValue("demographics", {
       ageGroup: "",
       language: "",
-      experience: "",
-      education: "",
-      gender: "",
-      country: "",
-      deviceType: "",
-      screenSize: ""
+      experience: ""
     })
   );
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
@@ -294,6 +289,9 @@ export default function App() {
       is_practice: trial.is_practice,
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
+      age_group: demographics.ageGroup,
+      native_language: demographics.language,
+      prior_experience: demographics.experience,
       nasa_mental: nasaRatings.mental,
       nasa_physical: nasaRatings.physical,
       nasa_temporal: nasaRatings.temporal,
@@ -467,79 +465,6 @@ export default function App() {
                     setDemographics((prev) => ({ ...prev, experience: event.target.value }))
                   }
                 />
-              </div>
-              <div>
-                <label>Education level 🎓</label>
-                <select
-                  value={demographics.education}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, education: event.target.value }))
-                  }
-                >
-                  <option value="">Select education level</option>
-                  <option value="high-school">High School</option>
-                  <option value="bachelor">Bachelor's Degree</option>
-                  <option value="master">Master's Degree</option>
-                  <option value="phd">PhD or higher</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div>
-                <label>Gender 👤</label>
-                <select
-                  value={demographics.gender}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, gender: event.target.value }))
-                  }
-                >
-                  <option value="">Select gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="non-binary">Non-binary</option>
-                  <option value="other">Other</option>
-                  <option value="prefer-not-to-say">Prefer not to say</option>
-                </select>
-              </div>
-              <div>
-                <label>Country of residence 🌎</label>
-                <input
-                  type="text"
-                  placeholder="e.g., United States"
-                  value={demographics.country}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, country: event.target.value }))
-                  }
-                />
-              </div>
-              <div>
-                <label>Device type 📱</label>
-                <select
-                  value={demographics.deviceType}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, deviceType: event.target.value }))
-                  }
-                >
-                  <option value="">Select device type</option>
-                  <option value="desktop">Desktop</option>
-                  <option value="laptop">Laptop</option>
-                  <option value="tablet">Tablet</option>
-                  <option value="mobile">Mobile</option>
-                </select>
-              </div>
-              <div>
-                <label>Screen size 🖥️</label>
-                <select
-                  value={demographics.screenSize}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, screenSize: event.target.value }))
-                  }
-                >
-                  <option value="">Select screen size</option>
-                  <option value="small">Small (&lt;13")</option>
-                  <option value="medium">Medium (13-15")</option>
-                  <option value="large">Large (16-24")</option>
-                  <option value="extra-large">Extra Large (25+")</option>
-                </select>
               </div>
             </div>
             <button className="primary" onClick={handleConsentStart} disabled={!consentChecked}>

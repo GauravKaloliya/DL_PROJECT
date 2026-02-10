@@ -2,7 +2,8 @@ import csv
 import hashlib
 import os
 import random
-from datetime import datetime, timezone
+import sqlite3
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
 from flask import Flask, jsonify, request, send_from_directory, abort
@@ -18,6 +19,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
 CSV_PATH = DATA_DIR / "submissions.csv"
+DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
@@ -41,6 +43,9 @@ CSV_HEADERS = [
     "too_fast_flag",
     "user_agent",
     "ip_hash",
+    "age_group",
+    "native_language",
+    "prior_experience",
     "nasa_mental",
     "nasa_physical",
     "nasa_temporal",
@@ -66,7 +71,7 @@ CORS(app, resources={
 
 # Rate Limiting
 limiter = Limiter(
-    app,
+    app=app,
     key_func=get_remote_address,
     default_limits=["200 per day", "50 per hour"]
 )
@@ -89,6 +94,124 @@ def ensure_csv():
         with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
             writer = csv.writer(file)
             writer.writerow(CSV_HEADERS)
+
+
+def init_db():
+    """Initialize the SQLite database"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    # Create admin users table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin_users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            email TEXT UNIQUE,
+            role TEXT DEFAULT 'admin',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP,
+            is_active BOOLEAN DEFAULT 1
+        )
+    ''')
+    
+    # Create admin sessions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin_sessions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            session_token TEXT UNIQUE NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expires_at TIMESTAMP,
+            ip_address TEXT,
+            user_agent TEXT,
+            FOREIGN KEY (user_id) REFERENCES admin_users (id)
+        )
+    ''')
+    
+    # Create admin audit log table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS admin_audit_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            action TEXT NOT NULL,
+            details TEXT,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ip_address TEXT,
+            FOREIGN KEY (user_id) REFERENCES admin_users (id)
+        )
+    ''')
+    
+    # Insert default admin user if none exists
+    cursor.execute("SELECT COUNT(*) FROM admin_users")
+    if cursor.fetchone()[0] == 0:
+        # Default admin user: username='admin', password='admin123'
+        # Password hash: SHA-256 of 'admin123'
+        default_password_hash = hashlib.sha256('admin123'.encode()).hexdigest()
+        cursor.execute(
+            "INSERT INTO admin_users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
+            ('admin', default_password_hash, 'admin@cognit.local', 'superadmin')
+        )
+    
+    conn.commit()
+    conn.close()
+
+
+def authenticate_admin(api_key_or_username, password=None):
+    """Authenticate admin user"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if it's an API key (legacy support)
+        if password is None:
+            # Legacy API key authentication
+            return api_key_or_username == ADMIN_API_KEY
+        
+        # Username/password authentication
+        cursor.execute(
+            "SELECT id, password_hash, role, is_active FROM admin_users WHERE username = ?",
+            (api_key_or_username,)
+        )
+        user = cursor.fetchone()
+        
+        if user and user[3]:  # Check if user exists and is active
+            user_id, stored_hash, role, is_active = user
+            # Verify password
+            input_hash = hashlib.sha256(password.encode()).hexdigest()
+            if input_hash == stored_hash:
+                # Log successful login
+                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+                cursor.execute(
+                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+                    (user_id, 'login_success', 'User logged in', ip_address)
+                )
+                conn.commit()
+                return True
+        
+        # Log failed login attempt
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (None, 'login_failed', f'Failed login for user: {api_key_or_username}', ip_address)
+        )
+        conn.commit()
+        
+        return False
+        
+    finally:
+        conn.close()
+
+
+def get_admin_user_by_api_key(api_key):
+    """Get admin user by API key (legacy support)"""
+    if api_key == ADMIN_API_KEY:
+        return {
+            'username': 'admin',
+            'role': 'superadmin',
+            'email': 'admin@cognit.local'
+        }
+    return None
 
 
 def list_images(image_type: str):
@@ -161,9 +284,28 @@ def count_words(text: str):
 
 def require_api_key():
     api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
-    if api_key != ADMIN_API_KEY:
-        return False
-    return True
+    
+    # Try legacy API key first
+    if api_key == ADMIN_API_KEY:
+        return True
+    
+    # Try new authentication system
+    return authenticate_admin(api_key)
+
+
+def require_admin_auth():
+    """Check if user is authenticated as admin (supports both API key and session)"""
+    # Check API key
+    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
+    if require_api_key():
+        return True
+    
+    # Check session (future implementation)
+    # session_token = request.cookies.get('admin_session')
+    # if session_token:
+    #     return validate_admin_session(session_token)
+    
+    return False
 
 
 @app.route("/api/images/random")
@@ -271,6 +413,9 @@ def submit():
         "too_fast_flag": too_fast_flag,
         "user_agent": request.headers.get("User-Agent", ""),
         "ip_hash": get_ip_hash(),
+        "age_group": payload.get("age_group", ""),
+        "native_language": payload.get("native_language", ""),
+        "prior_experience": payload.get("prior_experience", ""),
         "nasa_mental": payload.get("nasa_mental", ""),
         "nasa_physical": payload.get("nasa_physical", ""),
         "nasa_temporal": payload.get("nasa_temporal", ""),
@@ -395,6 +540,314 @@ def faq_page():
     })
 
 
+@app.route("/api/docs")
+def api_docs():
+    """Comprehensive API documentation"""
+    return jsonify({
+        "title": "C.O.G.N.I.T. API Documentation",
+        "version": "2.0.0",
+        "description": "Complete API documentation for the C.O.G.N.I.T. research platform",
+        "base_url": "/api",
+        "authentication": {
+            "type": "API Key",
+            "description": "Most endpoints require an API key for authentication",
+            "methods": [
+                "X-API-KEY header",
+                "api_key query parameter"
+            ],
+            "default_key": "changeme (for development only)"
+        },
+        "endpoints": {
+            "public": {
+                "description": "Endpoints accessible without authentication",
+                "routes": [
+                    {
+                        "path": "/api/images/random",
+                        "method": "GET",
+                        "description": "Get a random image for the study",
+                        "parameters": [
+                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, practice, attention)", "default": "normal"}
+                        ],
+                        "response": {
+                            "image_id": "string",
+                            "image_url": "string",
+                            "is_practice": "boolean",
+                            "is_attention": "boolean"
+                        }
+                    },
+                    {
+                        "path": "/api/images/<image_id>",
+                        "method": "GET",
+                        "description": "Get a specific image file",
+                        "response": "image file"
+                    },
+                    {
+                        "path": "/api/submit",
+                        "method": "POST",
+                        "description": "Submit participant data",
+                        "request_body": {
+                            "participant_id": "string (required)",
+                            "session_id": "string (required)",
+                            "image_id": "string (required)",
+                            "description": "string (required, min 30 words)",
+                            "rating": "integer (required, 1-10)",
+                            "feedback": "string (required, min 5 chars)",
+                            "time_spent_seconds": "number (required)",
+                            "is_practice": "boolean (required)",
+                            "is_attention": "boolean (required)",
+                            "attention_expected": "string",
+                            "age_group": "string",
+                            "native_language": "string",
+                            "prior_experience": "string",
+                            "nasa_mental": "integer (required, 1-5)",
+                            "nasa_physical": "integer (required, 1-5)",
+                            "nasa_temporal": "integer (required, 1-5)",
+                            "nasa_performance": "integer (required, 1-5)",
+                            "nasa_effort": "integer (required, 1-5)",
+                            "nasa_frustration": "integer (required, 1-5)"
+                        },
+                        "response": {
+                            "status": "string",
+                            "word_count": "integer",
+                            "attention_passed": "boolean"
+                        }
+                    },
+                    {
+                        "path": "/api/pages/home",
+                        "method": "GET",
+                        "description": "Get home page information",
+                        "response": {
+                            "title": "string",
+                            "description": "string",
+                            "version": "string",
+                            "features": "array"
+                        }
+                    },
+                    {
+                        "path": "/api/pages/about",
+                        "method": "GET",
+                        "description": "Get about page information",
+                        "response": {
+                            "title": "string",
+                            "content": "string",
+                            "purpose": "string",
+                            "team": "array"
+                        }
+                    },
+                    {
+                        "path": "/api/pages/contact",
+                        "method": "GET",
+                        "description": "Get contact page information",
+                        "response": {
+                            "title": "string",
+                            "email": "string",
+                            "support": "string",
+                            "address": "string",
+                            "social": "object"
+                        }
+                    },
+                    {
+                        "path": "/api/pages/faq",
+                        "method": "GET",
+                        "description": "Get FAQ information",
+                        "response": {
+                            "title": "string",
+                            "faqs": "array of {question, answer}"
+                        }
+                    },
+                    {
+                        "path": "/api/docs",
+                        "method": "GET",
+                        "description": "Get API documentation (this endpoint)",
+                        "response": "this documentation"
+                    }
+                ]
+            },
+            "admin": {
+                "description": "Endpoints requiring admin authentication",
+                "routes": [
+                    {
+                        "path": "/api/stats",
+                        "method": "GET",
+                        "description": "Get statistics about submissions",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": {
+                            "total_submissions": "integer",
+                            "avg_word_count": "number",
+                            "attention_fail_rate": "number"
+                        }
+                    },
+                    {
+                        "path": "/admin/download",
+                        "method": "GET",
+                        "description": "Download CSV file with all submissions",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": "CSV file attachment"
+                    },
+                    {
+                        "path": "/admin/csv-data",
+                        "method": "GET",
+                        "description": "Get CSV data as JSON for admin panel",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": "array of submission objects"
+                    },
+                    {
+                        "path": "/api/security/info",
+                        "method": "GET",
+                        "description": "Get security information",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": {
+                            "security": {
+                                "rate_limits": "object",
+                                "cors_allowed_origins": "array",
+                                "security_headers": "array",
+                                "data_protection": "object"
+                            }
+                        }
+                    },
+                    {
+                        "path": "/admin/security/audit",
+                        "method": "GET",
+                        "description": "Run security audit",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": {
+                            "security_audit": {
+                                "timestamp": "string",
+                                "status": "string",
+                                "checks": "object",
+                                "recommendations": "array"
+                            }
+                        }
+                    },
+                    {
+                        "path": "/api/admin/login",
+                        "method": "POST",
+                        "description": "Admin login endpoint",
+                        "request_body": {
+                            "username": "string (required)",
+                            "password": "string (required)"
+                        },
+                        "response": {
+                            "status": "string",
+                            "session_token": "string",
+                            "user": "object"
+                        }
+                    },
+                    {
+                        "path": "/api/admin/logout",
+                        "method": "POST",
+                        "description": "Admin logout endpoint",
+                        "response": {
+                            "status": "string",
+                            "message": "string"
+                        }
+                    },
+                    {
+                        "path": "/api/admin/me",
+                        "method": "GET",
+                        "description": "Get current admin user info",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": {
+                            "username": "string",
+                            "role": "string",
+                            "email": "string",
+                            "created_at": "string",
+                            "last_login": "string",
+                            "auth_method": "string"
+                        }
+                    }
+                ]
+            }
+        },
+        "data_structures": {
+            "submission": {
+                "description": "Structure of a submission record",
+                "fields": {
+                    "timestamp": "ISO format timestamp",
+                    "participant_id": "UUID string",
+                    "session_id": "UUID string",
+                    "image_id": "string (path to image)",
+                    "image_url": "string (URL to image)",
+                    "description": "string (participant description)",
+                    "word_count": "integer",
+                    "rating": "integer (1-10)",
+                    "feedback": "string (participant comments)",
+                    "time_spent_seconds": "number",
+                    "is_practice": "boolean",
+                    "is_attention": "boolean",
+                    "attention_passed": "boolean",
+                    "too_fast_flag": "boolean",
+                    "user_agent": "string",
+                    "ip_hash": "string (SHA-256 hash)",
+                    "age_group": "string",
+                    "native_language": "string",
+                    "prior_experience": "string",
+                    "nasa_mental": "integer (1-5)",
+                    "nasa_physical": "integer (1-5)",
+                    "nasa_temporal": "integer (1-5)",
+                    "nasa_performance": "integer (1-5)",
+                    "nasa_effort": "integer (1-5)",
+                    "nasa_frustration": "integer (1-5)"
+                }
+            }
+        },
+        "error_codes": {
+            "400": "Bad Request - Invalid parameters or missing required fields",
+            "401": "Unauthorized - Invalid or missing API key",
+            "404": "Not Found - Resource not found",
+            "429": "Too Many Requests - Rate limit exceeded",
+            "500": "Internal Server Error - Server-side error"
+        },
+        "rate_limits": {
+            "default": "200 requests per day, 50 requests per hour",
+            "admin_endpoints": "10 requests per minute",
+            "security_audit": "5 requests per minute"
+        },
+        "security": {
+            "cors": "Cross-Origin Resource Sharing is restricted to specific origins",
+            "headers": "Security headers are applied to all responses",
+            "ip_hashing": "IP addresses are hashed with SHA-256 and salt for privacy",
+            "data_storage": "Data is stored in CSV format with restricted access"
+        },
+        "changelog": [
+            {
+                "version": "2.0.0",
+                "date": "2024",
+                "changes": [
+                    "Added SQLite database for admin user management",
+                    "Enhanced admin authentication system",
+                    "Added comprehensive API documentation",
+                    "Improved admin dashboard with charts and filters",
+                    "Fixed data explorer search functionality",
+                    "Added demographic data collection"
+                ]
+            },
+            {
+                "version": "1.0.0",
+                "date": "2023",
+                "changes": [
+                    "Initial release of C.O.G.N.I.T. platform",
+                    "Basic participant workflow",
+                    "Admin panel with statistics",
+                    "CSV data export functionality"
+                ]
+            }
+        ]
+    })
+
+
 @app.route("/admin/csv-data")
 @limiter.limit("10 per minute")
 def get_csv_data():
@@ -471,6 +924,126 @@ def security_audit():
     })
 
 
+@app.route("/api/admin/login", methods=["POST"])
+def admin_login():
+    """Admin login endpoint"""
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    password = data.get("password")
+    
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+    
+    if authenticate_admin(username, password):
+        # Generate session token
+        session_token = secrets.token_hex(32)
+        
+        # Store session in database
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            # Get user ID
+            cursor.execute("SELECT id FROM admin_users WHERE username = ?", (username,))
+            user = cursor.fetchone()
+            user_id = user[0] if user else None
+            
+            if user_id:
+                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+                user_agent = request.headers.get("User-Agent", "")
+                expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+                
+                cursor.execute(
+                    "INSERT INTO admin_sessions (user_id, session_token, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+                    (user_id, session_token, expires_at.isoformat(), ip_address, user_agent)
+                )
+                
+                # Update last login time
+                cursor.execute(
+                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
+                    (datetime.now(timezone.utc).isoformat(), user_id)
+                )
+                
+                conn.commit()
+        finally:
+            conn.close()
+        
+        return jsonify({
+            "status": "success",
+            "session_token": session_token,
+            "user": {
+                "username": username,
+                "role": "admin"  # In real app, get this from DB
+            }
+        })
+    else:
+        return jsonify({"error": "Invalid username or password"}), 401
+
+
+@app.route("/api/admin/logout", methods=["POST"])
+def admin_logout():
+    """Admin logout endpoint"""
+    session_token = request.headers.get("X-SESSION-TOKEN") or request.cookies.get("admin_session")
+    
+    if session_token:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("DELETE FROM admin_sessions WHERE session_token = ?", (session_token,))
+            conn.commit()
+        finally:
+            conn.close()
+    
+    return jsonify({"status": "success", "message": "Logged out successfully"})
+
+
+@app.route("/api/admin/me")
+def admin_me():
+    """Get current admin user info"""
+    if not require_admin_auth():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    # Get user info from API key or session
+    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
+    
+    if api_key == ADMIN_API_KEY:
+        # Legacy admin
+        return jsonify({
+            "username": "admin",
+            "role": "superadmin",
+            "email": "admin@cognit.local",
+            "auth_method": "api_key"
+        })
+    else:
+        # Database user
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute(
+                "SELECT username, email, role, created_at, last_login FROM admin_users WHERE username = ?",
+                (api_key,)
+            )
+            user = cursor.fetchone()
+            
+            if user:
+                username, email, role, created_at, last_login = user
+                return jsonify({
+                    "username": username,
+                    "role": role,
+                    "email": email,
+                    "created_at": created_at,
+                    "last_login": last_login,
+                    "auth_method": "database"
+                })
+        finally:
+            conn.close()
+    
+    return jsonify({"error": "User not found"}), 404
+
+
 if __name__ == "__main__":
     ensure_csv()
+    init_db()
     app.run(debug=True)
