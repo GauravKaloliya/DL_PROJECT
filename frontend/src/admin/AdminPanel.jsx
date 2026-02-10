@@ -1,17 +1,21 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
-import { Bar, Pie, Line } from 'react-chartjs-2';
-
-// Register ChartJS components
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
 
 // Settings Tab Component
-function SettingsTab({ apiKey, csvData, onDataDeleted }) {
+function SettingsTab({ sessionToken, csvData, onDataDeleted }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
+  
+  // Password change state
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState(null);
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
 
   const handleDeleteCSV = async () => {
     setIsDeleting(true);
@@ -19,8 +23,9 @@ function SettingsTab({ apiKey, csvData, onDataDeleted }) {
     setDeleteSuccess(false);
     
     try {
-      const response = await fetch(`${API_BASE}/admin/settings/csv-delete?api_key=${apiKey}`, {
+      const response = await fetch(`${API_BASE}/admin/settings/csv-delete`, {
         method: 'DELETE',
+        headers: { "X-SESSION-TOKEN": sessionToken },
       });
       
       const data = await response.json();
@@ -42,9 +47,154 @@ function SettingsTab({ apiKey, csvData, onDataDeleted }) {
     }
   };
 
+  const handleChangePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(false);
+    
+    if (!currentPassword.trim() || !newPassword.trim()) {
+      setPasswordError("All password fields are required");
+      return;
+    }
+    
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
+    
+    if (newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters");
+      return;
+    }
+    
+    setIsChangingPassword(true);
+    
+    try {
+      const response = await fetch(`${API_BASE}/api/admin/change-password`, {
+        method: 'POST',
+        headers: { 
+          "Content-Type": "application/json",
+          "X-SESSION-TOKEN": sessionToken 
+        },
+        body: JSON.stringify({ 
+          current_password: currentPassword, 
+          new_password: newPassword 
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setPasswordSuccess(true);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setShowPasswordForm(false);
+        addToast("Password changed successfully", "success");
+      } else {
+        setPasswordError(data.error || "Failed to change password");
+        addToast(data.error || "Failed to change password", "error");
+      }
+    } catch (err) {
+      setPasswordError("Network error. Please try again.");
+      addToast("Network error. Please try again.", "error");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   return (
     <div className="settings">
       <h2>Settings</h2>
+      
+      {/* Password Change Section */}
+      <div className="settings-section">
+        <h3>Security</h3>
+        <p style={{ color: 'var(--muted)', marginBottom: '20px' }}>
+          Change your admin password to maintain account security.
+        </p>
+        
+        {!showPasswordForm ? (
+          <button className="primary" onClick={() => setShowPasswordForm(true)}>
+            Change Password
+          </button>
+        ) : (
+          <div style={{ 
+            background: 'var(--panel)', 
+            border: '2px solid var(--border)', 
+            borderRadius: '12px', 
+            padding: '20px',
+            maxWidth: '400px'
+          }}>
+            <h4 style={{ marginTop: 0, color: 'var(--primary)' }}>Change Password</h4>
+            
+            <form onSubmit={handleChangePassword}>
+              <div className="form-group">
+                <label>Current Password</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Enter current password"
+                />
+              </div>
+              <div className="form-group">
+                <label>New Password</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password"
+                />
+              </div>
+              <div className="form-group">
+                <label>Confirm New Password</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Confirm new password"
+                />
+              </div>
+              
+              {passwordError && (
+                <p style={{ color: '#c9444a', marginTop: '8px' }}>{passwordError}</p>
+              )}
+              
+              <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+                <button 
+                  type="submit" 
+                  className="primary" 
+                  disabled={isChangingPassword}
+                >
+                  {isChangingPassword ? "Changing..." : "Change Password"}
+                </button>
+                <button 
+                  type="button" 
+                  className="ghost" 
+                  onClick={() => {
+                    setShowPasswordForm(false);
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+                    setPasswordError(null);
+                  }}
+                  disabled={isChangingPassword}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+        
+        {passwordSuccess && (
+          <div className="toast success" style={{ marginTop: '12px' }}>
+            <span>Password changed successfully!</span>
+            <button onClick={() => setPasswordSuccess(false)} aria-label="Dismiss">×</button>
+          </div>
+        )}
+      </div>
       
       {/* Data Management Section */}
       <div className="settings-section">
@@ -124,6 +274,7 @@ function SettingsTab({ apiKey, csvData, onDataDeleted }) {
           <p><strong>API Version:</strong> 2.0.0</p>
           <p><strong>Database:</strong> SQLite + CSV</p>
           <p><strong>Status:</strong> <span className="status-online">Online</span></p>
+          <p><strong>Authentication:</strong> <span className="status-online">Password-based</span></p>
         </div>
       </div>
       
@@ -181,12 +332,11 @@ export default function AdminPanel() {
   // Auth state
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [user, setUser] = useState(null);
   
   // Login form state
   const [loginUsername, setLoginUsername] = useState("Gaurav");
-  const [loginApiKey, setLoginApiKey] = useState("$2a$10$9mF8ySltm8uFbamU/d4xXeQXIVt2h9G9voD1ayzSnFhESk.z1dviG");
+  const [loginPassword, setLoginPassword] = useState("newpassword123");
   
   // Data state
   const [stats, setStats] = useState(() => {
@@ -213,26 +363,22 @@ export default function AdminPanel() {
   // Check for existing session on mount
   useEffect(() => {
     const savedSession = sessionStorage.getItem("adminSessionToken");
-    const savedApiKey = sessionStorage.getItem("adminApiKey");
     const savedUser = sessionStorage.getItem("adminUser");
     
-    if (savedSession && savedApiKey) {
+    if (savedSession && savedUser) {
       setSessionToken(savedSession);
-      setApiKey(savedApiKey);
-      if (savedUser) {
-        setUser(JSON.parse(savedUser));
-      }
+      setUser(JSON.parse(savedUser));
       setIsAuthenticated(true);
     }
   }, []);
   
   // Fetch data when authenticated
   useEffect(() => {
-    if (isAuthenticated && apiKey) {
+    if (isAuthenticated && sessionToken) {
       fetchStats();
       fetchCsvData();
     }
-  }, [isAuthenticated, apiKey]);
+  }, [isAuthenticated, sessionToken]);
 
   // Persist stats, csvData and activeTab
   useEffect(() => {
@@ -271,7 +417,9 @@ export default function AdminPanel() {
   const fetchStats = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/stats?api_key=${apiKey}`);
+      const response = await fetch(`${API_BASE}/api/stats`, {
+        headers: { "X-SESSION-TOKEN": sessionToken }
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch statistics");
       }
@@ -287,7 +435,9 @@ export default function AdminPanel() {
   const fetchCsvData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/admin/csv-data?api_key=${apiKey}`);
+      const response = await fetch(`${API_BASE}/admin/csv-data`, {
+        headers: { "X-SESSION-TOKEN": sessionToken }
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch CSV data");
       }
@@ -304,8 +454,8 @@ export default function AdminPanel() {
     e.preventDefault();
     setError(null);
     
-    if (!loginUsername.trim() || !loginApiKey.trim()) {
-      setError("Username and API key are required");
+    if (!loginUsername.trim() || !loginPassword.trim()) {
+      setError("Username and password are required");
       return;
     }
     
@@ -314,20 +464,18 @@ export default function AdminPanel() {
       const response = await fetch(`${API_BASE}/api/admin/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: loginUsername, api_key: loginApiKey })
+        body: JSON.stringify({ username: loginUsername, password: loginPassword })
       });
       
       const data = await response.json();
       
       if (response.ok) {
         setSessionToken(data.session_token);
-        setApiKey(data.api_key);
         setUser(data.user);
         setIsAuthenticated(true);
         
         // Store in sessionStorage
         sessionStorage.setItem("adminSessionToken", data.session_token);
-        sessionStorage.setItem("adminApiKey", data.api_key);
         sessionStorage.setItem("adminUser", JSON.stringify(data.user));
         
         addToast("Login successful!", "success");
@@ -355,7 +503,6 @@ export default function AdminPanel() {
 
     // Clear session
     sessionStorage.removeItem("adminSessionToken");
-    sessionStorage.removeItem("adminApiKey");
     sessionStorage.removeItem("adminUser");
     sessionStorage.removeItem("adminStats");
     sessionStorage.removeItem("adminCsvData");
@@ -364,7 +511,6 @@ export default function AdminPanel() {
     // Clear all state
     setIsAuthenticated(false);
     setSessionToken("");
-    setApiKey("");
     setUser(null);
     setStats(null);
     setCsvData([]);
@@ -375,7 +521,9 @@ export default function AdminPanel() {
   
   const downloadCsv = async () => {
     try {
-      const response = await fetch(`${API_BASE}/admin/download?api_key=${apiKey}`);
+      const response = await fetch(`${API_BASE}/admin/download`, {
+        headers: { "X-SESSION-TOKEN": sessionToken }
+      });
       if (!response.ok) {
         throw new Error("Failed to download CSV");
       }
@@ -441,52 +589,6 @@ export default function AdminPanel() {
   
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
   
-  // Data processing for charts
-  const processChartData = () => {
-    if (!csvData || csvData.length === 0) return null;
-    
-    // Get unique usernames for distribution
-    const usernames = {};
-    const genders = {};
-    const languages = {};
-    const ratings = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0};
-    const wordCounts = [];
-    const timeSpent = [];
-    
-    csvData.forEach(row => {
-      const username = row.username || 'Anonymous';
-      usernames[username] = (usernames[username] || 0) + 1;
-      
-      const gender = row.gender || 'Unknown';
-      genders[gender] = (genders[gender] || 0) + 1;
-      
-      const language = row.native_language || 'Unknown';
-      languages[language] = (languages[language] || 0) + 1;
-      
-      const rating = parseInt(row.rating) || 0;
-      if (rating >= 1 && rating <= 10) {
-        ratings[rating]++;
-      }
-      
-      const words = parseInt(row.word_count) || 0;
-      wordCounts.push(words);
-      
-      const time = parseFloat(row.time_spent_seconds) || 0;
-      timeSpent.push(time);
-    });
-    
-    return {
-      usernames: Object.entries(usernames).sort((a, b) => b[1] - a[1]).slice(0, 10),
-      genders: Object.entries(genders).sort((a, b) => b[1] - a[1]),
-      languages: Object.entries(languages).sort((a, b) => b[1] - a[1]).slice(0, 5),
-      ratings,
-      wordCounts,
-      timeSpent
-    };
-  };
-  
-  const chartData = processChartData();
-  
   // Get column headers for table (excluding certain fields)
   const getTableHeaders = () => {
     if (csvData.length === 0) return [];
@@ -501,7 +603,7 @@ export default function AdminPanel() {
         <div className="login-panel">
           <div className="login-header">
             <h1>Admin Login</h1>
-            <p>Enter your username and API key to access the admin panel</p>
+            <p>Enter your username and password to access the admin panel</p>
           </div>
           
           {error && <div className="error-message">{error}</div>}
@@ -520,12 +622,12 @@ export default function AdminPanel() {
               />
             </div>
             <div className="form-group">
-              <label>API Key</label>
+              <label>Password</label>
               <input
                 type="password"
-                value={loginApiKey}
-                onChange={(e) => setLoginApiKey(e.target.value)}
-                placeholder="Enter your API key"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Enter your password"
                 onCopy={preventCopyPaste}
                 onPaste={preventCopyPaste}
               />
@@ -626,112 +728,6 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="error-message">No statistics available</div>
-            )}
-
-            {chartData && stats && stats.total_submissions > 0 ? (
-              <div className="charts-section">
-                <h3>Demographic Distribution</h3>
-                <div className="chart-grid">
-                  <div className="chart-card">
-                    <h4>Top Participants</h4>
-                    <Bar
-                      data={{
-                        labels: chartData.usernames.map(u => u[0]),
-                        datasets: [{
-                          label: 'Submissions',
-                          data: chartData.usernames.map(u => u[1]),
-                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B9D', '#4CAF50', '#9C27B0', '#FF9800']
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true }}
-                    />
-                  </div>
-                  <div className="chart-card">
-                    <h4>Top Languages</h4>
-                    <Pie
-                      data={{
-                        labels: chartData.languages.map(l => l[0]),
-                        datasets: [{
-                          data: chartData.languages.map(l => l[1]),
-                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true }}
-                    />
-                  </div>
-                </div>
-
-                <h3>Performance Metrics</h3>
-                <div className="chart-grid">
-                  <div className="chart-card">
-                    <h4>Rating Distribution</h4>
-                    <Bar
-                      data={{
-                        labels: Object.keys(chartData.ratings),
-                        datasets: [{
-                          label: 'Submissions',
-                          data: Object.values(chartData.ratings),
-                          backgroundColor: '#36A2EB'
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true } } }}
-                    />
-                  </div>
-                  <div className="chart-card">
-                    <h4>Gender Distribution</h4>
-                    <Pie
-                      data={{
-                        labels: chartData.genders.map(g => g[0]),
-                        datasets: [{
-                          data: chartData.genders.map(g => g[1]),
-                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true }}
-                    />
-                  </div>
-                </div>
-
-                <h3>Engagement Metrics</h3>
-                <div className="chart-grid">
-                  <div className="chart-card">
-                    <h4>Word Count Distribution</h4>
-                    <Line
-                      data={{
-                        labels: chartData.wordCounts.map((_, i) => i + 1),
-                        datasets: [{
-                          label: 'Words per Submission',
-                          data: chartData.wordCounts,
-                          borderColor: '#36A2EB',
-                          backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                          fill: true
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true }}
-                    />
-                  </div>
-                  <div className="chart-card">
-                    <h4>Time Spent Distribution</h4>
-                    <Line
-                      data={{
-                        labels: chartData.timeSpent.map((_, i) => i + 1),
-                        datasets: [{
-                          label: 'Seconds per Submission',
-                          data: chartData.timeSpent,
-                          borderColor: '#FF6384',
-                          backgroundColor: 'rgba(255, 99, 132, 0.1)',
-                          fill: true
-                        }]
-                      }}
-                      options={{ responsive: true, maintainAspectRatio: true }}
-                    />
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="no-data-message">
-                <p>No chart data available. Submit some responses to see visualizations.</p>
-              </div>
             )}
 
             <div className="quick-actions">
@@ -868,7 +864,7 @@ export default function AdminPanel() {
 
         {activeTab === "settings" && (
           <SettingsTab 
-            apiKey={apiKey} 
+            sessionToken={sessionToken} 
             csvData={csvData}
             onDataDeleted={() => {
               fetchStats();
