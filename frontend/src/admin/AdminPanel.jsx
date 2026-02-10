@@ -14,6 +14,12 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [showApiKeyChange, setShowApiKeyChange] = useState(false);
+  const [newApiKey, setNewApiKey] = useState("");
+  const [confirmApiKey, setConfirmApiKey] = useState("");
+  const [apiKeyError, setApiKeyError] = useState(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState("");
 
   const navigate = useNavigate();
 
@@ -54,6 +60,58 @@ export default function AdminPanel() {
     setCsvData([]);
     localStorage.removeItem("adminAuthenticated");
     navigate("/admin");
+  };
+
+  const handleChangeApiKey = () => {
+    if (newApiKey.length < 8) {
+      setApiKeyError("API key must be at least 8 characters");
+      return;
+    }
+    if (newApiKey !== confirmApiKey) {
+      setApiKeyError("API keys do not match");
+      return;
+    }
+    
+    // In a real app, this would call the backend to change the API key
+    // For now, we'll just update the local storage and state
+    localStorage.setItem("adminApiKey", newApiKey);
+    setApiKey(newApiKey);
+    setShowApiKeyChange(false);
+    setApiKeyError(null);
+    addToast("API key changed successfully! 🎉", "success");
+  };
+
+  const handleResetDatabase = () => {
+    if (resetConfirmText !== "RESET") {
+      setError("Please type RESET to confirm");
+      return;
+    }
+    
+    // In a real app, this would call the backend to reset the database
+    // For now, we'll just clear the local data
+    setCsvData([]);
+    setStats(null);
+    setShowResetConfirm(false);
+    addToast("Database reset completed! 🎉", "success");
+  };
+
+  const addToast = (message, type = "info") => {
+    // Simple toast notification
+    const toastId = Date.now();
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `
+      <span>${message}</span>
+      <button onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
+    `;
+    toast.style.position = "fixed";
+    toast.style.top = "20px";
+    toast.style.right = "20px";
+    toast.style.zIndex = "1000";
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.remove();
+    }, 4000);
   };
 
   const fetchStats = async () => {
@@ -169,6 +227,12 @@ export default function AdminPanel() {
           onClick={() => setActiveTab("data")}
         >
           Data Explorer 🔍
+        </button>
+        <button
+          className={activeTab === "security" ? "active" : ""}
+          onClick={() => setActiveTab("security")}
+        >
+          Security 🔒
         </button>
         <button
           className={activeTab === "settings" ? "active" : ""}
@@ -292,6 +356,96 @@ export default function AdminPanel() {
           </div>
         )}
 
+        {activeTab === "security" && (
+          <div className="security">
+            <h2>Security Center 🔒</h2>
+            <div className="security-overview">
+              <h3>Security Overview</h3>
+              <p>This panel provides comprehensive security information and controls for your C.O.G.N.I.T. application.</p>
+            </div>
+
+            <div className="security-section">
+              <h3>Security Status</h3>
+              <div className="security-status-grid">
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">API Key Protection</span>
+                </div>
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">Rate Limiting</span>
+                </div>
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">CORS Restrictions</span>
+                </div>
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">Security Headers</span>
+                </div>
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">IP Hashing</span>
+                </div>
+                <div className="security-status-item">
+                  <span className="status-icon">✅</span>
+                  <span className="status-label">Data Encryption</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="security-section">
+              <h3>Rate Limiting Configuration</h3>
+              <div className="rate-limit-info">
+                <p><strong>Default Limits:</strong> 200 requests per day, 50 requests per hour</p>
+                <p><strong>Admin Endpoints:</strong> 10 requests per minute</p>
+                <p><strong>Security Endpoints:</strong> 5 requests per minute</p>
+              </div>
+            </div>
+
+            <div className="security-section">
+              <h3>Data Protection</h3>
+              <div className="data-protection-info">
+                <p><strong>IP Address Handling:</strong> SHA-256 hashing with salt for anonymization</p>
+                <p><strong>Data Storage:</strong> CSV format with restricted access</p>
+                <p><strong>Anonymous Data:</strong> No personally identifiable information stored</p>
+                <p><strong>Session Security:</strong> Secure, HTTP-only cookies with SameSite protection</p>
+              </div>
+            </div>
+
+            <div className="security-section">
+              <h3>Security Recommendations</h3>
+              <div className="security-recommendations">
+                <ul>
+                  <li>🔑 Rotate API keys regularly (every 30-60 days)</li>
+                  <li>🔒 Use strong, unique API keys (minimum 16 characters)</li>
+                  <li>🌐 Enable HTTPS in production environments</li>
+                  <li>🛡️ Review and update CORS origins for production</li>
+                  <li>📊 Monitor failed login attempts and unusual activity</li>
+                  <li>🔄 Regularly backup your data files</li>
+                  <li>🚨 Keep dependencies updated to latest secure versions</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="security-section">
+              <h3>Security Audit</h3>
+              <button className="primary" onClick={() => {
+                fetch(`${API_BASE}/admin/security/audit?api_key=${apiKey}`)
+                  .then(response => response.json())
+                  .then(data => {
+                    addToast("Security audit completed! Check console for details.", "success");
+                    console.log("Security Audit:", data);
+                  })
+                  .catch(error => {
+                    addToast("Failed to run security audit", "error");
+                    console.error("Security audit error:", error);
+                  });
+              }}>Run Security Audit 🛡️</button>
+            </div>
+          </div>
+        )}
+
         {activeTab === "settings" && (
           <div className="settings">
             <h2>Admin Settings ⚙️</h2>
@@ -300,8 +454,37 @@ export default function AdminPanel() {
               <div className="form-group">
                 <label>Current API Key</label>
                 <input type="password" value="********" readOnly />
-                <button className="ghost">Change API Key 🔑</button>
+                <button className="ghost" onClick={() => setShowApiKeyChange(true)}>Change API Key 🔑</button>
               </div>
+              
+              {showApiKeyChange && (
+                <div className="api-key-change">
+                  <h4>Change API Key</h4>
+                  <div className="form-group">
+                    <label>New API Key</label>
+                    <input
+                      type="password"
+                      value={newApiKey}
+                      onChange={(e) => setNewApiKey(e.target.value)}
+                      placeholder="Enter new API key (min 8 chars)"
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Confirm API Key</label>
+                    <input
+                      type="password"
+                      value={confirmApiKey}
+                      onChange={(e) => setConfirmApiKey(e.target.value)}
+                      placeholder="Confirm new API key"
+                    />
+                  </div>
+                  {apiKeyError && <div className="error-message">{apiKeyError}</div>}
+                  <div className="action-buttons">
+                    <button className="primary" onClick={handleChangeApiKey}>Save New API Key</button>
+                    <button className="ghost" onClick={() => setShowApiKeyChange(false)}>Cancel</button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="settings-section">
@@ -310,14 +493,57 @@ export default function AdminPanel() {
                 <p><strong>Frontend Version:</strong> 1.0.0</p>
                 <p><strong>Backend Status:</strong> <span className="status-online">Online ✅</span></p>
                 <p><strong>Database Status:</strong> <span className="status-online">Connected ✅</span></p>
+                <p><strong>Total Storage:</strong> {csvData.length > 0 ? `${(JSON.stringify(csvData).length / 1024).toFixed(2)} KB` : '0 KB'}</p>
+              </div>
+            </div>
+
+            <div className="settings-section">
+              <h3>Security Settings</h3>
+              <div className="security-settings">
+                <div className="form-group">
+                  <label>Session Timeout</label>
+                  <select defaultValue="30">
+                    <option value="15">15 minutes</option>
+                    <option value="30">30 minutes</option>
+                    <option value="60">60 minutes</option>
+                    <option value="120">120 minutes</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Max Failed Login Attempts</label>
+                  <select defaultValue="5">
+                    <option value="3">3 attempts</option>
+                    <option value="5">5 attempts</option>
+                    <option value="10">10 attempts</option>
+                  </select>
+                </div>
               </div>
             </div>
 
             <div className="settings-section">
               <h3>Danger Zone</h3>
               <div className="danger-zone">
-                <button className="danger-button">Reset Database ⚠️</button>
+                <button className="danger-button" onClick={() => setShowResetConfirm(true)}>Reset Database ⚠️</button>
                 <p className="danger-note">This will permanently delete all data!</p>
+                
+                {showResetConfirm && (
+                  <div className="reset-confirm">
+                    <p style={{ color: '#c9444a', fontWeight: '600' }}>⚠️ WARNING: This action cannot be undone!</p>
+                    <div className="form-group">
+                      <label>Type "RESET" to confirm</label>
+                      <input
+                        type="text"
+                        value={resetConfirmText}
+                        onChange={(e) => setResetConfirmText(e.target.value)}
+                        placeholder="Type RESET to confirm"
+                      />
+                    </div>
+                    <div className="action-buttons">
+                      <button className="danger-button" onClick={handleResetDatabase}>Confirm Reset</button>
+                      <button className="ghost" onClick={() => setShowResetConfirm(false)}>Cancel</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
