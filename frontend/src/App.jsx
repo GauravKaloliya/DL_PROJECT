@@ -103,6 +103,12 @@ function Confetti({ show }) {
   );
 }
 
+// Prevent copy/paste functionality
+const preventCopyPaste = (e) => {
+  e.preventDefault();
+  return false;
+};
+
 export default function App() {
   const [darkMode, setDarkMode] = useState(getStoredValue("darkMode", false));
   const [online, setOnline] = useState(navigator.onLine);
@@ -140,6 +146,23 @@ export default function App() {
   const nextTimeout = useRef(null);
   
   const navigate = useNavigate();
+  
+  // Prevent copy/paste on the entire application
+  useEffect(() => {
+    const handleCopy = (e) => preventCopyPaste(e);
+    const handlePaste = (e) => preventCopyPaste(e);
+    const handleCut = (e) => preventCopyPaste(e);
+    
+    document.addEventListener("copy", handleCopy);
+    document.addEventListener("paste", handlePaste);
+    document.addEventListener("cut", handleCut);
+    
+    return () => {
+      document.removeEventListener("copy", handleCopy);
+      document.removeEventListener("paste", handlePaste);
+      document.removeEventListener("cut", handleCut);
+    };
+  }, []);
 
   const wordCount = useMemo(() => {
     return description.trim() ? description.trim().split(/\s+/).length : 0;
@@ -382,7 +405,7 @@ export default function App() {
 
   return (
     <ErrorBoundary onError={() => addToast("Unexpected error occurred.", "error")}>
-      <div className="app">
+      <div className="app" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
         <header className="header">
           <div>
             <h1>C.O.G.N.I.T. 🌸</h1>
@@ -415,10 +438,10 @@ export default function App() {
               purposes. You may stop at any time 💕
             </p>
             
-            <h3 style={{ color: 'var(--primary)', marginTop: '24px', marginBottom: '16px' }}>Demographics 📝</h3>
+            <h3 style={{ color: 'var(--primary)', marginTop: '24px', marginBottom: '16px' }}>Participant Information</h3>
             <div className="consent-form-grid">
               <div className={`form-field ${formErrors.ageGroup ? 'error' : ''}`}>
-                <label>Age group (required) 🎂</label>
+                <label>Age group</label>
                 <select
                   value={demographics.ageGroup}
                   onChange={(event) => {
@@ -438,7 +461,7 @@ export default function App() {
               </div>
               
               <div className={`form-field ${formErrors.gender ? 'error' : ''}`}>
-                <label>Gender (required) ⚧️</label>
+                <label>Gender</label>
                 <select
                   value={demographics.gender}
                   onChange={(event) => {
@@ -458,7 +481,7 @@ export default function App() {
               </div>
               
               <div className={`form-field ${formErrors.age ? 'error' : ''}`}>
-                <label>Age (required) 🔢</label>
+                <label>Age</label>
                 <input
                   type="number"
                   min="1"
@@ -475,7 +498,7 @@ export default function App() {
               </div>
               
               <div className={`form-field ${formErrors.place ? 'error' : ''}`}>
-                <label>Place/Location (required) 📍</label>
+                <label>Place/Location</label>
                 <input
                   type="text"
                   placeholder="e.g., New York, USA"
@@ -490,7 +513,7 @@ export default function App() {
               </div>
               
               <div className={`form-field ${formErrors.language ? 'error' : ''}`}>
-                <label>Native language (required) 🌍</label>
+                <label>Native language</label>
                 <input
                   type="text"
                   placeholder="e.g., English"
@@ -505,7 +528,7 @@ export default function App() {
               </div>
               
               <div className={`form-field ${formErrors.experience ? 'error' : ''}`}>
-                <label>Prior experience (required) 📸</label>
+                <label>Prior experience</label>
                 <input
                   type="text"
                   placeholder="e.g., photography, art"
@@ -725,7 +748,7 @@ function TrialForm({
       
       {/* Effort Rating - Radio buttons */}
       <div className="field effort-rating">
-        <label>General rating {rating > 0 ? `${rating}/10` : "(required)"} 💪</label>
+        <label>General rating {rating > 0 ? `${rating}/10` : ""}</label>
         <div className="rating-scale">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
             <label key={val} className="rating-option">
@@ -746,9 +769,9 @@ function TrialForm({
         </div>
       </div>
 
-      {/* Comments - Required */}
+      {/* Comments */}
       <label className="field">
-        Comments (required, min 5 chars) 💬
+        Comments
         <textarea
           value={comments}
           onChange={(event) => onComments(event.target.value)}

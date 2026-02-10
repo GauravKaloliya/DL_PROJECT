@@ -23,7 +23,6 @@ DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "changeme")
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 
 CSV_HEADERS = [
@@ -50,6 +49,13 @@ CSV_HEADERS = [
     "native_language",
     "prior_experience",
 ]
+
+# Email configuration (for development, using console output)
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASS = os.getenv("SMTP_PASS", "")
+FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@cognit-research.org")
 
 app = Flask(__name__)
 
@@ -98,13 +104,16 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Create admin users table
+    # Create admin users table with API key support
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS admin_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             email TEXT UNIQUE,
+            api_key TEXT UNIQUE,
+            email_verified BOOLEAN DEFAULT 0,
+            verification_token TEXT,
             role TEXT DEFAULT 'admin',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
@@ -139,49 +148,90 @@ def init_db():
         )
     ''')
     
-    # Insert default admin user if none exists
-    cursor.execute("SELECT COUNT(*) FROM admin_users")
-    if cursor.fetchone()[0] == 0:
-        # Default admin user: username='admin', password='admin123'
-        # Password hash: SHA-256 of 'admin123'
-        default_password_hash = hashlib.sha256('admin123'.encode()).hexdigest()
-        cursor.execute(
-            "INSERT INTO admin_users (username, password_hash, email, role) VALUES (?, ?, ?, ?)",
-            ('admin', default_password_hash, 'admin@cognit.local', 'superadmin')
-        )
-    
     conn.commit()
     conn.close()
 
 
+def generate_api_key():
+    """Generate a secure API key"""
+    return secrets.token_urlsafe(32)
+
+
+def send_verification_email(email, username, verification_token):
+    """Send verification email - in development, just print to console"""
+    verification_link = f"http://localhost:5173/verify-email?token={verification_token}"
+    
+    # In production, you would use smtplib to send actual emails
+    # For now, we'll log to console
+    print(f"\n{'='*60}")
+    print(f"VERIFICATION EMAIL for {email}")
+    print(f"{'='*60}")
+    print(f"To: {email}")
+    print(f"Subject: Verify your C.O.G.N.I.T. account")
+    print(f"\nHello {username},\n")
+    print(f"Please verify your email by clicking this link:")
+    print(f"{verification_link}")
+    print(f"\nOr use this verification token: {verification_token}")
+    print(f"{'='*60}\n")
+    
+    return True
+
+
+def hash_password(password):
+    """Hash password using SHA-256"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+
 def authenticate_admin(api_key_or_username, password=None):
-    """Authenticate admin user"""
+    """Authenticate admin user using API key or username/password"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        # Check if it's an API key (legacy support)
+        # If password is None, treat as API key authentication
         if password is None:
-            # Legacy API key authentication
-            return api_key_or_username == ADMIN_API_KEY
+            cursor.execute(
+                "SELECT id, username, role, is_active, email_verified FROM admin_users WHERE api_key = ?",
+                (api_key_or_username,)
+            )
+            user = cursor.fetchone()
+            if user and user[3] and user[4]:  # Check active and verified
+                user_id, username, role, is_active, email_verified = user
+                # Log successful login
+                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+                cursor.execute(
+                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+                    (user_id, 'login_success_api_key', 'User logged in with API key', ip_address)
+                )
+                cursor.execute(
+                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
+                    (datetime.now(timezone.utc).isoformat(), user_id)
+                )
+                conn.commit()
+                return True
+            return False
         
         # Username/password authentication
         cursor.execute(
-            "SELECT id, password_hash, role, is_active FROM admin_users WHERE username = ?",
+            "SELECT id, password_hash, role, is_active, email_verified FROM admin_users WHERE username = ?",
             (api_key_or_username,)
         )
         user = cursor.fetchone()
         
-        if user and user[3]:  # Check if user exists and is active
-            user_id, stored_hash, role, is_active = user
+        if user and user[3] and user[4]:  # Check active and verified
+            user_id, stored_hash, role, is_active, email_verified = user
             # Verify password
-            input_hash = hashlib.sha256(password.encode()).hexdigest()
+            input_hash = hash_password(password)
             if input_hash == stored_hash:
                 # Log successful login
                 ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
                 cursor.execute(
                     "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
                     (user_id, 'login_success', 'User logged in', ip_address)
+                )
+                cursor.execute(
+                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
+                    (datetime.now(timezone.utc).isoformat(), user_id)
                 )
                 conn.commit()
                 return True
@@ -200,15 +250,60 @@ def authenticate_admin(api_key_or_username, password=None):
         conn.close()
 
 
+def get_user_by_api_key(api_key):
+    """Get user details by API key"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE api_key = ?",
+            (api_key,)
+        )
+        user = cursor.fetchone()
+        if user:
+            return {
+                "id": user[0],
+                "username": user[1],
+                "email": user[2],
+                "role": user[3],
+                "created_at": user[4],
+                "last_login": user[5]
+            }
+        return None
+    finally:
+        conn.close()
+
+
+def get_user_by_username(username):
+    """Get user details by username"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "SELECT id, username, email, role, created_at, last_login, api_key FROM admin_users WHERE username = ?",
+            (username,)
+        )
+        user = cursor.fetchone()
+        if user:
+            return {
+                "id": user[0],
+                "username": user[1],
+                "email": user[2],
+                "role": user[3],
+                "created_at": user[4],
+                "last_login": user[5],
+                "api_key": user[6]
+            }
+        return None
+    finally:
+        conn.close()
+
+
 def get_admin_user_by_api_key(api_key):
-    """Get admin user by API key (legacy support)"""
-    if api_key == ADMIN_API_KEY:
-        return {
-            'username': 'admin',
-            'role': 'superadmin',
-            'email': 'admin@cognit.local'
-        }
-    return None
+    """Get admin user by API key"""
+    return get_user_by_api_key(api_key)
 
 
 def list_images(image_type: str):
@@ -280,13 +375,13 @@ def count_words(text: str):
 
 
 def require_api_key():
+    """Check if valid API key is provided"""
     api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
     
-    # Try legacy API key first
-    if api_key == ADMIN_API_KEY:
-        return True
+    if not api_key:
+        return False
     
-    # Try new authentication system
+    # Check database for API key
     return authenticate_admin(api_key)
 
 
@@ -294,13 +389,35 @@ def require_admin_auth():
     """Check if user is authenticated as admin (supports both API key and session)"""
     # Check API key
     api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
-    if require_api_key():
+    if api_key and require_api_key():
         return True
     
-    # Check session (future implementation)
-    # session_token = request.cookies.get('admin_session')
-    # if session_token:
-    #     return validate_admin_session(session_token)
+    # Check session token
+    session_token = request.headers.get("X-SESSION-TOKEN")
+    if session_token:
+        return validate_session(session_token)
+    
+    return False
+
+
+def validate_session(session_token):
+    """Validate session token"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "SELECT user_id, expires_at FROM admin_sessions WHERE session_token = ?",
+            (session_token,)
+        )
+        session = cursor.fetchone()
+        
+        if session:
+            user_id, expires_at = session
+            if datetime.fromisoformat(expires_at) > datetime.now(timezone.utc):
+                return True
+    finally:
+        conn.close()
     
     return False
 
@@ -525,12 +642,11 @@ def api_docs():
         "base_url": "/api",
         "authentication": {
             "type": "API Key",
-            "description": "Most endpoints require an API key for authentication",
+            "description": "Most endpoints require an API key for authentication. Register an account to get your API key.",
             "methods": [
                 "X-API-KEY header",
                 "api_key query parameter"
-            ],
-            "default_key": "changeme (for development only)"
+            ]
         },
         "endpoints": {
             "public": {
@@ -895,66 +1011,269 @@ def security_audit():
     })
 
 
-@app.route("/api/admin/login", methods=["POST"])
-def admin_login():
-    """Admin login endpoint"""
+@app.route("/api/admin/register", methods=["POST"])
+@limiter.limit("5 per hour")
+def admin_register():
+    """Admin registration endpoint with API key generation"""
     data = request.get_json(silent=True) or {}
-    username = data.get("username")
-    password = data.get("password")
+    username = data.get("username", "").strip()
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
     
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+    # Validation
+    if not username or len(username) < 3:
+        return jsonify({"error": "Username must be at least 3 characters"}), 400
+    if not email or "@" not in email:
+        return jsonify({"error": "Valid email is required"}), 400
+    if not password or len(password) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
     
-    if authenticate_admin(username, password):
+    # Generate API key and verification token
+    api_key = generate_api_key()
+    verification_token = secrets.token_urlsafe(32)
+    password_hash = hash_password(password)
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if username or email already exists
+        cursor.execute("SELECT id FROM admin_users WHERE username = ? OR email = ?", (username, email))
+        if cursor.fetchone():
+            return jsonify({"error": "Username or email already exists"}), 409
+        
+        # Insert new user
+        cursor.execute(
+            """INSERT INTO admin_users 
+               (username, password_hash, email, api_key, verification_token, is_active) 
+               VALUES (?, ?, ?, ?, ?, 1)""",
+            (username, password_hash, email, api_key, verification_token)
+        )
+        
+        user_id = cursor.lastrowid
+        
+        # Log registration
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (user_id, 'register', 'User registered', ip_address)
+        )
+        
+        conn.commit()
+        
+        # Send verification email
+        send_verification_email(email, username, verification_token)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Registration successful. Please check your email to verify your account.",
+            "username": username,
+            "api_key": api_key,
+            "verification_required": True
+        })
+        
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Username or email already exists"}), 409
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/verify-email", methods=["POST"])
+def verify_email():
+    """Verify email address"""
+    data = request.get_json(silent=True) or {}
+    token = data.get("token", "").strip()
+    
+    if not token:
+        return jsonify({"error": "Verification token is required"}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "SELECT id, username, email, api_key FROM admin_users WHERE verification_token = ?",
+            (token,)
+        )
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({"error": "Invalid verification token"}), 400
+        
+        user_id, username, email, api_key = user
+        
+        # Mark email as verified
+        cursor.execute(
+            "UPDATE admin_users SET email_verified = 1, verification_token = NULL WHERE id = ?",
+            (user_id,)
+        )
+        
+        # Log verification
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (user_id, 'email_verified', 'Email verified', ip_address)
+        )
+        
+        conn.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Email verified successfully",
+            "username": username,
+            "api_key": api_key
+        })
+        
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/resend-verification", methods=["POST"])
+@limiter.limit("3 per hour")
+def resend_verification():
+    """Resend verification email"""
+    data = request.get_json(silent=True) or {}
+    email = data.get("email", "").strip()
+    
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(
+            "SELECT id, username, email_verified FROM admin_users WHERE email = ?",
+            (email,)
+        )
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({"error": "Email not found"}), 404
+        
+        user_id, username, email_verified = user
+        
+        if email_verified:
+            return jsonify({"error": "Email already verified"}), 400
+        
+        # Generate new verification token
+        verification_token = secrets.token_urlsafe(32)
+        cursor.execute(
+            "UPDATE admin_users SET verification_token = ? WHERE id = ?",
+            (verification_token, user_id)
+        )
+        conn.commit()
+        
+        # Send verification email
+        send_verification_email(email, username, verification_token)
+        
+        return jsonify({
+            "status": "success",
+            "message": "Verification email sent"
+        })
+        
+    finally:
+        conn.close()
+
+
+@app.route("/api/admin/login", methods=["POST"])
+@limiter.limit("10 per minute")
+def admin_login():
+    """Admin login endpoint - accepts username/password or username/api_key"""
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    api_key = data.get("api_key", "").strip()
+    
+    if not username:
+        return jsonify({"error": "Username is required"}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if user exists and is verified
+        cursor.execute(
+            "SELECT id, password_hash, api_key, email_verified, role, is_active FROM admin_users WHERE username = ?",
+            (username,)
+        )
+        user = cursor.fetchone()
+        
+        if not user:
+            return jsonify({"error": "Invalid credentials"}), 401
+        
+        user_id, stored_password_hash, stored_api_key, email_verified, role, is_active = user
+        
+        if not is_active:
+            return jsonify({"error": "Account is deactivated"}), 401
+        
+        if not email_verified:
+            return jsonify({"error": "Please verify your email first", "needs_verification": True}), 401
+        
+        # Try API key authentication first
+        if api_key:
+            if api_key != stored_api_key:
+                return jsonify({"error": "Invalid API key"}), 401
+        # Then try password authentication
+        elif password:
+            input_hash = hash_password(password)
+            if input_hash != stored_password_hash:
+                # Log failed attempt
+                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+                cursor.execute(
+                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+                    (user_id, 'login_failed', 'Invalid password', ip_address)
+                )
+                conn.commit()
+                return jsonify({"error": "Invalid credentials"}), 401
+        else:
+            return jsonify({"error": "Password or API key is required"}), 400
+        
         # Generate session token
         session_token = secrets.token_hex(32)
         
-        # Store session in database
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
+        # Store session
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        user_agent = request.headers.get("User-Agent", "")
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
         
-        try:
-            # Get user ID
-            cursor.execute("SELECT id FROM admin_users WHERE username = ?", (username,))
-            user = cursor.fetchone()
-            user_id = user[0] if user else None
-            
-            if user_id:
-                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-                user_agent = request.headers.get("User-Agent", "")
-                expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-                
-                cursor.execute(
-                    "INSERT INTO admin_sessions (user_id, session_token, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
-                    (user_id, session_token, expires_at.isoformat(), ip_address, user_agent)
-                )
-                
-                # Update last login time
-                cursor.execute(
-                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), user_id)
-                )
-                
-                conn.commit()
-        finally:
-            conn.close()
+        cursor.execute(
+            "INSERT INTO admin_sessions (user_id, session_token, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+            (user_id, session_token, expires_at.isoformat(), ip_address, user_agent)
+        )
+        
+        # Update last login time
+        cursor.execute(
+            "UPDATE admin_users SET last_login = ? WHERE id = ?",
+            (datetime.now(timezone.utc).isoformat(), user_id)
+        )
+        
+        # Log successful login
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (user_id, 'login_success', 'User logged in', ip_address)
+        )
+        
+        conn.commit()
         
         return jsonify({
             "status": "success",
             "session_token": session_token,
+            "api_key": stored_api_key,
             "user": {
                 "username": username,
-                "role": "admin"  # In real app, get this from DB
+                "role": role
             }
         })
-    else:
-        return jsonify({"error": "Invalid username or password"}), 401
+        
+    finally:
+        conn.close()
 
 
 @app.route("/api/admin/logout", methods=["POST"])
 def admin_logout():
     """Admin logout endpoint"""
-    session_token = request.headers.get("X-SESSION-TOKEN") or request.cookies.get("admin_session")
+    session_token = request.headers.get("X-SESSION-TOKEN")
     
     if session_token:
         conn = sqlite3.connect(DB_PATH)
@@ -972,29 +1291,37 @@ def admin_logout():
 @app.route("/api/admin/me")
 def admin_me():
     """Get current admin user info"""
-    if not require_admin_auth():
+    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
+    session_token = request.headers.get("X-SESSION-TOKEN")
+    
+    if not api_key and not session_token:
         return jsonify({"error": "Unauthorized"}), 401
     
-    # Get user info from API key or session
-    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
+    # Try API key first
+    if api_key:
+        user = get_user_by_api_key(api_key)
+        if user:
+            return jsonify({
+                "username": user["username"],
+                "role": user["role"],
+                "email": user["email"],
+                "created_at": user["created_at"],
+                "last_login": user["last_login"],
+                "auth_method": "api_key"
+            })
     
-    if api_key == ADMIN_API_KEY:
-        # Legacy admin
-        return jsonify({
-            "username": "admin",
-            "role": "superadmin",
-            "email": "admin@cognit.local",
-            "auth_method": "api_key"
-        })
-    else:
-        # Database user
+    # Try session token
+    if session_token and validate_session(session_token):
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
         try:
             cursor.execute(
-                "SELECT username, email, role, created_at, last_login FROM admin_users WHERE username = ?",
-                (api_key,)
+                """SELECT u.username, u.email, u.role, u.created_at, u.last_login 
+                   FROM admin_users u 
+                   JOIN admin_sessions s ON u.id = s.user_id 
+                   WHERE s.session_token = ?""",
+                (session_token,)
             )
             user = cursor.fetchone()
             
@@ -1006,12 +1333,12 @@ def admin_me():
                     "email": email,
                     "created_at": created_at,
                     "last_login": last_login,
-                    "auth_method": "database"
+                    "auth_method": "session"
                 })
         finally:
             conn.close()
     
-    return jsonify({"error": "User not found"}), 404
+    return jsonify({"error": "Unauthorized"}), 401
 
 
 if __name__ == "__main__":
