@@ -196,6 +196,15 @@ textarea {
   transition: all 0.2s ease;
 }
 
+select {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 40px;
+}
+
 input:focus,
 select:focus,
 textarea:focus {
@@ -228,6 +237,37 @@ textarea {
   width: 20px;
   height: 20px;
   accent-color: var(--primary);
+}
+
+.consent-checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 12px;
+  background: rgba(24, 119, 242, 0.05);
+  border-radius: 12px;
+  border: 2px solid var(--border);
+  transition: all 0.3s ease;
+}
+
+.consent-checkbox:hover {
+  border-color: var(--primary);
+  background: rgba(24, 119, 242, 0.1);
+}
+
+.consent-checkbox input[type="checkbox"] {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--primary);
+  margin-top: 4px;
+}
+
+.consent-checkbox label {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
 }
 
 /* Primary button - cute pill shape */
@@ -833,11 +873,31 @@ body.dark .toast.warning {
   max-width: 400px;
   width: 100%;
   text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: linear-gradient(90deg, var(--primary) 0%, #ff6b9d 100%);
 }
 
 .login-panel h1 {
   color: var(--primary);
   margin-bottom: 16px;
+  font-size: 32px;
+}
+
+.login-panel p {
+  color: var(--muted);
+  margin-bottom: 24px;
+  font-size: 15px;
+}
 }
 
 .error-message {
@@ -1120,6 +1180,138 @@ body.dark .danger-zone {
 
 body.dark .danger-note {
   color: #ff8fa3;
+}
+
+.security-settings {
+  margin-top: 16px;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.api-key-change {
+  margin-top: 20px;
+  padding: 16px;
+  background: rgba(24, 119, 242, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.api-key-change h4 {
+  color: var(--primary);
+  margin: 0 0 16px 0;
+}
+
+.reset-confirm {
+  margin-top: 16px;
+  padding: 16px;
+  background: #fff5f5;
+  border-radius: 12px;
+  border: 2px solid #ffccd5;
+}
+
+body.dark .reset-confirm {
+  background: #3d1f25;
+  border-color: #5a353a;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.security {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.security-overview {
+  background: rgba(24, 119, 242, 0.05);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 24px;
+}
+
+.security-section {
+  background: var(--panel);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.security-section h3 {
+  color: var(--primary);
+  margin-top: 0;
+  border-bottom: 2px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.security-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.security-status-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(24, 119, 242, 0.05);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.security-status-item .status-icon {
+  font-size: 20px;
+  color: var(--success);
+}
+
+.security-status-item .status-label {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.rate-limit-info,
+.data-protection-info {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(24, 119, 242, 0.03);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.rate-limit-info p,
+.data-protection-info p {
+  margin: 8px 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.security-recommendations {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(255, 243, 188, 0.2);
+  border-radius: 12px;
+  border: 1px solid var(--warning);
+}
+
+.security-recommendations ul {
+  margin: 0;
+  padding-left: 24px;
+}
+
+.security-recommendations li {
+  margin-bottom: 8px;
+  color: var(--text);
+  font-size: 14px;
 }
 
 .loading {
