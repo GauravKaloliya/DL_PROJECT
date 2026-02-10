@@ -167,7 +167,6 @@ def _migrate_admin_users_table(cursor):
     
     # Define columns that should exist
     required_columns = {
-        'api_key': 'TEXT UNIQUE',
         'email_verified': 'BOOLEAN DEFAULT 0',
         'verification_token': 'TEXT',
     }
@@ -189,15 +188,14 @@ def _create_default_admin_user(cursor):
     if cursor.fetchone():
         return  # User already exists
     
-    # Create default admin user
-    default_api_key = "$2a$10$9mF8ySltm8uFbamU/d4xXeQXIVt2h9G9voD1ayzSnFhESk.z1dviG"
-    default_password_hash = hash_password("default_password")  # This won't be used since we authenticate via API key
+    # Create default admin user with password-based authentication
+    default_password_hash = hash_password("admin123")
     
     cursor.execute(
         """INSERT INTO admin_users 
-           (username, password_hash, email, api_key, email_verified, is_active) 
-           VALUES (?, ?, ?, ?, 1, 1)""",
-        ("Gaurav", default_password_hash, "gaurav@admin.com", default_api_key)
+           (username, password_hash, email, email_verified, is_active) 
+           VALUES (?, ?, ?, 1, 1)""",
+        ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
     
     # Log the creation
@@ -205,17 +203,6 @@ def _create_default_admin_user(cursor):
         "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
         (cursor.lastrowid, 'system_create', 'Default admin user created', 'system')
     )
-    
-    # Also ensure the API key is set correctly if user exists but has wrong API key
-    cursor.execute("SELECT id, api_key FROM admin_users WHERE username = ?", ("Gaurav",))
-    user = cursor.fetchone()
-    if user and user[1] != default_api_key:
-        cursor.execute("UPDATE admin_users SET api_key = ? WHERE username = ?", (default_api_key, "Gaurav"))
-
-
-def generate_api_key():
-    """Generate a secure API key"""
-    return secrets.token_urlsafe(32)
 
 
 # Email verification functionality removed
@@ -226,39 +213,16 @@ def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def authenticate_admin(api_key_or_username, password=None):
-    """Authenticate admin user using API key or username/password"""
+def authenticate_admin(username, password):
+    """Authenticate admin user using username/password"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
-        # If password is None, treat as API key authentication
-        if password is None:
-            cursor.execute(
-                "SELECT id, username, role, is_active, email_verified FROM admin_users WHERE api_key = ?",
-                (api_key_or_username,)
-            )
-            user = cursor.fetchone()
-            if user and user[3] and user[4]:  # Check active and verified
-                user_id, username, role, is_active, email_verified = user
-                # Log successful login
-                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-                cursor.execute(
-                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-                    (user_id, 'login_success_api_key', 'User logged in with API key', ip_address)
-                )
-                cursor.execute(
-                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), user_id)
-                )
-                conn.commit()
-                return True
-            return False
-        
         # Username/password authentication
         cursor.execute(
             "SELECT id, password_hash, role, is_active, email_verified FROM admin_users WHERE username = ?",
-            (api_key_or_username,)
+            (username,)
         )
         user = cursor.fetchone()
         
@@ -284,7 +248,7 @@ def authenticate_admin(api_key_or_username, password=None):
         ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
         cursor.execute(
             "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (None, 'login_failed', f'Failed login for user: {api_key_or_username}', ip_address)
+            (None, 'login_failed', f'Failed login for user: {username}', ip_address)
         )
         conn.commit()
         
@@ -294,15 +258,15 @@ def authenticate_admin(api_key_or_username, password=None):
         conn.close()
 
 
-def get_user_by_api_key(api_key):
-    """Get user details by API key"""
+def get_user_by_username(username):
+    """Get user details by username"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
         cursor.execute(
-            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE api_key = ?",
-            (api_key,)
+            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE username = ?",
+            (username,)
         )
         user = cursor.fetchone()
         if user:
@@ -319,15 +283,15 @@ def get_user_by_api_key(api_key):
         conn.close()
 
 
-def get_user_by_username(username):
-    """Get user details by username"""
+def get_user_by_id(user_id):
+    """Get user details by ID"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
         cursor.execute(
-            "SELECT id, username, email, role, created_at, last_login, api_key FROM admin_users WHERE username = ?",
-            (username,)
+            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE id = ?",
+            (user_id,)
         )
         user = cursor.fetchone()
         if user:
@@ -337,17 +301,11 @@ def get_user_by_username(username):
                 "email": user[2],
                 "role": user[3],
                 "created_at": user[4],
-                "last_login": user[5],
-                "api_key": user[6]
+                "last_login": user[5]
             }
         return None
     finally:
         conn.close()
-
-
-def get_admin_user_by_api_key(api_key):
-    """Get admin user by API key"""
-    return get_user_by_api_key(api_key)
 
 
 def validate_session(session_token):
@@ -448,52 +406,71 @@ def count_words(text: str):
     return len([word for word in text.strip().split() if word])
 
 
-def require_api_key():
-    """Check if valid API key is provided"""
-    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
-    
-    if not api_key:
+def require_auth():
+    """Check if user is authenticated via session token"""
+    session_token = request.headers.get("X-SESSION-TOKEN")
+    if not session_token:
         return False
     
-    # Check database for API key
-    return authenticate_admin(api_key)
+    return validate_session(session_token)
 
 
-def require_admin_auth():
-    """Check if user is authenticated as admin (supports both API key and session)"""
-    # Check API key
-    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
-    if api_key and require_api_key():
-        return True
-    
-    # Check session token
-    session_token = request.headers.get("X-SESSION-TOKEN")
-    if session_token:
-        return validate_session(session_token)
-    
-    return False
-
-
-def validate_session(session_token):
-    """Validate session token"""
+def get_user_from_session(session_token):
+    """Get user info from session token"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     try:
         cursor.execute(
-            "SELECT user_id, expires_at FROM admin_sessions WHERE session_token = ?",
-            (session_token,)
+            """SELECT u.id, u.username, u.email, u.role, u.created_at, u.last_login 
+               FROM admin_users u 
+               JOIN admin_sessions s ON u.id = s.user_id 
+               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
+            (session_token, datetime.now(timezone.utc).isoformat())
         )
-        session = cursor.fetchone()
+        user = cursor.fetchone()
         
-        if session:
-            user_id, expires_at = session
-            if datetime.fromisoformat(expires_at) > datetime.now(timezone.utc):
-                return True
+        if user:
+            return {
+                "id": user[0],
+                "username": user[1],
+                "email": user[2],
+                "role": user[3],
+                "created_at": user[4],
+                "last_login": user[5]
+            }
+        return None
     finally:
         conn.close()
+
+
+def validate_session(session_token):
+    """Validate session token and return user info"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
     
-    return False
+    try:
+        cursor.execute(
+            """SELECT u.id, u.username, u.role, u.is_active 
+               FROM admin_users u 
+               JOIN admin_sessions s ON u.id = s.user_id 
+               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
+            (session_token, datetime.now(timezone.utc).isoformat())
+        )
+        user = cursor.fetchone()
+        
+        if user:
+            user_id, username, role, is_active = user
+            return {
+                "id": user_id,
+                "username": username,
+                "role": role,
+                "is_active": is_active
+            }
+        return None
+        
+    finally:
+        conn.close()
 
 
 @app.route("/api/images/random")
@@ -598,7 +575,8 @@ def submit():
 
 @app.route("/api/stats")
 def stats():
-    if not require_api_key():
+    user = require_auth()
+    if not user:
         return jsonify({"error": "Unauthorized"}), 401
 
     ensure_csv()
@@ -634,7 +612,8 @@ def stats():
 
 @app.route("/admin/download")
 def download_csv():
-    if not require_api_key():
+    user = require_auth()
+    if not user:
         return jsonify({"error": "Unauthorized"}), 401
 
     ensure_csv()
@@ -715,12 +694,12 @@ def api_docs():
         "description": "Complete API documentation for the C.O.G.N.I.T. research platform",
         "base_url": "/api",
         "authentication": {
-            "type": "API Key",
-            "description": "Most endpoints require an API key for authentication. Register an account to get your API key.",
+            "type": "Session Token",
+            "description": "Most admin endpoints require a session token for authentication. Login with username/password to get a session token.",
             "methods": [
-                "X-API-KEY header",
-                "api_key query parameter"
-            ]
+                "X-SESSION-TOKEN header"
+            ],
+            "login_endpoint": "/api/admin/login"
         },
         "endpoints": {
             "public": {
@@ -778,8 +757,8 @@ def api_docs():
                         "path": "/admin/settings/csv-delete",
                         "method": "DELETE",
                         "description": "Delete all data from CSV file (admin only)",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": {
                             "status": "string",
@@ -838,14 +817,14 @@ def api_docs():
                 ]
             },
             "admin": {
-                "description": "Endpoints requiring admin authentication",
+                "description": "Endpoints requiring admin authentication (X-SESSION-TOKEN header required)",
                 "routes": [
                     {
                         "path": "/api/stats",
                         "method": "GET",
                         "description": "Get statistics about submissions",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": {
                             "total_submissions": "integer",
@@ -857,8 +836,8 @@ def api_docs():
                         "path": "/admin/download",
                         "method": "GET",
                         "description": "Download CSV file with all submissions",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": "CSV file attachment"
                     },
@@ -866,8 +845,8 @@ def api_docs():
                         "path": "/admin/csv-data",
                         "method": "GET",
                         "description": "Get CSV data as JSON for admin panel",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": "array of submission objects"
                     },
@@ -875,8 +854,8 @@ def api_docs():
                         "path": "/api/security/info",
                         "method": "GET",
                         "description": "Get security information",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": {
                             "security": {
@@ -891,8 +870,8 @@ def api_docs():
                         "path": "/admin/security/audit",
                         "method": "GET",
                         "description": "Run security audit",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": {
                             "security_audit": {
@@ -921,6 +900,9 @@ def api_docs():
                         "path": "/api/admin/logout",
                         "method": "POST",
                         "description": "Admin logout endpoint",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": False, "description": "Session token to invalidate"}
+                        ],
                         "response": {
                             "status": "string",
                             "message": "string"
@@ -930,8 +912,8 @@ def api_docs():
                         "path": "/api/admin/me",
                         "method": "GET",
                         "description": "Get current admin user info",
-                        "parameters": [
-                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
                         ],
                         "response": {
                             "username": "string",
@@ -940,6 +922,22 @@ def api_docs():
                             "created_at": "string",
                             "last_login": "string",
                             "auth_method": "string"
+                        }
+                    },
+                    {
+                        "path": "/api/admin/change-password",
+                        "method": "POST",
+                        "description": "Change admin user password",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "request_body": {
+                            "current_password": "string (required)",
+                            "new_password": "string (required, min 6 characters)"
+                        },
+                        "response": {
+                            "status": "string",
+                            "message": "string"
                         }
                     }
                 ]
@@ -1025,7 +1023,8 @@ def api_docs():
 @limiter.limit("10 per minute")
 def get_csv_data():
     """Get CSV data as JSON for admin panel"""
-    if not require_api_key():
+    user = require_auth()
+    if not user:
         return jsonify({"error": "Unauthorized"}), 401
 
     ensure_csv()
@@ -1044,7 +1043,8 @@ def get_csv_data():
 @limiter.limit("5 per minute")
 def delete_csv_data():
     """Delete all data from CSV file (admin only)"""
-    if not require_api_key():
+    user = require_auth()
+    if not user:
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
@@ -1092,7 +1092,8 @@ def security_info():
 @limiter.limit("5 per minute")
 def security_audit():
     """Admin security audit endpoint"""
-    if not require_api_key():
+    user = require_auth()
+    if not user:
         return jsonify({"error": "Unauthorized"}), 401
     
     # In a real app, this would check various security aspects
@@ -1101,7 +1102,7 @@ def security_audit():
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": "ok",
             "checks": {
-                "api_key_validation": "enabled",
+                "password_validation": "enabled",
                 "rate_limiting": "enabled",
                 "cors_restrictions": "enabled",
                 "security_headers": "enabled",
@@ -1109,7 +1110,7 @@ def security_audit():
                 "csrf_protection": "available"
             },
             "recommendations": [
-                "Rotate API keys regularly",
+                "Change password regularly",
                 "Monitor failed login attempts",
                 "Review CORS origins in production",
                 "Enable HTTPS in production"
@@ -1127,14 +1128,16 @@ def security_audit():
 @app.route("/api/admin/login", methods=["POST"])
 @limiter.limit("10 per minute")
 def admin_login():
-    """Admin login endpoint - accepts username/password or username/api_key"""
+    """Admin login endpoint - accepts username/password"""
     data = request.get_json(silent=True) or {}
     username = data.get("username", "").strip()
     password = data.get("password", "").strip()
-    api_key = data.get("api_key", "").strip()
     
     if not username:
         return jsonify({"error": "Username is required"}), 400
+    
+    if not password:
+        return jsonify({"error": "Password is required"}), 400
     
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -1142,7 +1145,7 @@ def admin_login():
     try:
         # Check if user exists and is verified
         cursor.execute(
-            "SELECT id, password_hash, api_key, email_verified, role, is_active FROM admin_users WHERE username = ?",
+            "SELECT id, password_hash, email_verified, role, is_active FROM admin_users WHERE username = ?",
             (username,)
         )
         user = cursor.fetchone()
@@ -1150,29 +1153,22 @@ def admin_login():
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
         
-        user_id, stored_password_hash, stored_api_key, email_verified, role, is_active = user
+        user_id, stored_password_hash, email_verified, role, is_active = user
         
         if not is_active:
             return jsonify({"error": "Account is deactivated"}), 401
         
-        # Try API key authentication first
-        if api_key:
-            if api_key != stored_api_key:
-                return jsonify({"error": "Invalid API key"}), 401
-        # Then try password authentication
-        elif password:
-            input_hash = hash_password(password)
-            if input_hash != stored_password_hash:
-                # Log failed attempt
-                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-                cursor.execute(
-                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-                    (user_id, 'login_failed', 'Invalid password', ip_address)
-                )
-                conn.commit()
-                return jsonify({"error": "Invalid credentials"}), 401
-        else:
-            return jsonify({"error": "Password or API key is required"}), 400
+        # Verify password
+        input_hash = hash_password(password)
+        if input_hash != stored_password_hash:
+            # Log failed attempt
+            ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+            cursor.execute(
+                "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+                (user_id, 'login_failed', 'Invalid password', ip_address)
+            )
+            conn.commit()
+            return jsonify({"error": "Invalid credentials"}), 401
         
         # Generate session token
         session_token = secrets.token_hex(32)
@@ -1204,7 +1200,6 @@ def admin_login():
         return jsonify({
             "status": "success",
             "session_token": session_token,
-            "api_key": stored_api_key,
             "user": {
                 "username": username,
                 "role": role
@@ -1236,54 +1231,92 @@ def admin_logout():
 @app.route("/api/admin/me")
 def admin_me():
     """Get current admin user info"""
-    api_key = request.headers.get("X-API-KEY") or request.args.get("api_key")
     session_token = request.headers.get("X-SESSION-TOKEN")
     
-    if not api_key and not session_token:
+    if not session_token:
         return jsonify({"error": "Unauthorized"}), 401
     
-    # Try API key first
-    if api_key:
-        user = get_user_by_api_key(api_key)
-        if user:
-            return jsonify({
-                "username": user["username"],
-                "role": user["role"],
-                "email": user["email"],
-                "created_at": user["created_at"],
-                "last_login": user["last_login"],
-                "auth_method": "api_key"
-            })
-    
     # Try session token
-    if session_token and validate_session(session_token):
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
-        try:
-            cursor.execute(
-                """SELECT u.username, u.email, u.role, u.created_at, u.last_login 
-                   FROM admin_users u 
-                   JOIN admin_sessions s ON u.id = s.user_id 
-                   WHERE s.session_token = ?""",
-                (session_token,)
-            )
-            user = cursor.fetchone()
-            
-            if user:
-                username, email, role, created_at, last_login = user
-                return jsonify({
-                    "username": username,
-                    "role": role,
-                    "email": email,
-                    "created_at": created_at,
-                    "last_login": last_login,
-                    "auth_method": "session"
-                })
-        finally:
-            conn.close()
+    user = get_user_from_session(session_token)
+    if user:
+        return jsonify({
+            "username": user["username"],
+            "role": user["role"],
+            "email": user["email"],
+            "created_at": user["created_at"],
+            "last_login": user["last_login"],
+            "auth_method": "session"
+        })
     
     return jsonify({"error": "Unauthorized"}), 401
+
+
+@app.route("/api/admin/change-password", methods=["POST"])
+@limiter.limit("5 per minute")
+def change_password():
+    """Change admin user password"""
+    session_token = request.headers.get("X-SESSION-TOKEN")
+    
+    if not session_token:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    user = validate_session(session_token)
+    if not user:
+        return jsonify({"error": "Invalid or expired session"}), 401
+    
+    data = request.get_json(silent=True) or {}
+    current_password = data.get("current_password", "").strip()
+    new_password = data.get("new_password", "").strip()
+    
+    if not current_password or not new_password:
+        return jsonify({"error": "Current password and new password are required"}), 400
+    
+    if len(new_password) < 6:
+        return jsonify({"error": "New password must be at least 6 characters long"}), 400
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Get current password hash
+        cursor.execute(
+            "SELECT password_hash FROM admin_users WHERE id = ?",
+            (user["id"],)
+        )
+        result = cursor.fetchone()
+        
+        if not result:
+            return jsonify({"error": "User not found"}), 404
+        
+        stored_hash = result[0]
+        
+        # Verify current password
+        if hash_password(current_password) != stored_hash:
+            return jsonify({"error": "Current password is incorrect"}), 401
+        
+        # Update password
+        new_hash = hash_password(new_password)
+        cursor.execute(
+            "UPDATE admin_users SET password_hash = ? WHERE id = ?",
+            (new_hash, user["id"])
+        )
+        
+        # Log password change
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (user["id"], 'password_change', 'Password changed successfully', ip_address)
+        )
+        
+        conn.commit()
+        
+        return jsonify({
+            "status": "success",
+            "message": "Password changed successfully"
+        })
+        
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":
