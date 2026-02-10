@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const MIN_WORDS = 30;
-const PRACTICE_TARGET = 2;
 const MAIN_TARGET = 15;
 const ATTENTION_TARGET = 1;
 const AUTO_NEXT_DELAY_MS = 1200;
@@ -286,7 +285,7 @@ export default function App() {
 
   const startSurvey = async () => {
     setStage("survey");
-    await fetchImage("practice");
+    await fetchImage("survey");
   };
 
   const startMain = async () => {
@@ -364,7 +363,6 @@ export default function App() {
       feedback: comments,
       time_spent_seconds: timeSpentSeconds,
       word_count: wordCount,
-      is_practice: trial.is_practice,
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
       username: demographics.username,
@@ -396,7 +394,7 @@ export default function App() {
       setTimeout(() => setShowConfetti(false), 1200);
       setSubmissions((prev) => [...prev, { ...payload, attention_passed: result.attention_passed }]);
 
-      if (trial.is_practice) {
+      if (trial.is_survey) {
         setSurveyCompleted((prev) => prev + 1);
         setSurveyFeedbackReady(true);
       } else {
@@ -424,7 +422,7 @@ export default function App() {
     clearNextTimeout();
     setReadyForNext(false);
     if (stage === "survey") {
-      await fetchImage("practice");
+      await fetchImage("survey");
       return;
     }
     if (mainCompleted >= MAIN_TARGET) {
@@ -891,7 +889,7 @@ function TrialForm({
       <div className="meta">
         <span className="timer">Time: {elapsed}s ⏱️</span>
         {trial.is_attention && <span className="tag attention">Attention check 💝</span>}
-        {trial.is_practice && <span className="tag survey">Practice 🎯</span>}
+        {trial.is_survey && <span className="tag survey">Survey 🎯</span>}
       </div>
       <label className="field">
         Description 📝
