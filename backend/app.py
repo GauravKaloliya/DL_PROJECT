@@ -90,7 +90,6 @@ def add_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
 
-
 def ensure_csv():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     if not CSV_PATH.exists():
@@ -149,7 +148,35 @@ def init_db():
     ''')
     
     conn.commit()
+    
+    # Run migrations to add missing columns if they don't exist
+    _migrate_admin_users_table(cursor)
+    
+    conn.commit()
     conn.close()
+
+
+def _migrate_admin_users_table(cursor):
+    """Add missing columns to admin_users table if they don't exist"""
+    # Get existing columns
+    cursor.execute("PRAGMA table_info(admin_users)")
+    existing_columns = {row[1] for row in cursor.fetchall()}
+    
+    # Define columns that should exist
+    required_columns = {
+        'api_key': 'TEXT UNIQUE',
+        'email_verified': 'BOOLEAN DEFAULT 0',
+        'verification_token': 'TEXT',
+    }
+    
+    # Add missing columns
+    for col_name, col_def in required_columns.items():
+        if col_name not in existing_columns:
+            try:
+                cursor.execute(f"ALTER TABLE admin_users ADD COLUMN {col_name} {col_def}")
+            except sqlite3.OperationalError:
+                # Column might already exist or there's another issue
+                pass
 
 
 def generate_api_key():
