@@ -259,6 +259,88 @@ def download_csv():
     return send_from_directory(DATA_DIR, CSV_PATH.name, as_attachment=True)
 
 
+@app.route("/api/pages/home")
+def home_page():
+    """Home page endpoint"""
+    return jsonify({
+        "title": "C.O.G.N.I.T. - Cognitive Observation & Generalized Narrative Inquiry Tool",
+        "description": "A research tool for studying how people describe visual scenes",
+        "version": "1.0.0",
+        "features": ["Image description tasks", "NASA-TLX workload assessment", "Attention checks", "Data export"]
+    })
+
+
+@app.route("/api/pages/about")
+def about_page():
+    """About page endpoint"""
+    return jsonify({
+        "title": "About C.O.G.N.I.T.",
+        "content": "C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a research platform designed to study how individuals describe and interpret visual stimuli. This tool helps researchers understand cognitive processes involved in language production and visual perception.",
+        "purpose": "To collect anonymous descriptions of images for improving language understanding models and cognitive research",
+        "team": ["Researchers", "Developers", "Data Scientists"]
+    })
+
+
+@app.route("/api/pages/contact")
+def contact_page():
+    """Contact page endpoint"""
+    return jsonify({
+        "title": "Contact Us",
+        "email": "contact@cognit-research.org",
+        "support": "support@cognit-research.org",
+        "address": "Research Department, University of Cognitive Sciences, 123 Research Ave, Science City, ST 12345",
+        "social": {
+            "twitter": "@cognit_research",
+            "facebook": "/cognit.study",
+            "linkedin": "/company/cognit-research"
+        }
+    })
+
+
+@app.route("/api/pages/faq")
+def faq_page():
+    """FAQ page endpoint"""
+    return jsonify({
+        "title": "Frequently Asked Questions",
+        "faqs": [
+            {
+                "question": "What is C.O.G.N.I.T.?",
+                "answer": "C.O.G.N.I.T. is a research tool for studying how people describe visual scenes and assess their cognitive workload."
+            },
+            {
+                "question": "How long does a session take?",
+                "answer": "A typical session takes about 15-20 minutes to complete, depending on your description speed."
+            },
+            {
+                "question": "Is my data anonymous?",
+                "answer": "Yes, all data is collected anonymously. We only store a hashed version of your IP address for research purposes."
+            },
+            {
+                "question": "Can I stop at any time?",
+                "answer": "Absolutely! You can stop participating at any time without any consequences."
+            }
+        ]
+    })
+
+
+@app.route("/admin/csv-data")
+def get_csv_data():
+    """Get CSV data as JSON for admin panel"""
+    if not require_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    ensure_csv()
+    
+    try:
+        with CSV_PATH.open("r", newline="", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+            data = [row for row in reader]
+        
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 500
+
+
 if __name__ == "__main__":
     ensure_csv()
     app.run(debug=True)
