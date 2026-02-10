@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Admin from "./Admin";
+import { fetchRandomImage, submitTrial } from "./api";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 const MIN_WORDS = 30;
@@ -103,6 +105,17 @@ function Confetti({ show }) {
 }
 
 export default function App() {
+  // Check if we're on the admin route
+  const path = window.location.pathname;
+  
+  if (path === '/admin') {
+    return <Admin />;
+  }
+  
+  return <CognitStudy />;
+}
+
+function CognitStudy() {
   const [darkMode, setDarkMode] = useState(getStoredValue("darkMode", false));
   const [online, setOnline] = useState(navigator.onLine);
   const [stage, setStage] = useState("consent");
@@ -193,11 +206,7 @@ export default function App() {
   const fetchImage = useCallback(async (type) => {
     setFetchingImage(true);
     try {
-      const response = await fetch(`${API_BASE}/api/images/random?type=${type}&session_id=${sessionId}`);
-      if (!response.ok) {
-        throw new Error("Unable to fetch image");
-      }
-      const data = await response.json();
+      const data = await fetchRandomImage(type);
       setTrial(data);
       setDescription("");
       setRating(0);
@@ -219,7 +228,7 @@ export default function App() {
     } finally {
       setFetchingImage(false);
     }
-  }, [addToast, sessionId]);
+  }, [addToast]);
 
   const startPractice = async () => {
     setStage("practice");
@@ -295,17 +304,7 @@ export default function App() {
     };
 
     try {
-      const response = await fetch(`${API_BASE}/api/submit`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Submission failed");
-      }
-      const result = await response.json();
+      const result = await submitTrial(payload);
       if (trial.is_attention && !result.attention_passed) {
         addToast("Oopsie! 💕 Please follow the special instructions next time!", "warning");
       } else {

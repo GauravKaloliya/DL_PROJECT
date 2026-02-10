@@ -250,6 +250,87 @@ def stats():
     )
 
 
+@app.route("/api/submissions")
+def get_submissions():
+    if not require_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    
+    ensure_csv()
+    rows = []
+    with CSV_PATH.open('r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            rows.append(row)
+    
+    total = len(rows)
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    return jsonify({
+        'submissions': rows[start:end],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+
+@app.route("/api/submissions/<participant_id>")
+def get_participant_submissions(participant_id):
+    if not require_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    ensure_csv()
+    rows = []
+    with CSV_PATH.open('r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if row.get('participant_id') == participant_id:
+                rows.append(row)
+    
+    return jsonify({'submissions': rows})
+
+
+@app.route("/api/submissions/search")
+def search_submissions():
+    if not require_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    query = request.args.get('q', '').lower()
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 20))
+    
+    ensure_csv()
+    rows = []
+    with CSV_PATH.open('r', newline='', encoding='utf-8') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            if query in row.get('description', '').lower() or \
+               query in row.get('participant_id', '').lower() or \
+               query in row.get('image_id', '').lower():
+                rows.append(row)
+    
+    total = len(rows)
+    start = (page - 1) * per_page
+    end = start + per_page
+    
+    return jsonify({
+        'submissions': rows[start:end],
+        'total': total,
+        'page': page,
+        'per_page': per_page,
+        'total_pages': (total + per_page - 1) // per_page
+    })
+
+
+@app.route("/api/health")
+def health():
+    return jsonify({"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()})
+
+
 @app.route("/admin/download")
 def download_csv():
     if not require_api_key():
