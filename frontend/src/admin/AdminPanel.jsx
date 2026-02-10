@@ -48,7 +48,7 @@ export default function AdminPanel() {
   const location = useLocation();
   
   // Auth state
-  const [authMode, setAuthMode] = useState("login"); // "login", "register", "verify"
+  const [authMode, setAuthMode] = useState("login"); // "login", "register"
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [sessionToken, setSessionToken] = useState("");
   const [apiKey, setApiKey] = useState("");
@@ -63,10 +63,6 @@ export default function AdminPanel() {
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
-  
-  // Verification state
-  const [verifyToken, setVerifyToken] = useState("");
-  const [pendingEmail, setPendingEmail] = useState("");
   
   // Data state
   const [stats, setStats] = useState(null);
@@ -96,15 +92,7 @@ export default function AdminPanel() {
       }
       setIsAuthenticated(true);
     }
-    
-    // Check for verification token in URL
-    const params = new URLSearchParams(location.search);
-    const token = params.get("token");
-    if (token) {
-      setVerifyToken(token);
-      setAuthMode("verify");
-    }
-  }, [location]);
+  }, []);
   
   // Fetch data when authenticated
   useEffect(() => {
@@ -195,13 +183,7 @@ export default function AdminPanel() {
         
         addToast("Login successful!", "success");
       } else {
-        if (data.needs_verification) {
-          setPendingEmail(data.email || "");
-          setAuthMode("verify");
-          setError("Please verify your email before logging in");
-        } else {
-          setError(data.error || "Invalid credentials");
-        }
+        setError(data.error || "Invalid credentials");
       }
     } catch (err) {
       setError("Failed to login. Please check your connection.");
@@ -258,13 +240,7 @@ export default function AdminPanel() {
 
         addToast("Login successful with loaded credentials!", "success");
       } else {
-        if (data.needs_verification) {
-          setPendingEmail(data.email || "");
-          setAuthMode("verify");
-          setError("Please verify your email before logging in");
-        } else {
-          setError(data.error || "Invalid credentials from JSON file");
-        }
+        setError(data.error || "Invalid credentials from JSON file");
       }
     } catch (err) {
       if (err instanceof SyntaxError) {
@@ -332,9 +308,8 @@ export default function AdminPanel() {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         
-        setPendingEmail(regEmail);
-        setAuthMode("verify");
-        addToast("Registration successful! Please check your email to verify your account.", "success");
+        setAuthMode("login");
+        addToast("Registration successful! You can now login.", "success");
       } else {
         setError(data.error || "Registration failed");
       }
@@ -345,38 +320,7 @@ export default function AdminPanel() {
     }
   };
   
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setError(null);
-    
-    if (!verifyToken.trim()) {
-      setError("Verification token is required");
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_BASE}/api/admin/verify-email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: verifyToken })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setApiKey(data.api_key);
-        setAuthMode("login");
-        addToast("Email verified! You can now login.", "success");
-      } else {
-        setError(data.error || "Verification failed");
-      }
-    } catch (err) {
-      setError("Failed to verify email. Please check your connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
+// Email verification removed
   
   const handleLogout = async () => {
     try {
@@ -598,6 +542,9 @@ export default function AdminPanel() {
             <button className="ghost" onClick={() => { setAuthMode("register"); setError(null); }}>
               Register
             </button>
+            <button className="ghost" onClick={() => navigate('/')}>
+              Back to Home
+            </button>
           </div>
         </div>
       </div>
@@ -672,51 +619,16 @@ export default function AdminPanel() {
             <button className="ghost" onClick={() => { setAuthMode("login"); setError(null); }}>
               Login
             </button>
+            <button className="ghost" onClick={() => navigate('/')}>
+              Back to Home
+            </button>
           </div>
         </div>
       </div>
     );
   }
   
-  // Render verification form
-  if (!isAuthenticated && authMode === "verify") {
-    return (
-      <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
-        <div className="login-panel">
-          <div className="login-header">
-            <h1>Verify Email</h1>
-            <p>Enter the verification token sent to your email</p>
-          </div>
-          
-          {error && <div className="error-message">{error}</div>}
-          
-          <form onSubmit={handleVerify} className="auth-form">
-            <div className="form-group">
-              <label>Verification Token</label>
-              <input
-                type="text"
-                value={verifyToken}
-                onChange={(e) => setVerifyToken(e.target.value)}
-                placeholder="Enter verification token"
-                autoFocus
-                onCopy={preventCopyPaste}
-                onPaste={preventCopyPaste}
-              />
-            </div>
-            <button type="submit" className="primary" disabled={loading}>
-              {loading ? "Verifying..." : "Verify Email"}
-            </button>
-          </form>
-          
-          <div className="auth-switch">
-            <button className="ghost" onClick={() => { setAuthMode("login"); setError(null); }}>
-              Back to Login
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+// Verification form removed
   
   // Render admin panel
   return (

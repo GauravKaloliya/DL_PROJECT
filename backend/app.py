@@ -157,24 +157,7 @@ def generate_api_key():
     return secrets.token_urlsafe(32)
 
 
-def send_verification_email(email, username, verification_token):
-    """Send verification email - in development, just print to console"""
-    verification_link = f"http://localhost:5173/verify-email?token={verification_token}"
-    
-    # In production, you would use smtplib to send actual emails
-    # For now, we'll log to console
-    print(f"\n{'='*60}")
-    print(f"VERIFICATION EMAIL for {email}")
-    print(f"{'='*60}")
-    print(f"To: {email}")
-    print(f"Subject: Verify your C.O.G.N.I.T. account")
-    print(f"\nHello {username},\n")
-    print(f"Please verify your email by clicking this link:")
-    print(f"{verification_link}")
-    print(f"\nOr use this verification token: {verification_token}")
-    print(f"{'='*60}\n")
-    
-    return True
+# Email verification functionality removed
 
 
 def hash_password(password):
@@ -1058,9 +1041,8 @@ def admin_register():
     if not password or len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters"}), 400
     
-    # Generate API key and verification token
+    # Generate API key
     api_key = generate_api_key()
-    verification_token = secrets.token_urlsafe(32)
     password_hash = hash_password(password)
     
     conn = sqlite3.connect(DB_PATH)
@@ -1072,12 +1054,12 @@ def admin_register():
         if cursor.fetchone():
             return jsonify({"error": "Username or email already exists"}), 409
         
-        # Insert new user
+        # Insert new user (email_verified = 1 by default)
         cursor.execute(
             """INSERT INTO admin_users 
-               (username, password_hash, email, api_key, verification_token, is_active) 
-               VALUES (?, ?, ?, ?, ?, 1)""",
-            (username, password_hash, email, api_key, verification_token)
+               (username, password_hash, email, api_key, email_verified, is_active) 
+               VALUES (?, ?, ?, ?, 1, 1)""",
+            (username, password_hash, email, api_key)
         )
         
         user_id = cursor.lastrowid
@@ -1091,15 +1073,11 @@ def admin_register():
         
         conn.commit()
         
-        # Send verification email
-        send_verification_email(email, username, verification_token)
-        
         return jsonify({
             "status": "success",
-            "message": "Registration successful. Please check your email to verify your account.",
+            "message": "Registration successful. You can now login.",
             "username": username,
-            "api_key": api_key,
-            "verification_required": True
+            "api_key": api_key
         })
         
     except sqlite3.IntegrityError:
@@ -1108,102 +1086,7 @@ def admin_register():
         conn.close()
 
 
-@app.route("/api/admin/verify-email", methods=["POST"])
-def verify_email():
-    """Verify email address"""
-    data = request.get_json(silent=True) or {}
-    token = data.get("token", "").strip()
-    
-    if not token:
-        return jsonify({"error": "Verification token is required"}), 400
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute(
-            "SELECT id, username, email, api_key FROM admin_users WHERE verification_token = ?",
-            (token,)
-        )
-        user = cursor.fetchone()
-        
-        if not user:
-            return jsonify({"error": "Invalid verification token"}), 400
-        
-        user_id, username, email, api_key = user
-        
-        # Mark email as verified
-        cursor.execute(
-            "UPDATE admin_users SET email_verified = 1, verification_token = NULL WHERE id = ?",
-            (user_id,)
-        )
-        
-        # Log verification
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (user_id, 'email_verified', 'Email verified', ip_address)
-        )
-        
-        conn.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Email verified successfully",
-            "username": username,
-            "api_key": api_key
-        })
-        
-    finally:
-        conn.close()
-
-
-@app.route("/api/admin/resend-verification", methods=["POST"])
-@limiter.limit("3 per hour")
-def resend_verification():
-    """Resend verification email"""
-    data = request.get_json(silent=True) or {}
-    email = data.get("email", "").strip()
-    
-    if not email:
-        return jsonify({"error": "Email is required"}), 400
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute(
-            "SELECT id, username, email_verified FROM admin_users WHERE email = ?",
-            (email,)
-        )
-        user = cursor.fetchone()
-        
-        if not user:
-            return jsonify({"error": "Email not found"}), 404
-        
-        user_id, username, email_verified = user
-        
-        if email_verified:
-            return jsonify({"error": "Email already verified"}), 400
-        
-        # Generate new verification token
-        verification_token = secrets.token_urlsafe(32)
-        cursor.execute(
-            "UPDATE admin_users SET verification_token = ? WHERE id = ?",
-            (verification_token, user_id)
-        )
-        conn.commit()
-        
-        # Send verification email
-        send_verification_email(email, username, verification_token)
-        
-        return jsonify({
-            "status": "success",
-            "message": "Verification email sent"
-        })
-        
-    finally:
-        conn.close()
+# Email verification endpoints removed
 
 
 @app.route("/api/admin/login", methods=["POST"])
@@ -1236,9 +1119,6 @@ def admin_login():
         
         if not is_active:
             return jsonify({"error": "Account is deactivated"}), 401
-        
-        if not email_verified:
-            return jsonify({"error": "Please verify your email first", "needs_verification": True}), 401
         
         # Try API key authentication first
         if api_key:
