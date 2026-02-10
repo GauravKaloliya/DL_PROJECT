@@ -40,7 +40,6 @@ export default function ApiDocs() {
       <div className="app">
         <div className="panel">
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <div style={{ fontSize: '60px', marginBottom: '20px' }}>📚</div>
             <h2>Loading API Documentation...</h2>
           </div>
         </div>
@@ -53,11 +52,10 @@ export default function ApiDocs() {
       <div className="app">
         <div className="panel">
           <div style={{ textAlign: 'center', padding: '40px' }}>
-            <div style={{ fontSize: '60px', marginBottom: '20px' }}>❌</div>
             <h2>Error Loading Documentation</h2>
             <p style={{ color: 'var(--muted)' }}>{error}</p>
             <button className="primary" onClick={fetchApiDocs}>
-              Retry 🔄
+              Retry
             </button>
           </div>
         </div>
@@ -82,17 +80,17 @@ export default function ApiDocs() {
       <div className="panel">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
           <div>
-            <h1 style={{ margin: 0, color: 'var(--primary)' }}>📚 API Documentation</h1>
+            <h1 style={{ margin: 0, color: 'var(--primary)' }}>API Documentation</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
               {docs.title} v{docs.version}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button className="ghost" onClick={() => navigate('/')}>
-              Home 🏠
+              Home
             </button>
             <button className="ghost" onClick={() => navigate('/admin')}>
-              Admin 🛠️
+              Admin
             </button>
           </div>
         </div>
@@ -104,7 +102,7 @@ export default function ApiDocs() {
 
         {docs.authentication && (
           <div style={{ marginBottom: '32px' }}>
-            <h2>🔐 Authentication</h2>
+            <h2>Authentication</h2>
             <p><strong>Type:</strong> {docs.authentication.type}</p>
             <p style={{ color: 'var(--muted)' }}>{docs.authentication.description}</p>
             <h4>Methods:</h4>
@@ -118,7 +116,7 @@ export default function ApiDocs() {
 
         {docs.endpoints && (
           <div>
-            <h2>📡 Endpoints</h2>
+            <h2>Endpoints</h2>
             
             {docs.endpoints.public && (
               <div style={{ marginBottom: '32px' }}>
@@ -199,7 +197,7 @@ export default function ApiDocs() {
         )}
 
         <div style={{ marginTop: '32px', padding: '20px', background: 'var(--secondary)', borderRadius: '12px' }}>
-          <h3>💡 Usage Example</h3>
+          <h3>Usage Example</h3>
           <p>Base URL: <code>{window.location.origin}</code></p>
           <p>Full endpoint example:</p>
           <div style={{ background: 'var(--bg)', padding: '12px', borderRadius: '6px' }}>

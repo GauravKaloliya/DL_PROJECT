@@ -391,79 +391,6 @@ export default function AdminPanel() {
     }
   };
 
-  const handleCsvFileUpload = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.csv')) {
-      setError('Please select a CSV file');
-      addToast('Please select a CSV file', 'error');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const text = await file.text();
-      const lines = text.split('\n');
-      
-      if (lines.length < 2) {
-        setError('CSV file is empty or invalid');
-        addToast('CSV file is empty or invalid', 'error');
-        return;
-      }
-
-      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
-      const data = [];
-
-      for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (!line) continue;
-
-        const values = [];
-        let currentValue = '';
-        let insideQuotes = false;
-
-        for (let j = 0; j < line.length; j++) {
-          const char = line[j];
-          if (char === '"') {
-            insideQuotes = !insideQuotes;
-          } else if (char === ',' && !insideQuotes) {
-            values.push(currentValue.trim().replace(/^"|"$/g, ''));
-            currentValue = '';
-          } else {
-            currentValue += char;
-          }
-        }
-        values.push(currentValue.trim().replace(/^"|"$/g, ''));
-
-        if (values.length === headers.length) {
-          const row = {};
-          headers.forEach((header, index) => {
-            row[header] = values[index];
-          });
-          data.push(row);
-        }
-      }
-
-      setCsvData(data);
-      addToast(`Successfully loaded ${data.length} records from CSV`, 'success');
-      
-      const calculatedStats = {
-        total_submissions: data.length,
-        avg_word_count: data.reduce((sum, row) => sum + (parseInt(row.word_count) || 0), 0) / data.length || 0,
-        attention_fail_rate: data.filter(row => row.is_attention === 'True' && row.attention_passed === 'False').length / data.length || 0
-      };
-      setStats(calculatedStats);
-      
-    } catch (err) {
-      setError('Failed to process CSV file: ' + err.message);
-      addToast('Failed to process CSV file: ' + err.message, 'error');
-    } finally {
-      setLoading(false);
-      event.target.value = '';
-    }
-  };
-  
   // Filter and sort data
   const processedData = useCallback(() => {
     let data = [...csvData];
@@ -755,12 +682,6 @@ export default function AdminPanel() {
         >
           Data Explorer
         </button>
-        <button
-          className={activeTab === "security" ? "active" : ""}
-          onClick={() => setActiveTab("security")}
-        >
-          Security
-        </button>
       </div>
 
       <div className="admin-content">
@@ -914,19 +835,13 @@ export default function AdminPanel() {
               <h3>Quick Actions</h3>
               <div className="action-buttons">
                 <button className="primary" onClick={downloadCsv}>Download CSV</button>
-                <label htmlFor="csv-upload-dashboard" className="primary" style={{ cursor: 'pointer', display: 'inline-block', padding: '12px 24px', borderRadius: '12px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: '600' }}>
-                  Upload CSV
-                </label>
-                <input
-                  id="csv-upload-dashboard"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCsvFileUpload}
-                  disabled={loading}
-                  style={{ display: 'none' }}
-                />
-                <button className="ghost" onClick={() => setActiveTab("data")}>View Data</button>
-                <button className="ghost" onClick={fetchStats}>Refresh Stats</button>
+                <button className="ghost refresh-btn" onClick={fetchStats} title="Refresh Stats">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
@@ -949,17 +864,6 @@ export default function AdminPanel() {
                 />
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
-                <label htmlFor="csv-upload-explorer" className="primary" style={{ cursor: 'pointer', display: 'inline-block', padding: '12px 24px', borderRadius: '12px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: '600', fontSize: '15px' }}>
-                  Upload CSV
-                </label>
-                <input
-                  id="csv-upload-explorer"
-                  type="file"
-                  accept=".csv"
-                  onChange={handleCsvFileUpload}
-                  disabled={loading}
-                  style={{ display: 'none' }}
-                />
                 <button className="primary" onClick={downloadCsv}>Export CSV</button>
               </div>
             </div>
@@ -1041,66 +945,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {activeTab === "security" && (
-          <div className="security">
-            <h2>Security Center</h2>
-            <div className="security-overview">
-              <h3>Security Overview</h3>
-              <p>This panel provides security information for your C.O.G.N.I.T. application.</p>
-            </div>
-
-            <div className="security-section">
-              <h3>Security Status</h3>
-              <div className="security-status-grid">
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">API Key Protection</span>
-                </div>
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">Rate Limiting</span>
-                </div>
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">CORS Restrictions</span>
-                </div>
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">Security Headers</span>
-                </div>
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">IP Hashing</span>
-                </div>
-                <div className="security-status-item">
-                  <span className="status-icon">✅</span>
-                  <span className="status-label">Data Encryption</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="security-section">
-              <h3>Your API Key</h3>
-              <div className="api-key-display">
-                <code>{apiKey}</code>
-                <p className="api-key-hint">Keep your API key secure. Do not share it with others.</p>
-              </div>
-            </div>
-
-            <div className="security-section">
-              <h3>Security Recommendations</h3>
-              <div className="security-recommendations">
-                <ul>
-                  <li>Keep your API key secure and never share it</li>
-                  <li>Use strong, unique passwords</li>
-                  <li>Enable HTTPS in production environments</li>
-                  <li>Monitor your account activity regularly</li>
-                  <li>Log out when finished using the admin panel</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

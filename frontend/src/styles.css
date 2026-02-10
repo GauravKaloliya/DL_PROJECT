@@ -82,6 +82,7 @@ body {
   display: flex;
   gap: 12px;
   align-items: center;
+  margin-left: auto;
 }
 
 .status-dot {
@@ -188,6 +189,42 @@ body.dark .banner.info {
   .consent-form-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Welcome page info section */
+.welcome-info {
+  margin: 24px 0;
+  padding: 20px;
+  background: rgba(24, 119, 242, 0.05);
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.welcome-info h3 {
+  color: var(--primary);
+  margin: 20px 0 12px 0;
+  font-size: 16px;
+}
+
+.welcome-info h3:first-child {
+  margin-top: 0;
+}
+
+.welcome-info ul {
+  margin: 12px 0;
+  padding-left: 24px;
+}
+
+.welcome-info li {
+  margin: 8px 0;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.welcome-info p {
+  margin: 12px 0;
+  line-height: 1.6;
+  color: var(--text);
 }
 
 .form-field {
@@ -1084,6 +1121,19 @@ body.dark .error-message {
   display: flex;
   gap: 12px;
   margin-top: 16px;
+  align-items: center;
+}
+
+.refresh-btn {
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.refresh-btn:hover {
+  background: var(--primary);
+  color: white;
 }
 
 .data-explorer h2 {
