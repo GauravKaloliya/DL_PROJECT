@@ -103,10 +103,21 @@ function Confetti({ show }) {
   );
 }
 
-// Prevent copy/paste functionality
+// Allow copy/paste only in input fields
 const preventCopyPaste = (e) => {
-  e.preventDefault();
-  return false;
+  const target = e.target;
+  const isInputField = target.tagName === 'INPUT' || 
+                       target.tagName === 'TEXTAREA' || 
+                       target.contentEditable === 'true' ||
+                       target.closest('input') ||
+                       target.closest('textarea') ||
+                       target.closest('[contenteditable="true"]');
+  
+  // Allow copy/paste only in input fields
+  if (!isInputField) {
+    e.preventDefault();
+    return false;
+  }
 };
 
 export default function App() {

@@ -8,10 +8,21 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
-// Prevent copy/paste functionality
+// Allow copy/paste only in input fields
 const preventCopyPaste = (e) => {
-  e.preventDefault();
-  return false;
+  const target = e.target;
+  const isInputField = target.tagName === 'INPUT' || 
+                       target.tagName === 'TEXTAREA' || 
+                       target.contentEditable === 'true' ||
+                       target.closest('input') ||
+                       target.closest('textarea') ||
+                       target.closest('[contenteditable="true"]');
+  
+  // Allow copy/paste only in input fields
+  if (!isInputField) {
+    e.preventDefault();
+    return false;
+  }
 };
 
 // Simple toast notification helper
@@ -196,6 +207,75 @@ export default function AdminPanel() {
       setError("Failed to login. Please check your connection.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleJsonFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      setError('Please select a JSON file');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const credentials = JSON.parse(text);
+
+      if (!credentials.username || !credentials.api_key) {
+        setError('JSON file must contain "username" and "api_key" fields');
+        return;
+      }
+
+      // Set the credentials and attempt login
+      setLoginUsername(credentials.username);
+      setLoginApiKey(credentials.api_key);
+
+      // Automatically trigger login with the loaded credentials
+      const response = await fetch(`${API_BASE}/api/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          username: credentials.username, 
+          api_key: credentials.api_key 
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSessionToken(data.session_token);
+        setApiKey(data.api_key);
+        setUser(data.user);
+        setIsAuthenticated(true);
+
+        // Store in sessionStorage
+        sessionStorage.setItem("adminSessionToken", data.session_token);
+        sessionStorage.setItem("adminApiKey", data.api_key);
+        sessionStorage.setItem("adminUser", JSON.stringify(data.user));
+
+        addToast("Login successful with loaded credentials!", "success");
+      } else {
+        if (data.needs_verification) {
+          setPendingEmail(data.email || "");
+          setAuthMode("verify");
+          setError("Please verify your email before logging in");
+        } else {
+          setError(data.error || "Invalid credentials from JSON file");
+        }
+      }
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        setError('Invalid JSON file format');
+      } else {
+        setError('Failed to process JSON file: ' + err.message);
+      }
+    } finally {
+      setLoading(false);
+      // Reset the file input
+      event.target.value = '';
     }
   };
   
@@ -487,6 +567,31 @@ export default function AdminPanel() {
               {loading ? "Authenticating..." : "Login"}
             </button>
           </form>
+
+          <div className="json-upload-section">
+            <div className="json-upload-divider">
+              <span>OR</span>
+            </div>
+            <div className="json-upload">
+              <label htmlFor="json-file-upload" className="json-upload-label">
+                📄 Upload JSON Credentials File
+              </label>
+              <input
+                id="json-file-upload"
+                type="file"
+                accept=".json"
+                onChange={handleJsonFileUpload}
+                disabled={loading}
+                style={{ display: 'none' }}
+              />
+              <p className="json-upload-help">
+                Select a JSON file containing your credentials
+              </p>
+              <p className="json-upload-format">
+                Format: {"{"}"username": "your_username", "api_key": "your_api_key"{"}"}
+              </p>
+            </div>
+          </div>
           
           <div className="auth-switch">
             <p>Don't have an account?</p>
