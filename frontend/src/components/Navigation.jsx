@@ -6,10 +6,10 @@ export default function Navigation() {
     <nav className="navigation">
       <ul className="nav-list">
         <li className="nav-item">
-          <Link to="/" className="nav-link">Home 🏠</Link>
+          <Link to="/" className="nav-link">Home</Link>
         </li>
         <li className="nav-item">
-          <Link to="/admin" className="nav-link">Admin 🛠️</Link>
+          <Link to="/admin" className="nav-link">Admin</Link>
         </li>
       </ul>
     </nav>

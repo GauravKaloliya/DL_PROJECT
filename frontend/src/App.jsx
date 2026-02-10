@@ -459,21 +459,21 @@ export default function App() {
       <div className="app" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
         <header className="header">
           <div>
-            <h1>C.O.G.N.I.T. 🌸</h1>
-            <p className="subtitle">Describe each image with as much detail as possible ✨</p>
+            <h1>C.O.G.N.I.T.</h1>
+            <p className="subtitle">Describe each image with as much detail as possible</p>
           </div>
           <div className="header-actions">
             <button className="ghost" onClick={() => setDarkMode((prev) => !prev)}>
-              {darkMode ? "Light mode ☀️" : "Dark mode 🌙"}
+              {darkMode ? "Light mode" : "Dark mode"}
             </button>
             <button className="ghost" onClick={() => navigate("/api/docs")}>
-              API Docs 📚
+              API Docs
             </button>
             <button className="ghost" onClick={() => navigate("/admin")}>
-              Admin 🛠️
+              Admin
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
-              {online ? "Online ✨" : "Offline 💕"}
+              {online ? "Online" : "Offline"}
             </div>
           </div>
         </header>
@@ -486,11 +486,42 @@ export default function App() {
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Welcome to C.O.G.N.I.T.! 🌸</h2>
+            <h2>Welcome to C.O.G.N.I.T.!</h2>
             <p>
-              By participating, you consent to having your descriptions stored anonymously for research
-              purposes. You may stop at any time 💕
+              Thank you for your interest in our research study. C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
+              is designed to explore how people perceive and describe visual information. Your participation will help us better understand 
+              cognitive processes involved in image description and visual analysis.
             </p>
+            
+            <div className="welcome-info">
+              <h3>What to Expect</h3>
+              <ul>
+                <li>You will be shown a series of images and asked to describe them in detail</li>
+                <li>Each description should be at least 30 words to ensure quality responses</li>
+                <li>You will rate the complexity of each image on a scale of 1-10</li>
+                <li>The study includes practice trials to help you get started</li>
+                <li>You may include additional comments about each image</li>
+              </ul>
+              
+              <h3>Time Commitment</h3>
+              <p>
+                The study typically takes 15-20 minutes to complete. You can take breaks between images, 
+                and you have the option to finish early at any time. Your progress will be saved automatically.
+              </p>
+              
+              <h3>Privacy & Data Protection</h3>
+              <p>
+                All responses are collected anonymously and stored securely. Your personal information 
+                will never be shared with third parties. Data is used solely for academic research purposes 
+                to improve our understanding of visual cognition and descriptive language patterns.
+              </p>
+              
+              <h3>Consent</h3>
+              <p>
+                By participating, you consent to having your descriptions stored anonymously for research 
+                purposes. Participation is completely voluntary, and you may stop at any time without penalty.
+              </p>
+            </div>
             
             <h3 style={{ color: 'var(--primary)', marginTop: '24px', marginBottom: '16px' }}>Participant Information</h3>
             <div className="consent-form-grid">
@@ -617,7 +648,7 @@ export default function App() {
             </div>
             
             <button className="primary" onClick={handleConsentStart}>
-              Let's start! 🌟
+              Start Study
             </button>
           </div>
         )}
