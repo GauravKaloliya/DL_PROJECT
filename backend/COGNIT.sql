@@ -7,8 +7,6 @@ CREATE TABLE IF NOT EXISTS admin_users (
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE,
-    email_verified BOOLEAN DEFAULT 0,
-    verification_token TEXT,
     role TEXT DEFAULT 'admin',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_login TIMESTAMP,
