@@ -858,22 +858,6 @@ def api_docs():
                         }
                     },
                     {
-                        "path": "/api/admin/change-password",
-                        "method": "POST",
-                        "description": "Change admin user password",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "request_body": {
-                            "current_password": "string (required)",
-                            "new_password": "string (required, min 6 characters)"
-                        },
-                        "response": {
-                            "status": "string",
-                            "message": "string"
-                        }
-                    },
-                    {
                         "path": "/api/stats",
                         "method": "GET",
                         "description": "Get statistics about submissions",

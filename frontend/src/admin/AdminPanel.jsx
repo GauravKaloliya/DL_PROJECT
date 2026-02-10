@@ -8,14 +8,6 @@ function SettingsTab({ sessionToken, csvData, onDataDeleted }) {
   const [deleteError, setDeleteError] = useState(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   
-  // Password change state
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [passwordError, setPasswordError] = useState(null);
-  const [passwordSuccess, setPasswordSuccess] = useState(false);
-
   const handleDeleteCSV = async () => {
     setIsDeleting(true);
     setDeleteError(null);
@@ -46,121 +38,9 @@ function SettingsTab({ sessionToken, csvData, onDataDeleted }) {
     }
   };
 
-  const handleChangePassword = async (e) => {
-    e.preventDefault();
-    setPasswordError(null);
-    setPasswordSuccess(false);
-    
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setPasswordError("All fields are required");
-      return;
-    }
-    
-    if (newPassword.length < 6) {
-      setPasswordError("New password must be at least 6 characters long");
-      return;
-    }
-    
-    if (newPassword !== confirmPassword) {
-      setPasswordError("New passwords do not match");
-      return;
-    }
-    
-    setIsChangingPassword(true);
-    
-    try {
-      const response = await fetch(`${API_BASE}/api/admin/change-password`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'X-SESSION-TOKEN': sessionToken 
-        },
-        body: JSON.stringify({
-          current_password: currentPassword,
-          new_password: newPassword
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setPasswordSuccess(true);
-        setCurrentPassword("");
-        setNewPassword("");
-        setConfirmPassword("");
-        addToast("Password changed successfully", "success");
-      } else {
-        setPasswordError(data.error || "Failed to change password");
-        addToast(data.error || "Failed to change password", "error");
-      }
-    } catch (err) {
-      setPasswordError("Network error. Please try again.");
-      addToast("Network error. Please try again.", "error");
-    } finally {
-      setIsChangingPassword(false);
-    }
-  };
-
   return (
     <div className="settings">
       <h2>Settings</h2>
-      
-      {/* Password Change Section */}
-      <div className="settings-section">
-        <h3>Change Password</h3>
-        <p style={{ color: 'var(--muted)', marginBottom: '20px' }}>
-          Update your admin account password. Choose a strong password to keep your account secure.
-        </p>
-        
-        <form onSubmit={handleChangePassword} className="password-form" style={{ maxWidth: '400px' }}>
-          <div className="form-group">
-            <label>Current Password</label>
-            <input
-              type="password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-              placeholder="Enter current password"
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>New Password</label>
-            <input
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Enter new password (min 6 characters)"
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>Confirm New Password</label>
-            <input
-              type="password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              placeholder="Confirm new password"
-            />
-          </div>
-          
-          {passwordError && (
-            <p style={{ color: '#c9444a', marginTop: '12px' }}>{passwordError}</p>
-          )}
-          
-          {passwordSuccess && (
-            <p style={{ color: '#4CAF50', marginTop: '12px' }}>Password changed successfully!</p>
-          )}
-          
-          <button 
-            type="submit" 
-            className="primary"
-            disabled={isChangingPassword}
-            style={{ marginTop: '16px' }}
-          >
-            {isChangingPassword ? "Changing..." : "Change Password"}
-          </button>
-        </form>
-      </div>
       
       {/* Data Management Section */}
       <div className="settings-section">
