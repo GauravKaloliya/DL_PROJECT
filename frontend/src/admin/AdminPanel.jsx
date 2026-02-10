@@ -65,11 +65,19 @@ export default function AdminPanel() {
   const [regConfirmPassword, setRegConfirmPassword] = useState("");
   
   // Data state
-  const [stats, setStats] = useState(null);
-  const [csvData, setCsvData] = useState([]);
+  const [stats, setStats] = useState(() => {
+    const saved = sessionStorage.getItem("adminStats");
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [csvData, setCsvData] = useState(() => {
+    const saved = sessionStorage.getItem("adminCsvData");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState(() => {
+    return sessionStorage.getItem("adminActiveTab") || "dashboard";
+  });
   
   // Data explorer state
   const [searchTerm, setSearchTerm] = useState("");
@@ -101,6 +109,23 @@ export default function AdminPanel() {
       fetchCsvData();
     }
   }, [isAuthenticated, apiKey]);
+
+  // Persist stats, csvData and activeTab
+  useEffect(() => {
+    if (stats) {
+      sessionStorage.setItem("adminStats", JSON.stringify(stats));
+    }
+  }, [stats]);
+
+  useEffect(() => {
+    if (csvData && csvData.length > 0) {
+      sessionStorage.setItem("adminCsvData", JSON.stringify(csvData));
+    }
+  }, [csvData]);
+
+  useEffect(() => {
+    sessionStorage.setItem("adminActiveTab", activeTab);
+  }, [activeTab]);
   
   // Prevent copy/paste on the entire component
   useEffect(() => {
@@ -363,6 +388,79 @@ export default function AdminPanel() {
       document.body.removeChild(a);
     } catch (err) {
       addToast(err.message, "error");
+    }
+  };
+
+  const handleCsvFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      setError('Please select a CSV file');
+      addToast('Please select a CSV file', 'error');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const text = await file.text();
+      const lines = text.split('\n');
+      
+      if (lines.length < 2) {
+        setError('CSV file is empty or invalid');
+        addToast('CSV file is empty or invalid', 'error');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+      const data = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const values = [];
+        let currentValue = '';
+        let insideQuotes = false;
+
+        for (let j = 0; j < line.length; j++) {
+          const char = line[j];
+          if (char === '"') {
+            insideQuotes = !insideQuotes;
+          } else if (char === ',' && !insideQuotes) {
+            values.push(currentValue.trim().replace(/^"|"$/g, ''));
+            currentValue = '';
+          } else {
+            currentValue += char;
+          }
+        }
+        values.push(currentValue.trim().replace(/^"|"$/g, ''));
+
+        if (values.length === headers.length) {
+          const row = {};
+          headers.forEach((header, index) => {
+            row[header] = values[index];
+          });
+          data.push(row);
+        }
+      }
+
+      setCsvData(data);
+      addToast(`Successfully loaded ${data.length} records from CSV`, 'success');
+      
+      const calculatedStats = {
+        total_submissions: data.length,
+        avg_word_count: data.reduce((sum, row) => sum + (parseInt(row.word_count) || 0), 0) / data.length || 0,
+        attention_fail_rate: data.filter(row => row.is_attention === 'True' && row.attention_passed === 'False').length / data.length || 0
+      };
+      setStats(calculatedStats);
+      
+    } catch (err) {
+      setError('Failed to process CSV file: ' + err.message);
+      addToast('Failed to process CSV file: ' + err.message, 'error');
+    } finally {
+      setLoading(false);
+      event.target.value = '';
     }
   };
   
@@ -639,6 +737,7 @@ export default function AdminPanel() {
           {user && <p className="user-info">Welcome, {user.username}</p>}
         </div>
         <div className="admin-actions">
+          <button className="ghost" onClick={() => navigate('/api/docs')}>API Docs</button>
           <button className="ghost" onClick={handleLogout}>Logout</button>
         </div>
       </div>
@@ -815,6 +914,17 @@ export default function AdminPanel() {
               <h3>Quick Actions</h3>
               <div className="action-buttons">
                 <button className="primary" onClick={downloadCsv}>Download CSV</button>
+                <label htmlFor="csv-upload-dashboard" className="primary" style={{ cursor: 'pointer', display: 'inline-block', padding: '12px 24px', borderRadius: '12px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: '600' }}>
+                  Upload CSV
+                </label>
+                <input
+                  id="csv-upload-dashboard"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileUpload}
+                  disabled={loading}
+                  style={{ display: 'none' }}
+                />
                 <button className="ghost" onClick={() => setActiveTab("data")}>View Data</button>
                 <button className="ghost" onClick={fetchStats}>Refresh Stats</button>
               </div>
@@ -838,7 +948,20 @@ export default function AdminPanel() {
                   }}
                 />
               </div>
-              <button className="primary" onClick={downloadCsv}>Export CSV</button>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <label htmlFor="csv-upload-explorer" className="primary" style={{ cursor: 'pointer', display: 'inline-block', padding: '12px 24px', borderRadius: '12px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: '600', fontSize: '15px' }}>
+                  Upload CSV
+                </label>
+                <input
+                  id="csv-upload-explorer"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleCsvFileUpload}
+                  disabled={loading}
+                  style={{ display: 'none' }}
+                />
+                <button className="primary" onClick={downloadCsv}>Export CSV</button>
+              </div>
             </div>
             
             <div className="sort-controls">

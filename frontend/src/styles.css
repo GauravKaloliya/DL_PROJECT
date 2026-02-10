@@ -917,10 +917,11 @@ body.dark .toast.warning {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  text-align: center;
 }
 
 .form-group {
-  text-align: left;
+  text-align: center;
 }
 
 .form-group label {

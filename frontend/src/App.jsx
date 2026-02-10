@@ -123,8 +123,8 @@ const preventCopyPaste = (e) => {
 export default function App() {
   const [darkMode, setDarkMode] = useState(getStoredValue("darkMode", false));
   const [online, setOnline] = useState(navigator.onLine);
-  const [stage, setStage] = useState("consent");
-  const [consentChecked, setConsentChecked] = useState(false);
+  const [stage, setStage] = useState(getStoredValue("stage", "consent"));
+  const [consentChecked, setConsentChecked] = useState(getStoredValue("consentChecked", false));
   const [demographics, setDemographics] = useState(
     getStoredValue("demographics", {
       ageGroup: "",
@@ -138,16 +138,16 @@ export default function App() {
   const [formErrors, setFormErrors] = useState({});
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
   const [sessionId] = useState(() => getStoredValue("sessionId", createId()));
-  const [trial, setTrial] = useState(null);
-  const [description, setDescription] = useState("");
-  const [rating, setRating] = useState(0);
-  const [comments, setComments] = useState("");
+  const [trial, setTrial] = useState(getStoredValue("trial", null));
+  const [description, setDescription] = useState(getStoredValue("description", ""));
+  const [rating, setRating] = useState(getStoredValue("rating", 0));
+  const [comments, setComments] = useState(getStoredValue("comments", ""));
   const [submitting, setSubmitting] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
-  const [practiceCompleted, setPracticeCompleted] = useState(0);
-  const [mainCompleted, setMainCompleted] = useState(0);
-  const [attentionRemaining, setAttentionRemaining] = useState(ATTENTION_TARGET);
-  const [submissions, setSubmissions] = useState([]);
+  const [practiceCompleted, setPracticeCompleted] = useState(getStoredValue("practiceCompleted", 0));
+  const [mainCompleted, setMainCompleted] = useState(getStoredValue("mainCompleted", 0));
+  const [attentionRemaining, setAttentionRemaining] = useState(getStoredValue("attentionRemaining", ATTENTION_TARGET));
+  const [submissions, setSubmissions] = useState(getStoredValue("submissions", []));
   const [toasts, setToasts] = useState([]);
   const [showConfetti, setShowConfetti] = useState(false);
   const [practiceFeedbackReady, setPracticeFeedbackReady] = useState(false);
@@ -194,6 +194,46 @@ export default function App() {
     saveStoredValue("darkMode", darkMode);
     document.body.classList.toggle("dark", darkMode);
   }, [darkMode]);
+
+  useEffect(() => {
+    saveStoredValue("stage", stage);
+  }, [stage]);
+
+  useEffect(() => {
+    saveStoredValue("consentChecked", consentChecked);
+  }, [consentChecked]);
+
+  useEffect(() => {
+    saveStoredValue("trial", trial);
+  }, [trial]);
+
+  useEffect(() => {
+    saveStoredValue("description", description);
+  }, [description]);
+
+  useEffect(() => {
+    saveStoredValue("rating", rating);
+  }, [rating]);
+
+  useEffect(() => {
+    saveStoredValue("comments", comments);
+  }, [comments]);
+
+  useEffect(() => {
+    saveStoredValue("practiceCompleted", practiceCompleted);
+  }, [practiceCompleted]);
+
+  useEffect(() => {
+    saveStoredValue("mainCompleted", mainCompleted);
+  }, [mainCompleted]);
+
+  useEffect(() => {
+    saveStoredValue("attentionRemaining", attentionRemaining);
+  }, [attentionRemaining]);
+
+  useEffect(() => {
+    saveStoredValue("submissions", submissions);
+  }, [submissions]);
 
   useEffect(() => {
     const handleOnline = () => setOnline(true);
@@ -425,6 +465,9 @@ export default function App() {
           <div className="header-actions">
             <button className="ghost" onClick={() => setDarkMode((prev) => !prev)}>
               {darkMode ? "Light mode ☀️" : "Dark mode 🌙"}
+            </button>
+            <button className="ghost" onClick={() => navigate("/api/docs")}>
+              API Docs 📚
             </button>
             <button className="ghost" onClick={() => navigate("/admin")}>
               Admin 🛠️
