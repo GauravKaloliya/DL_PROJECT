@@ -13,7 +13,7 @@ IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
 CSV_PATH = DATA_DIR / "submissions.csv"
 
-MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "20"))
+MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "changeme")
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
