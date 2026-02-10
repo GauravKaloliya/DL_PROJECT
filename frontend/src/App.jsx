@@ -502,7 +502,7 @@ export default function App() {
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Research Consent Form</h2>
+            <h2>Survey Consent Form</h2>
             <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
               <strong>C.O.G.N.I.T.: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
             </p>
