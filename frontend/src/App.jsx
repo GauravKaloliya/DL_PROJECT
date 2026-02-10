@@ -1,16 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
-const MIN_WORDS = 20;
+const MIN_WORDS = 30;
 const PRACTICE_TARGET = 2;
-const MAIN_TARGET = 10;
+const MAIN_TARGET = 15;
 const ATTENTION_TARGET = 1;
 const AUTO_NEXT_DELAY_MS = 1200;
 
 const attentionInstruction = {
-  "attention/attention-ocean.svg": {
-    text: "Attention check: include the word \"ocean\" in your description.",
-    expected: "ocean"
+  "attention/attention-red.svg": {
+    text: "💝 Special task: Include the word \"red\" in your description!",
+    expected: "red"
+  },
+  "attention/attention-circle.svg": {
+    text: "🎯 Special task: Include the word \"circle\" in your description!",
+    expected: "circle"
   }
 };
 
@@ -126,6 +130,16 @@ export default function App() {
   const [trialStartTime, setTrialStartTime] = useState(Date.now());
   const nextTimeout = useRef(null);
 
+  // NASA-TLX ratings (1-20 scale)
+  const [nasaRatings, setNasaRatings] = useState({
+    mental: 10,
+    physical: 5,
+    temporal: 5,
+    performance: 10,
+    effort: 8,
+    frustration: 3
+  });
+
   const wordCount = useMemo(() => {
     return description.trim() ? description.trim().split(/\s+/).length : 0;
   }, [description]);
@@ -225,7 +239,7 @@ export default function App() {
   const handleSubmit = async () => {
     if (!trial || submitting) return;
     if (wordCount < MIN_WORDS) {
-      addToast(`Please write at least ${MIN_WORDS} words.`, "error");
+      addToast(`Almost there! ✨ Please write at least ${MIN_WORDS} words.`, "error");
       return;
     }
     setSubmitting(true);
@@ -243,7 +257,13 @@ export default function App() {
       word_count: wordCount,
       is_practice: trial.is_practice,
       is_attention: trial.is_attention,
-      attention_expected: attentionMeta?.expected || ""
+      attention_expected: attentionMeta?.expected || "",
+      nasa_mental: nasaRatings.mental,
+      nasa_physical: nasaRatings.physical,
+      nasa_temporal: nasaRatings.temporal,
+      nasa_performance: nasaRatings.performance,
+      nasa_effort: nasaRatings.effort,
+      nasa_frustration: nasaRatings.frustration
     };
 
     try {
@@ -259,9 +279,9 @@ export default function App() {
       }
       const result = await response.json();
       if (trial.is_attention && !result.attention_passed) {
-        addToast("Attention check missed. Please follow instructions next time.", "warning");
+        addToast("Oopsie! 💕 Please follow the special instructions next time!", "warning");
       } else {
-        addToast("Submission saved!", "success");
+        addToast("Yay! 🎉 Your response was saved!", "success");
       }
       setShowConfetti(true);
       setTimeout(() => setShowConfetti(false), 1200);
@@ -330,31 +350,31 @@ export default function App() {
       <div className="app">
         <header className="header">
           <div>
-            <h1>Image Description Study</h1>
-            <p className="subtitle">Describe each image with as much detail as possible.</p>
+            <h1>Image Description Study 🌸</h1>
+            <p className="subtitle">Describe each image with as much detail as possible ✨</p>
           </div>
           <div className="header-actions">
             <button className="ghost" onClick={() => setDarkMode((prev) => !prev)}>
-              {darkMode ? "Light mode" : "Dark mode"}
+              {darkMode ? "Light mode ☀️" : "Dark mode 🌙"}
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
-              {online ? "Online" : "Offline"}
+              {online ? "Online ✨" : "Offline 💕"}
             </div>
           </div>
         </header>
 
         {!online && (
           <div className="banner warning">
-            You appear to be offline. Submissions will fail until connectivity is restored.
+            Oh no! 💕 You appear to be offline. Submissions will fail until connectivity is restored.
           </div>
         )}
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Consent</h2>
+            <h2>Welcome! 🌸</h2>
             <p>
               By participating, you consent to having your descriptions stored anonymously for research
-              purposes. You may stop at any time.
+              purposes. You may stop at any time 💕
             </p>
             <label className="checkbox">
               <input
@@ -362,11 +382,11 @@ export default function App() {
                 checked={consentChecked}
                 onChange={(event) => setConsentChecked(event.target.checked)}
               />
-              I consent to participate.
+              I consent to participate ✨
             </label>
             <div className="form-grid">
               <div>
-                <label>Age group (optional)</label>
+                <label>Age group (optional) 🎂</label>
                 <select
                   value={demographics.ageGroup}
                   onChange={(event) =>
@@ -382,7 +402,7 @@ export default function App() {
                 </select>
               </div>
               <div>
-                <label>Native language (optional)</label>
+                <label>Native language (optional) 🌍</label>
                 <input
                   type="text"
                   placeholder="e.g., English"
@@ -393,7 +413,7 @@ export default function App() {
                 />
               </div>
               <div>
-                <label>Prior experience (optional)</label>
+                <label>Prior experience (optional) 📸</label>
                 <input
                   type="text"
                   placeholder="e.g., photography, art"
@@ -405,7 +425,7 @@ export default function App() {
               </div>
             </div>
             <button className="primary" onClick={handleConsentStart} disabled={!consentChecked}>
-              Start
+              Let's start! 🌟
             </button>
           </div>
         )}
@@ -413,17 +433,17 @@ export default function App() {
         {stage === "practice" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>Practice {practiceCompleted + 1} / {PRACTICE_TARGET}</span>
+              <span>Practice {practiceCompleted + 1} / {PRACTICE_TARGET} 🎯</span>
             </div>
             {practiceFeedbackReady ? (
               <div className="guidance">
-                <h2>Practice feedback</h2>
+                <h2>Great job! 🎉</h2>
                 <p>
-                  Great work! Aim to describe colors, textures, relationships, and any notable objects.
-                  Remember to write at least {MIN_WORDS} words.
+                  You're doing amazing! Aim to describe colors, textures, relationships, and any notable objects.
+                  Remember to write at least {MIN_WORDS} words ✨
                 </p>
                 <button className="primary" onClick={handleNext}>
-                  Continue
+                  Continue! 💕
                 </button>
               </div>
             ) : (
@@ -447,6 +467,8 @@ export default function App() {
                 showNext={false}
                 onNext={handleNext}
                 showFinish={false}
+                nasaRatings={nasaRatings}
+                onNasaRatingChange={setNasaRatings}
               />
             )}
           </div>
@@ -455,10 +477,20 @@ export default function App() {
         {stage === "trial" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>Progress {mainCompleted} / {MAIN_TARGET}</span>
+              <span>Progress {mainCompleted} / {MAIN_TARGET} 💗</span>
               <button className="ghost" onClick={handleFinishEarly}>
-                Finish / Stop
+                Finish / Stop 💕
               </button>
+            </div>
+            <div className="progress-bar">
+              {Array.from({ length: MAIN_TARGET }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`progress-heart ${i < mainCompleted ? "filled" : ""}`}
+                >
+                  💗
+                </span>
+              ))}
             </div>
             <TrialForm
               trial={trial}
@@ -480,24 +512,26 @@ export default function App() {
               showNext={readyForNext}
               onNext={handleNext}
               showFinish={true}
+              nasaRatings={nasaRatings}
+              onNasaRatingChange={setNasaRatings}
             />
           </div>
         )}
 
         {stage === "finished" && (
           <div className="panel">
-            <h2>Thank you!</h2>
+            <h2>Thank you! 🌸</h2>
             <p>
-              You have completed {mainCompleted} main trials and {practiceCompleted} practice trials.
+              You have completed {mainCompleted} main trials and {practiceCompleted} practice trials! 🎉
               Your responses have been recorded. If you would like a copy of your data, download it
-              below.
+              below 💕
             </p>
             <p className="debrief">
               Debrief: This study examines how people describe visual scenes. Your anonymous responses
-              will help improve language understanding models.
+              will help improve language understanding models ✨
             </p>
             <button className="primary" onClick={downloadData} disabled={submissions.length === 0}>
-              Download my data
+              Download my data 📥
             </button>
           </div>
         )}
@@ -527,7 +561,9 @@ function TrialForm({
   fetchingImage,
   showNext,
   onNext,
-  showFinish
+  showFinish,
+  nasaRatings,
+  onNasaRatingChange
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -541,22 +577,31 @@ function TrialForm({
 
   const imageSrc = `${API_BASE}${trial.image_url}`;
 
+  const nasaDimensions = [
+    { key: "mental", label: "Mental Demand", description: "How mentally demanding was the task?" },
+    { key: "physical", label: "Physical Demand", description: "How physically demanding was the task?" },
+    { key: "temporal", label: "Temporal Demand", description: "How hurried or rushed was the pace?" },
+    { key: "performance", label: "Performance", description: "How successful were you?" },
+    { key: "effort", label: "Effort", description: "How hard did you work?" },
+    { key: "frustration", label: "Frustration", description: "How insecure or irritated were you?" }
+  ];
+
   return (
     <div className="trial">
       {instruction && <div className="banner info">{instruction.text}</div>}
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
         <img src={imageSrc} alt="Study prompt" onClick={onToggleZoom} />
         <button className="zoom-toggle" onClick={onToggleZoom}>
-          {isZoomed ? "Reset zoom" : "Zoom"}
+          {isZoomed ? "Reset zoom 🔍" : "Zoom 🔍"}
         </button>
       </div>
       <div className="meta">
-        <span className="timer">Time: {elapsed}s</span>
-        {trial.is_attention && <span className="tag attention">Attention check</span>}
-        {trial.is_practice && <span className="tag practice">Practice</span>}
+        <span className="timer">Time: {elapsed}s ⏱️</span>
+        {trial.is_attention && <span className="tag attention">Attention check 💝</span>}
+        {trial.is_practice && <span className="tag practice">Practice 🎯</span>}
       </div>
       <label className="field">
-        Description
+        Description 📝
         <textarea
           value={description}
           onChange={(event) => onDescription(event.target.value)}
@@ -566,14 +611,14 @@ function TrialForm({
         />
       </label>
       <div className="counts">
-        <span>Words: {wordCount}</span>
-        <span>Characters: {charCount}</span>
+        <span>Words: {wordCount} 📝</span>
+        <span>Characters: {charCount} ⌨️</span>
         <span className={wordCount >= minWords ? "ok" : "warning"}>
-          Minimum: {minWords} words
+          Minimum: {minWords} words ✨
         </span>
       </div>
       <label className="field">
-        Effort rating: {rating}
+        Effort rating: {rating} / 10 💪
         <input
           type="range"
           min="1"
@@ -583,29 +628,61 @@ function TrialForm({
         />
       </label>
       <label className="field">
-        Optional comments
+        Optional comments 💬
         <textarea
           value={comments}
           onChange={(event) => onComments(event.target.value)}
           placeholder="Share any additional notes..."
         />
       </label>
+      {!trial.is_practice && (
+        <div className="nasa-tlx">
+          <h3>Task Experience 🌟</h3>
+          <p className="nasa-tlx-description">
+            Please rate your experience with this task on a scale of 1-20 💕
+          </p>
+          {nasaDimensions.map((dimension) => (
+            <div key={dimension.key} className="nasa-slider-group">
+              <label>{dimension.label}</label>
+              <p className="description">{dimension.description}</p>
+              <input
+                type="range"
+                min="1"
+                max="20"
+                value={nasaRatings[dimension.key]}
+                onChange={(event) =>
+                  onNasaRatingChange({
+                    ...nasaRatings,
+                    [dimension.key]: Number(event.target.value)
+                  })
+                }
+              />
+              <div className="nasa-scale-labels">
+                <span>Low (1)</span>
+                <span className="value-display">{nasaRatings[dimension.key]}</span>
+                <span>High (20)</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="actions">
         <button
           className="primary"
           onClick={onSubmit}
           disabled={submitting || wordCount < minWords || fetchingImage}
+          className={submitting ? "wiggle" : ""}
         >
-          {submitting ? "Submitting..." : "Submit"}
+          {submitting ? "Submitting... 🌸" : "Submit! 💗"}
         </button>
         {showNext && (
           <button className="ghost" onClick={onNext}>
-            Next
+            Next ➡️
           </button>
         )}
       </div>
       {showFinish && (
-        <p className="hint">You can stop at any time using the Finish / Stop button above.</p>
+        <p className="hint">You can stop at any time using the Finish / Stop button above 💕</p>
       )}
     </div>
   );
