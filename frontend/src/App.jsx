@@ -111,10 +111,14 @@ export default function App() {
   const [demographics, setDemographics] = useState(
     getStoredValue("demographics", {
       ageGroup: "",
+      gender: "",
+      age: "",
+      place: "",
       language: "",
       experience: ""
     })
   );
+  const [formErrors, setFormErrors] = useState({});
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
   const [sessionId] = useState(() => getStoredValue("sessionId", createId()));
   const [trial, setTrial] = useState(null);
@@ -136,16 +140,6 @@ export default function App() {
   const nextTimeout = useRef(null);
   
   const navigate = useNavigate();
-
-  // NASA-TLX ratings (1-5 scale, 0 = not rated)
-  const [nasaRatings, setNasaRatings] = useState({
-    mental: 0,
-    physical: 0,
-    temporal: 0,
-    performance: 0,
-    effort: 0,
-    frustration: 0
-  });
 
   const wordCount = useMemo(() => {
     return description.trim() ? description.trim().split(/\s+/).length : 0;
@@ -205,14 +199,6 @@ export default function App() {
       setDescription("");
       setRating(0);
       setComments("");
-      setNasaRatings({
-        mental: 0,
-        physical: 0,
-        temporal: 0,
-        performance: 0,
-        effort: 0,
-        frustration: 0
-      });
       setIsZoomed(false);
       setTrialStartTime(Date.now());
       setPracticeFeedbackReady(false);
@@ -246,10 +232,32 @@ export default function App() {
     return "normal";
   };
 
+  const validateForm = () => {
+    const errors = {};
+    if (!demographics.ageGroup) errors.ageGroup = "Age group is required";
+    if (!demographics.gender) errors.gender = "Gender is required";
+    if (!demographics.age || isNaN(demographics.age) || demographics.age < 1 || demographics.age > 120) {
+      errors.age = "Please enter a valid age (1-120)";
+    }
+    if (!demographics.place || demographics.place.trim().length < 2) {
+      errors.place = "Place/Location is required";
+    }
+    if (!demographics.language || demographics.language.trim().length < 2) {
+      errors.language = "Native language is required";
+    }
+    if (!demographics.experience || demographics.experience.trim().length < 2) {
+      errors.experience = "Prior experience is required";
+    }
+    if (!consentChecked) {
+      errors.consent = "You must consent to participate";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleConsentStart = () => {
-    if (!consentChecked) return;
-    if (!demographics.ageGroup || !demographics.language.trim() || !demographics.experience.trim()) {
-      addToast("Please fill in all required demographic fields 💕", "error");
+    if (!validateForm()) {
+      addToast("Please fill in all required fields correctly 💕", "error");
       return;
     }
     startPractice();
@@ -263,10 +271,6 @@ export default function App() {
     }
     if (rating === 0) {
       addToast("Please provide a general rating 💕", "error");
-      return;
-    }
-    if (Object.values(nasaRatings).some(r => r === 0)) {
-      addToast("Please rate all NASA-TLX dimensions 🌸", "error");
       return;
     }
     if (comments.trim().length < 5) {
@@ -290,14 +294,11 @@ export default function App() {
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
       age_group: demographics.ageGroup,
+      gender: demographics.gender,
+      age: demographics.age,
+      place: demographics.place,
       native_language: demographics.language,
-      prior_experience: demographics.experience,
-      nasa_mental: nasaRatings.mental,
-      nasa_physical: nasaRatings.physical,
-      nasa_temporal: nasaRatings.temporal,
-      nasa_performance: nasaRatings.performance,
-      nasa_effort: nasaRatings.effort,
-      nasa_frustration: nasaRatings.frustration
+      prior_experience: demographics.experience
     };
 
     try {
@@ -413,28 +414,18 @@ export default function App() {
               By participating, you consent to having your descriptions stored anonymously for research
               purposes. You may stop at any time 💕
             </p>
-            <div className="consent-checkbox">
-              <input
-                type="checkbox"
-                checked={consentChecked}
-                onChange={(event) => setConsentChecked(event.target.checked)}
-                id="consent-check"
-              />
-              <label htmlFor="consent-check">
-                I consent to participate ✨
-                <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
-                  By checking this box, I agree to participate in this study and understand that my responses will be collected anonymously for research purposes.
-                </p>
-              </label>
-            </div>
-            <div className="form-grid">
-              <div>
+            
+            <h3 style={{ color: 'var(--primary)', marginTop: '24px', marginBottom: '16px' }}>Demographics 📝</h3>
+            <div className="consent-form-grid">
+              <div className={`form-field ${formErrors.ageGroup ? 'error' : ''}`}>
                 <label>Age group (required) 🎂</label>
                 <select
                   value={demographics.ageGroup}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, ageGroup: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, ageGroup: event.target.value }));
+                    if (formErrors.ageGroup) setFormErrors(prev => ({ ...prev, ageGroup: null }));
+                  }}
+                  className={formErrors.ageGroup ? 'error-input' : ''}
                 >
                   <option value="">Select age group</option>
                   <option value="18-24">18-24</option>
@@ -443,31 +434,112 @@ export default function App() {
                   <option value="45-54">45-54</option>
                   <option value="55+">55+</option>
                 </select>
+                {formErrors.ageGroup && <span className="error-text">{formErrors.ageGroup}</span>}
               </div>
-              <div>
+              
+              <div className={`form-field ${formErrors.gender ? 'error' : ''}`}>
+                <label>Gender (required) ⚧️</label>
+                <select
+                  value={demographics.gender}
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, gender: event.target.value }));
+                    if (formErrors.gender) setFormErrors(prev => ({ ...prev, gender: null }));
+                  }}
+                  className={formErrors.gender ? 'error-input' : ''}
+                >
+                  <option value="">Select gender</option>
+                  <option value="female">Female</option>
+                  <option value="male">Male</option>
+                  <option value="non-binary">Non-binary</option>
+                  <option value="prefer-not-say">Prefer not to say</option>
+                  <option value="other">Other</option>
+                </select>
+                {formErrors.gender && <span className="error-text">{formErrors.gender}</span>}
+              </div>
+              
+              <div className={`form-field ${formErrors.age ? 'error' : ''}`}>
+                <label>Age (required) 🔢</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  placeholder="Enter your age"
+                  value={demographics.age}
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, age: event.target.value }));
+                    if (formErrors.age) setFormErrors(prev => ({ ...prev, age: null }));
+                  }}
+                  className={formErrors.age ? 'error-input' : ''}
+                />
+                {formErrors.age && <span className="error-text">{formErrors.age}</span>}
+              </div>
+              
+              <div className={`form-field ${formErrors.place ? 'error' : ''}`}>
+                <label>Place/Location (required) 📍</label>
+                <input
+                  type="text"
+                  placeholder="e.g., New York, USA"
+                  value={demographics.place}
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, place: event.target.value }));
+                    if (formErrors.place) setFormErrors(prev => ({ ...prev, place: null }));
+                  }}
+                  className={formErrors.place ? 'error-input' : ''}
+                />
+                {formErrors.place && <span className="error-text">{formErrors.place}</span>}
+              </div>
+              
+              <div className={`form-field ${formErrors.language ? 'error' : ''}`}>
                 <label>Native language (required) 🌍</label>
                 <input
                   type="text"
                   placeholder="e.g., English"
                   value={demographics.language}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, language: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, language: event.target.value }));
+                    if (formErrors.language) setFormErrors(prev => ({ ...prev, language: null }));
+                  }}
+                  className={formErrors.language ? 'error-input' : ''}
                 />
+                {formErrors.language && <span className="error-text">{formErrors.language}</span>}
               </div>
-              <div>
+              
+              <div className={`form-field ${formErrors.experience ? 'error' : ''}`}>
                 <label>Prior experience (required) 📸</label>
                 <input
                   type="text"
                   placeholder="e.g., photography, art"
                   value={demographics.experience}
-                  onChange={(event) =>
-                    setDemographics((prev) => ({ ...prev, experience: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setDemographics((prev) => ({ ...prev, experience: event.target.value }));
+                    if (formErrors.experience) setFormErrors(prev => ({ ...prev, experience: null }));
+                  }}
+                  className={formErrors.experience ? 'error-input' : ''}
                 />
+                {formErrors.experience && <span className="error-text">{formErrors.experience}</span>}
               </div>
             </div>
-            <button className="primary" onClick={handleConsentStart} disabled={!consentChecked}>
+            
+            <div className={`consent-checkbox ${formErrors.consent ? 'error' : ''}`}>
+              <input
+                type="checkbox"
+                checked={consentChecked}
+                onChange={(event) => {
+                  setConsentChecked(event.target.checked);
+                  if (formErrors.consent) setFormErrors(prev => ({ ...prev, consent: null }));
+                }}
+                id="consent-check"
+              />
+              <label htmlFor="consent-check">
+                I consent to participate ✨
+                <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
+                  By checking this box, I agree to participate in this study and understand that my responses will be collected anonymously for research purposes.
+                </p>
+              </label>
+              {formErrors.consent && <span className="error-text consent-error">{formErrors.consent}</span>}
+            </div>
+            
+            <button className="primary" onClick={handleConsentStart}>
               Let's start! 🌟
             </button>
           </div>
@@ -510,8 +582,6 @@ export default function App() {
                 showNext={false}
                 onNext={handleNext}
                 showFinish={false}
-                nasaRatings={nasaRatings}
-                onNasaRatingChange={setNasaRatings}
               />
             )}
           </div>
@@ -557,8 +627,6 @@ export default function App() {
               showNext={readyForNext}
               onNext={handleNext}
               showFinish={true}
-              nasaRatings={nasaRatings}
-              onNasaRatingChange={setNasaRatings}
             />
           </div>
         )}
@@ -607,9 +675,7 @@ function TrialForm({
   fetchingImage,
   showNext,
   onNext,
-  showFinish,
-  nasaRatings,
-  onNasaRatingChange
+  showFinish
 }) {
   const [elapsed, setElapsed] = useState(0);
 
@@ -623,16 +689,6 @@ function TrialForm({
 
   const imageSrc = `${API_BASE}${trial.image_url}`;
 
-  const nasaDimensions = [
-    { key: "mental", label: "Mental Demand", description: "How mentally demanding was the task?" },
-    { key: "physical", label: "Physical Demand", description: "How physically demanding was the task?" },
-    { key: "temporal", label: "Temporal Demand", description: "How hurried or rushed was the pace?" },
-    { key: "performance", label: "Performance", description: "How successful were you?" },
-    { key: "effort", label: "Effort", description: "How hard did you work?" },
-    { key: "frustration", label: "Frustration", description: "How insecure or irritated were you?" }
-  ];
-
-  const allNasaRated = Object.values(nasaRatings).every(r => r > 0);
   const commentsValid = comments.trim().length >= 5;
 
   return (
@@ -700,48 +756,11 @@ function TrialForm({
         />
       </label>
 
-      {/* NASA-TLX Rating Scale */}
-      <div className="nasa-tlx">
-        <h3>Task Experience {allNasaRated ? "✅" : "(required)"} 🌟</h3>
-        <p className="nasa-tlx-description">
-          Please rate your experience with this task on a scale of 1-5 💕
-        </p>
-        {nasaDimensions.map((dimension) => (
-          <div key={dimension.key} className="nasa-item">
-            <label>{dimension.label}</label>
-            <p className="nasa-desc">{dimension.description}</p>
-            <div className="rating-scale">
-              {[1, 2, 3, 4, 5].map((val) => (
-                <label key={val} className="rating-option">
-                  <input
-                    type="radio"
-                    name={dimension.key}
-                    value={val}
-                    checked={nasaRatings[dimension.key] === val}
-                    onChange={() =>
-                      onNasaRatingChange({
-                        ...nasaRatings,
-                        [dimension.key]: val
-                      })
-                    }
-                  />
-                  <span className="rating-label">{val}</span>
-                </label>
-              ))}
-            </div>
-            <div className="rating-labels">
-              <span>Low</span>
-              <span>High</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
       <div className="actions">
         <button
           className={`primary ${submitting ? "wiggle" : ""}`}
           onClick={onSubmit}
-          disabled={submitting || wordCount < minWords || fetchingImage || rating === 0 || !allNasaRated || !commentsValid}
+          disabled={submitting || wordCount < minWords || fetchingImage || rating === 0 || !commentsValid}
         >
           {submitting ? "Submitting... 🌸" : "Submit! 💗"}
         </button>

@@ -44,14 +44,11 @@ CSV_HEADERS = [
     "user_agent",
     "ip_hash",
     "age_group",
+    "gender",
+    "age",
+    "place",
     "native_language",
     "prior_experience",
-    "nasa_mental",
-    "nasa_physical",
-    "nasa_temporal",
-    "nasa_performance",
-    "nasa_effort",
-    "nasa_frustration",
 ]
 
 app = Flask(__name__)
@@ -355,26 +352,6 @@ def submit():
     except (TypeError, ValueError):
         return jsonify({"error": "rating must be an integer between 1-10"}), 400
 
-    # Validate NASA-TLX ratings (1-5 scale)
-    nasa_fields = [
-        "nasa_mental",
-        "nasa_physical", 
-        "nasa_temporal",
-        "nasa_performance",
-        "nasa_effort",
-        "nasa_frustration"
-    ]
-    for field in nasa_fields:
-        value = payload.get(field)
-        if value is None:
-            return jsonify({"error": f"{field} is required"}), 400
-        try:
-            value = int(value)
-            if not 1 <= value <= 5:
-                raise ValueError
-        except (TypeError, ValueError):
-            return jsonify({"error": f"{field} must be an integer between 1-5"}), 400
-
     # Validate comments
     feedback = (payload.get("feedback") or "").strip()
     if len(feedback) < 5:
@@ -414,14 +391,11 @@ def submit():
         "user_agent": request.headers.get("User-Agent", ""),
         "ip_hash": get_ip_hash(),
         "age_group": payload.get("age_group", ""),
+        "gender": payload.get("gender", ""),
+        "age": payload.get("age", ""),
+        "place": payload.get("place", ""),
         "native_language": payload.get("native_language", ""),
         "prior_experience": payload.get("prior_experience", ""),
-        "nasa_mental": payload.get("nasa_mental", ""),
-        "nasa_physical": payload.get("nasa_physical", ""),
-        "nasa_temporal": payload.get("nasa_temporal", ""),
-        "nasa_performance": payload.get("nasa_performance", ""),
-        "nasa_effort": payload.get("nasa_effort", ""),
-        "nasa_frustration": payload.get("nasa_frustration", ""),
     }
 
     with CSV_PATH.open("a", newline="", encoding="utf-8") as file:
@@ -482,8 +456,8 @@ def home_page():
     return jsonify({
         "title": "C.O.G.N.I.T. - Cognitive Observation & Generalized Narrative Inquiry Tool",
         "description": "A research tool for studying how people describe visual scenes",
-        "version": "1.0.0",
-        "features": ["Image description tasks", "NASA-TLX workload assessment", "Attention checks", "Data export"]
+        "version": "2.0.0",
+        "features": ["Image description tasks", "Demographic data collection", "Attention checks", "Data export"]
     })
 
 
@@ -541,6 +515,7 @@ def faq_page():
 
 
 @app.route("/api/docs")
+@limiter.limit("30 per minute")
 def api_docs():
     """Comprehensive API documentation"""
     return jsonify({
@@ -597,14 +572,11 @@ def api_docs():
                             "is_attention": "boolean (required)",
                             "attention_expected": "string",
                             "age_group": "string",
+                            "gender": "string",
+                            "age": "string",
+                            "place": "string",
                             "native_language": "string",
-                            "prior_experience": "string",
-                            "nasa_mental": "integer (required, 1-5)",
-                            "nasa_physical": "integer (required, 1-5)",
-                            "nasa_temporal": "integer (required, 1-5)",
-                            "nasa_performance": "integer (required, 1-5)",
-                            "nasa_effort": "integer (required, 1-5)",
-                            "nasa_frustration": "integer (required, 1-5)"
+                            "prior_experience": "string"
                         },
                         "response": {
                             "status": "string",
@@ -792,14 +764,11 @@ def api_docs():
                     "user_agent": "string",
                     "ip_hash": "string (SHA-256 hash)",
                     "age_group": "string",
+                    "gender": "string",
+                    "age": "string",
+                    "place": "string",
                     "native_language": "string",
-                    "prior_experience": "string",
-                    "nasa_mental": "integer (1-5)",
-                    "nasa_physical": "integer (1-5)",
-                    "nasa_temporal": "integer (1-5)",
-                    "nasa_performance": "integer (1-5)",
-                    "nasa_effort": "integer (1-5)",
-                    "nasa_frustration": "integer (1-5)"
+                    "prior_experience": "string"
                 }
             }
         },
@@ -831,7 +800,9 @@ def api_docs():
                     "Added comprehensive API documentation",
                     "Improved admin dashboard with charts and filters",
                     "Fixed data explorer search functionality",
-                    "Added demographic data collection"
+                    "Added demographic data collection",
+                    "Removed NASA-TLX workload assessment",
+                    "Added gender, age, and place fields to demographics"
                 ]
             },
             {

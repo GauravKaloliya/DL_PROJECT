@@ -19,6 +19,8 @@ export default function AdminPanel() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filters, setFilters] = useState({
     ageGroup: "",
+    gender: "",
+    place: "",
     language: "",
     rating: "",
     isPractice: "",
@@ -200,22 +202,32 @@ export default function AdminPanel() {
     // Age group filter
     const ageMatch = filters.ageGroup === "" || row.age_group === filters.ageGroup;
     
+    // Gender filter
+    const genderMatch = filters.gender === "" || row.gender === filters.gender;
+    
+    // Place filter
+    const placeMatch = filters.place === "" || 
+      (row.place && row.place.toLowerCase().includes(filters.place.toLowerCase()));
+    
     // Language filter
     const languageMatch = filters.language === "" || row.native_language === filters.language;
     
     // Rating filter
-    const ratingMatch = filters.rating === "" || row.rating === filters.rating;
+    const ratingMatch = filters.rating === "" || String(row.rating) === filters.rating;
     
-    // Practice filter
-    const practiceMatch = filters.isPractice === "" || row.is_practice === filters.isPractice;
+    // Practice filter - handle both string and boolean values
+    const practiceMatch = filters.isPractice === "" || 
+      String(row.is_practice).toLowerCase() === filters.isPractice.toLowerCase();
     
     // Attention filter
-    const attentionMatch = filters.isAttention === "" || row.is_attention === filters.isAttention;
+    const attentionMatch = filters.isAttention === "" || 
+      String(row.is_attention).toLowerCase() === filters.isAttention.toLowerCase();
     
     // Attention passed filter
-    const attentionPassedMatch = filters.attentionPassed === "" || row.attention_passed === filters.attentionPassed;
+    const attentionPassedMatch = filters.attentionPassed === "" || 
+      String(row.attention_passed).toLowerCase() === filters.attentionPassed.toLowerCase();
     
-    return searchMatch && ageMatch && languageMatch && ratingMatch && practiceMatch && attentionMatch && attentionPassedMatch;
+    return searchMatch && ageMatch && genderMatch && placeMatch && languageMatch && ratingMatch && practiceMatch && attentionMatch && attentionPassedMatch;
   });
 
   // Data processing for charts
@@ -226,6 +238,9 @@ export default function AdminPanel() {
     const ageGroups = {
       '18-24': 0, '25-34': 0, '35-44': 0, '45-54': 0, '55+': 0, 'Unknown': 0
     };
+    
+    // Gender distribution
+    const genders = {};
     
     // Language distribution
     const languages = {};
@@ -238,11 +253,6 @@ export default function AdminPanel() {
     
     // Time spent distribution
     const timeSpent = [];
-    
-    // NASA-TLX averages
-    const nasaAverages = {
-      mental: [], physical: [], temporal: [], performance: [], effort: [], frustration: []
-    };
 
     csvData.forEach(row => {
       // Age groups
@@ -252,6 +262,10 @@ export default function AdminPanel() {
       } else {
         ageGroups['Unknown']++;
       }
+
+      // Gender
+      const gender = row.gender || 'Unknown';
+      genders[gender] = (genders[gender] || 0) + 1;
 
       // Languages
       const language = row.native_language || 'Unknown';
@@ -270,29 +284,15 @@ export default function AdminPanel() {
       // Time spent
       const time = parseFloat(row.time_spent_seconds) || 0;
       timeSpent.push(time);
-
-      // NASA-TLX
-      Object.keys(nasaAverages).forEach(key => {
-        const value = parseInt(row[`nasa_${key}`]) || 0;
-        if (value >= 1 && value <= 5) {
-          nasaAverages[key].push(value);
-        }
-      });
     });
 
     return {
       ageGroups,
+      genders: Object.entries(genders).sort((a, b) => b[1] - a[1]),
       languages: Object.entries(languages).sort((a, b) => b[1] - a[1]).slice(0, 5),
       ratings,
       wordCounts,
-      timeSpent,
-      nasaAverages: Object.entries(nasaAverages).map(([key, values]) => {
-        const sum = values.reduce((a, b) => a + b, 0);
-        return {
-          label: key.charAt(0).toUpperCase() + key.slice(1),
-          average: values.length > 0 ? (sum / values.length).toFixed(2) : 0
-        };
-      })
+      timeSpent
     };
   };
 
@@ -371,12 +371,6 @@ export default function AdminPanel() {
         >
           Settings ⚙️
         </button>
-        <button
-          className={activeTab === "api-docs" ? "active" : ""}
-          onClick={() => setActiveTab("api-docs")}
-        >
-          API Docs 📚
-        </button>
       </div>
 
       <div className="admin-content">
@@ -420,7 +414,7 @@ export default function AdminPanel() {
               <div className="error-message">No statistics available</div>
             )}
 
-            {chartData && (
+            {chartData && stats && stats.total_submissions > 0 ? (
               <div className="charts-section">
                 <h3>Demographic Distribution 📊</h3>
                 <div className="chart-grid">
@@ -470,17 +464,16 @@ export default function AdminPanel() {
                     />
                   </div>
                   <div className="chart-card">
-                    <h4>NASA-TLX Averages</h4>
-                    <Bar
+                    <h4>Gender Distribution</h4>
+                    <Pie
                       data={{
-                        labels: chartData.nasaAverages.map(item => item.label),
+                        labels: chartData.genders.map(g => g[0]),
                         datasets: [{
-                          label: 'Average Score',
-                          data: chartData.nasaAverages.map(item => item.average),
-                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                          data: chartData.genders.map(g => g[1]),
+                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
                         }]
                       }}
-                      options={{ responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, max: 5 } } }}
+                      options={{ responsive: true, maintainAspectRatio: true }}
                     />
                   </div>
                 </div>
@@ -520,6 +513,10 @@ export default function AdminPanel() {
                     />
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="no-data-message">
+                <p>No chart data available. Submit some responses to see visualizations 📊</p>
               </div>
             )}
 
@@ -568,6 +565,27 @@ export default function AdminPanel() {
                     <option value="45-54">45-54</option>
                     <option value="55+">55+</option>
                   </select>
+                </div>
+                <div className="filter-group">
+                  <label>Gender</label>
+                  <select
+                    value={filters.gender}
+                    onChange={(e) => setFilters({...filters, gender: e.target.value})}
+                  >
+                    <option value="">All</option>
+                    {csvData.length > 0 && [...new Set(csvData.map(row => row.gender).filter(Boolean))].map(gender => (
+                      <option key={gender} value={gender}>{gender}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-group">
+                  <label>Place</label>
+                  <input
+                    type="text"
+                    placeholder="Filter by place..."
+                    value={filters.place}
+                    onChange={(e) => setFilters({...filters, place: e.target.value})}
+                  />
                 </div>
                 <div className="filter-group">
                   <label>Language</label>
@@ -629,6 +647,8 @@ export default function AdminPanel() {
                 <div className="filter-group">
                   <button className="ghost" onClick={() => setFilters({
                     ageGroup: "",
+                    gender: "",
+                    place: "",
                     language: "",
                     rating: "",
                     isPractice: "",
@@ -643,6 +663,11 @@ export default function AdminPanel() {
 
             {loading ? (
               <div className="loading">Loading data...</div>
+            ) : csvData.length === 0 ? (
+              <div className="no-data-message">
+                <p>No data available yet. Start collecting submissions to see data here 📊</p>
+                <p className="hint">Use the participant interface to submit responses.</p>
+              </div>
             ) : filteredData.length > 0 ? (
               <div className="data-table-container">
                 <div className="data-table">
@@ -689,7 +714,19 @@ export default function AdminPanel() {
                 </div>
               </div>
             ) : (
-              <div className="error-message">No data available</div>
+              <div className="no-data-message">
+                <p>No matching data found. Try adjusting your filters 🔍</p>
+                <button className="ghost" onClick={() => setFilters({
+                  ageGroup: "",
+                  gender: "",
+                  place: "",
+                  language: "",
+                  rating: "",
+                  isPractice: "",
+                  isAttention: "",
+                  attentionPassed: ""
+                })}>Clear Filters 🚫</button>
+              </div>
             )}
           </div>
         )}
@@ -887,127 +924,6 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {activeTab === "api-docs" && (
-          <div className="api-docs">
-            <h2>API Documentation 📚</h2>
-            <div className="api-docs-section">
-              <h3>Available Endpoints</h3>
-              <div className="endpoint-grid">
-                <div className="endpoint-card">
-                  <h4>Public Endpoints</h4>
-                  <ul>
-                    <li><code>GET /api/images/random</code> - Get random image</li>
-                    <li><code>GET /api/images/&lt;image_id&gt;</code> - Get specific image</li>
-                    <li><code>POST /api/submit</code> - Submit participant data</li>
-                    <li><code>GET /api/pages/*</code> - Page information</li>
-                    <li><code>GET /api/docs</code> - Full API documentation</li>
-                  </ul>
-                </div>
-                <div className="endpoint-card">
-                  <h4>Admin Endpoints</h4>
-                  <ul>
-                    <li><code>GET /api/stats</code> - Get statistics</li>
-                    <li><code>GET /admin/download</code> - Download CSV</li>
-                    <li><code>GET /admin/csv-data</code> - Get CSV as JSON</li>
-                    <li><code>GET /api/security/info</code> - Security info</li>
-                    <li><code>GET /admin/security/audit</code> - Security audit</li>
-                    <li><code>POST /api/admin/login</code> - Admin login</li>
-                    <li><code>POST /api/admin/logout</code> - Admin logout</li>
-                    <li><code>GET /api/admin/me</code> - Get user info</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-
-            <div className="api-docs-section">
-              <h3>Authentication</h3>
-              <p>Most admin endpoints require authentication using an API key.</p>
-              <div className="auth-methods">
-                <h4>Authentication Methods</h4>
-                <ul>
-                  <li><strong>X-API-KEY header:</strong> <code>X-API-KEY: your-api-key</code></li>
-                  <li><strong>Query parameter:</strong> <code>?api_key=your-api-key</code></li>
-                </ul>
-                <p>Default API key for development: <code>changeme</code></p>
-              </div>
-            </div>
-
-            <div className="api-docs-section">
-              <h3>API Documentation Actions</h3>
-              <div className="api-actions">
-                <button className="primary" onClick={() => {
-                  fetch(`${API_BASE}/api/docs`)
-                    .then(response => response.json())
-                    .then(data => {
-                      const jsonStr = JSON.stringify(data, null, 2);
-                      const blob = new Blob([jsonStr], { type: 'application/json' });
-                      const url = URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = 'cognit-api-docs.json';
-                      document.body.appendChild(a);
-                      a.click();
-                      document.body.removeChild(a);
-                      URL.revokeObjectURL(url);
-                      addToast('API documentation downloaded! 🎉', 'success');
-                    })
-                    .catch(error => {
-                      addToast('Failed to download API docs', 'error');
-                      console.error('API docs download error:', error);
-                    });
-                }}>Download Full API Docs 📥</button>
-
-                <button className="ghost" onClick={() => {
-                  window.open(`${API_BASE}/api/docs`, '_blank');
-                }}>View Raw API Docs 🔍</button>
-              </div>
-            </div>
-
-            <div className="api-docs-section">
-              <h3>Data Structure</h3>
-              <p>The submission data includes the following fields:</p>
-              <div className="data-structure">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Field</th>
-                      <th>Type</th>
-                      <th>Description</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr><td>timestamp</td><td>string</td><td>ISO format timestamp</td></tr>
-                    <tr><td>participant_id</td><td>string</td><td>Unique participant ID</td></tr>
-                    <tr><td>session_id</td><td>string</td><td>Unique session ID</td></tr>
-                    <tr><td>image_id</td><td>string</td><td>Image identifier</td></tr>
-                    <tr><td>description</td><td>string</td><td>Participant's description</td></tr>
-                    <tr><td>word_count</td><td>integer</td><td>Number of words in description</td></tr>
-                    <tr><td>rating</td><td>integer</td><td>General rating (1-10)</td></tr>
-                    <tr><td>age_group</td><td>string</td><td>Participant's age group</td></tr>
-                    <tr><td>native_language</td><td>string</td><td>Participant's native language</td></tr>
-                    <tr><td>prior_experience</td><td>string</td><td>Participant's prior experience</td></tr>
-                    <tr><td>nasa_mental</td><td>integer</td><td>NASA-TLX mental demand (1-5)</td></tr>
-                    <tr><td>nasa_physical</td><td>integer</td><td>NASA-TLX physical demand (1-5)</td></tr>
-                    <tr><td>nasa_temporal</td><td>integer</td><td>NASA-TLX temporal demand (1-5)</td></tr>
-                    <tr><td>nasa_performance</td><td>integer</td><td>NASA-TLX performance (1-5)</td></tr>
-                    <tr><td>nasa_effort</td><td>integer</td><td>NASA-TLX effort (1-5)</td></tr>
-                    <tr><td>nasa_frustration</td><td>integer</td><td>NASA-TLX frustration (1-5)</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            <div className="api-docs-section">
-              <h3>Rate Limits</h3>
-              <p>API endpoints have the following rate limits:</p>
-              <ul>
-                <li><strong>Default:</strong> 200 requests per day, 50 requests per hour</li>
-                <li><strong>Admin endpoints:</strong> 10 requests per minute</li>
-                <li><strong>Security audit:</strong> 5 requests per minute</li>
-              </ul>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
