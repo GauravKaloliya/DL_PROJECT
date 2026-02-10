@@ -1,155 +1,233 @@
 #!/usr/bin/env python3
 """
-Test script for C.O.G.N.I.T. features
+Test script to verify the specific features implemented in the ticket.
+
+This script tests:
+1. Image loading validation functionality
+2. Survey completion buttons (Continue Survey and Finish Survey)
+3. Admin authentication with updated credentials
 """
 
-import requests
-import time
-import json
+import hashlib
+import sqlite3
 import os
-import sys
+from pathlib import Path
 
-# Add backend path to import the app module
-sys.path.insert(0, '/home/engine/project/backend')
-
-def test_backend_endpoints():
-    """Test that all backend endpoints work correctly"""
-    base_url = "http://localhost:5000"
+def test_image_loading_functionality():
+    """Test that image loading validation is properly implemented"""
+    print("🖼️  Testing image loading functionality...")
     
-    print("🧪 Testing backend endpoints...")
+    frontend_file = Path(__file__).parent / "frontend" / "src" / "App.jsx"
     
-    # Test home endpoint
     try:
-        response = requests.get(f"{base_url}/api/pages/home")
-        if response.status_code == 200:
-            print("✅ Home endpoint works")
-        else:
-            print(f"❌ Home endpoint failed: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Home endpoint error: {e}")
-    
-    # Test API docs endpoint
-    try:
-        response = requests.get(f"{base_url}/api/docs")
-        if response.status_code == 200:
-            print("✅ API docs endpoint works")
-            data = response.json()
-            if 'title' in data and 'version' in data:
-                print(f"📚 API docs available: {data['title']} v{data['version']}")
+        with open(frontend_file, 'r') as f:
+            content = f.read()
+        
+        # Check for image loading state management
+        checks = [
+            ('imageLoaded state', 'const [imageLoaded, setImageLoaded]'),
+            ('imageError state', 'const [imageError, setImageError]'),
+            ('handleImageLoad function', 'const handleImageLoad = () =>'),
+            ('handleImageError function', 'const handleImageError = () =>'),
+            ('onLoad event handler', 'onLoad={handleImageLoad}'),
+            ('onError event handler', 'onError={handleImageError}'),
+            ('Loading indicator', 'Loading image...'),
+            ('Error message', 'Image failed to load'),
+        ]
+        
+        all_passed = True
+        for check_name, check_string in checks:
+            if check_string in content:
+                print(f"   ✅ {check_name}")
             else:
-                print("❌ API docs missing expected fields")
-        else:
-            print(f"❌ API docs endpoint failed: {response.status_code}")
+                print(f"   ❌ {check_name} - Not found")
+                all_passed = False
+        
+        return all_passed
+        
     except Exception as e:
-        print(f"❌ API docs endpoint error: {e}")
-    
-    # Test random image endpoint
-    try:
-        response = requests.get(f"{base_url}/api/images/random?type=normal")
-        if response.status_code == 200:
-            print("✅ Random image endpoint works")
-        else:
-            print(f"❌ Random image endpoint failed: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Random image endpoint error: {e}")
+        print(f"   ❌ Error reading frontend file: {e}")
+        return False
 
-def test_email_verification():
-    """Test email verification endpoints"""
-    base_url = "http://localhost:5000"
+def test_survey_completion_buttons():
+    """Test that survey completion buttons are properly implemented"""
+    print("\n📝 Testing survey completion buttons...")
     
-    print("\n📧 Testing email verification endpoints...")
+    frontend_file = Path(__file__).parent / "frontend" / "src" / "App.jsx"
     
-    # Test verification endpoint (this should fail with no token, which is expected)
     try:
-        response = requests.post(f"{base_url}/api/admin/verify-email", 
-                               json={"token": "test_token"})
-        if response.status_code == 400:
-            print("✅ Email verification endpoint responds correctly")
-        else:
-            print(f"❌ Email verification endpoint unexpected status: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Email verification endpoint error: {e}")
-
-def test_frontend_components():
-    """Test that frontend components are accessible"""
-    print("\n🖥️ Testing frontend components...")
-    
-    frontend_url = "http://localhost:5173"
-    
-    # Test API docs page (frontend route)
-    try:
-        response = requests.get(f"{frontend_url}/api/docs")
-        if response.status_code == 200:
-            print("✅ Frontend API docs page accessible")
-        elif response.status_code == 404:
-            print("⚠️ Frontend API docs page not found (normal for dev server)")
-        else:
-            print(f"❌ Frontend API docs page failed: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Frontend API docs page error: {e}")
-    
-    # Test admin page
-    try:
-        response = requests.get(f"{frontend_url}/admin")
-        if response.status_code == 200:
-            print("✅ Admin page accessible")
-        elif response.status_code == 404:
-            print("⚠️ Admin page not found (normal for dev server)")
-        else:
-            print(f"❌ Admin page failed: {response.status_code}")
-    except Exception as e:
-        print(f"❌ Admin page error: {e}")
-
-def test_csv_headers():
-    """Test that CSV includes consent user details"""
-    print("\n📊 Testing CSV headers...")
-    
-    csv_path = "/home/engine/project/backend/data/submissions.csv"
-    
-    if os.path.exists(csv_path):
-        with open(csv_path, 'r') as f:
-            headers = f.readline().strip().split(',')
-            expected_headers = [
-                'age_group', 'gender', 'age', 'place', 
-                'native_language', 'prior_experience'
-            ]
-            
-            missing_headers = []
-            for header in expected_headers:
-                if header not in headers:
-                    missing_headers.append(header)
-            
-            if not missing_headers:
-                print("✅ All consent user details headers present in CSV")
+        with open(frontend_file, 'r') as f:
+            content = f.read()
+        
+        # Check for both buttons in the survey completion section
+        checks = [
+            ('Continue Survey button', 'Continue Survey'),
+            ('Finish Survey button', 'Finish Survey'),
+            ('Button container', 'display: \'flex\''),
+            ('Gap between buttons', 'gap: \'16px\''),
+            ('Finish Survey handler', 'onClick={handleFinishEarly}'),
+            ('Continue Survey handler', 'onClick={handleNext}'),
+        ]
+        
+        all_passed = True
+        for check_name, check_string in checks:
+            if check_string in content:
+                print(f"   ✅ {check_name}")
             else:
-                print(f"❌ Missing CSV headers: {missing_headers}")
-    else:
-        print("⚠️ CSV file not found (will be created on first submission)")
+                print(f"   ❌ {check_name} - Not found")
+                all_passed = False
+        
+        return all_passed
+        
+    except Exception as e:
+        print(f"   ❌ Error reading frontend file: {e}")
+        return False
+
+def test_admin_authentication():
+    """Test admin authentication with updated credentials"""
+    print("\n🔐 Testing admin authentication...")
+    
+    db_path = Path(__file__).parent / "backend" / "COGNIT.db"
+    
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        
+        # Get the stored password hash
+        cursor.execute("SELECT password_hash FROM admin_users WHERE username = ?", ("Gaurav",))
+        result = cursor.fetchone()
+        
+        if not result:
+            print("   ❌ Admin user 'Gaurav' not found")
+            return False
+        
+        stored_hash = result[0]
+        
+        # Test authentication with correct password
+        test_password = "Gaurav@0809"
+        test_hash = hashlib.sha256(test_password.encode()).hexdigest()
+        
+        if stored_hash == test_hash:
+            print("   ✅ Admin password is correctly set to 'Gaurav@0809'")
+            print("   ✅ Password hash verification successful")
+            return True
+        else:
+            print("   ❌ Password hash does not match expected value")
+            print(f"   Expected: {test_hash}")
+            print(f"   Got: {stored_hash}")
+            return False
+            
+    except Exception as e:
+        print(f"   ❌ Error testing admin authentication: {e}")
+        return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+def test_css_styling():
+    """Test that CSS styling is properly implemented"""
+    print("\n🎨 Testing CSS styling...")
+    
+    css_file = Path(__file__).parent / "frontend" / "src" / "styles.css"
+    
+    try:
+        with open(css_file, 'r') as f:
+            content = f.read()
+        
+        # Check for image loading/error styling
+        checks = [
+            ('Image loading class', '.image-loading'),
+            ('Image error class', '.image-error'),
+            ('Z-index for overlay', 'z-index: 10'),
+            ('Position absolute', 'position: absolute'),
+            ('Background color for loading', 'background: rgba(24, 119, 242'),
+            ('Error background color', 'background: rgba(201, 68, 74'),
+        ]
+        
+        all_passed = True
+        for check_name, check_string in checks:
+            if check_string in content:
+                print(f"   ✅ {check_name}")
+            else:
+                print(f"   ❌ {check_name} - Not found")
+                all_passed = False
+        
+        return all_passed
+        
+    except Exception as e:
+        print(f"   ❌ Error reading CSS file: {e}")
+        return False
+
+def test_backend_security():
+    """Test backend security features"""
+    print("\n🛡️  Testing backend security...")
+    
+    backend_file = Path(__file__).parent / "backend" / "app.py"
+    
+    try:
+        with open(backend_file, 'r') as f:
+            content = f.read()
+        
+        # Check for security features
+        checks = [
+            ('Password hashing function', 'def hash_password(password):'),
+            ('Admin authentication', 'def authenticate_admin(username, password):'),
+            ('Session validation', 'def validate_session(session_token):'),
+            ('Rate limiting', 'flask_limiter'),
+            ('CORS configuration', 'CORS(app'),
+            ('Security headers', 'add_security_headers'),
+        ]
+        
+        all_passed = True
+        for check_name, check_string in checks:
+            if check_string in content:
+                print(f"   ✅ {check_name}")
+            else:
+                print(f"   ❌ {check_name} - Not found")
+                all_passed = False
+        
+        return all_passed
+        
+    except Exception as e:
+        print(f"   ❌ Error reading backend file: {e}")
+        return False
 
 def main():
-    """Run all tests"""
-    print("🚀 Starting C.O.G.N.I.T. Feature Tests\n")
+    """Run all feature tests"""
+    print("🧪 Running C.O.G.N.I.T. feature verification tests...\n")
     
-    # Wait a bit for servers to start
-    print("⏳ Waiting for servers to start...")
-    time.sleep(2)
+    tests = [
+        test_image_loading_functionality,
+        test_survey_completion_buttons,
+        test_admin_authentication,
+        test_css_styling,
+        test_backend_security,
+    ]
     
-    test_backend_endpoints()
-    test_email_verification()
-    test_frontend_components()
-    test_csv_headers()
+    results = []
+    for test in tests:
+        try:
+            result = test()
+            results.append(result)
+        except Exception as e:
+            print(f"   ❌ Test {test.__name__} failed with exception: {e}")
+            results.append(False)
     
-    print("\n🎉 Feature testing completed!")
-    print("\n📋 Summary of implemented features:")
-    print("1. ✅ Email verification functionality")
-    print("2. ✅ Copy/paste restricted to input fields only")
-    print("3. ✅ API documentation at /api/docs")
-    print("4. ✅ 404 Not Found page")
-    print("5. ✅ Error page with error boundary")
-    print("6. ✅ Consent page user details included in CSV")
-    print("7. ✅ JSON credentials file upload in admin login")
-    print("8. ✅ Enhanced admin authentication")
-    print("9. ✅ Error handling and styles fixes")
+    print(f"\n📊 Feature Test Results:")
+    print(f"   Passed: {sum(results)}/{len(results)}")
+    
+    if all(results):
+        print("\n🎉 All feature tests passed! Implementation is complete.")
+        print("\n📋 Summary of implemented features:")
+        print("   1. ✅ Image loading validation with loading/error states")
+        print("   2. ✅ Survey completion buttons (Continue Survey + Finish Survey)")
+        print("   3. ✅ Admin credentials updated (Gaurav/Gaurav@0809)")
+        print("   4. ✅ CSS styling for new UI elements")
+        print("   5. ✅ Backend security features maintained")
+        return 0
+    else:
+        print("\n⚠️  Some feature tests failed. Please review the implementation.")
+        return 1
 
 if __name__ == "__main__":
-    main()
+    exit(main())

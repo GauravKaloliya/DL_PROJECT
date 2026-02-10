@@ -741,6 +741,9 @@ export default function App() {
                   <button className="ghost" onClick={handleNext}>
                     Continue Survey
                   </button>
+                  <button className="ghost" onClick={handleFinishEarly}>
+                    Finish Survey
+                  </button>
                 </div>
               </div>
             ) : (
@@ -856,6 +859,8 @@ function TrialForm({
   onBack
 }) {
   const [elapsed, setElapsed] = useState(0);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     setElapsed(0);
@@ -869,6 +874,16 @@ function TrialForm({
 
   const commentsValid = comments.trim().length >= 5;
 
+  const handleImageLoad = () => {
+    setImageLoaded(true);
+    setImageError(false);
+  };
+
+  const handleImageError = () => {
+    setImageError(true);
+    setImageLoaded(false);
+  };
+
   return (
     <div className="trial">
       {instruction && <div className="banner info">{instruction.text}</div>}
@@ -881,8 +896,26 @@ function TrialForm({
         </button>
       </div>
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
-        <img src={imageSrc} alt="Prompt" onClick={onToggleZoom} />
-        <button className="zoom-toggle" onClick={onToggleZoom}>
+        {!imageError ? (
+          <img 
+            src={imageSrc} 
+            alt="Prompt" 
+            onClick={onToggleZoom} 
+            onLoad={handleImageLoad}
+            onError={handleImageError}
+            style={{ display: imageLoaded ? 'block' : 'none' }}
+          />
+        ) : (
+          <div className="image-error">
+            <p>⚠️ Image failed to load. Please refresh the page.</p>
+          </div>
+        )}
+        {!imageLoaded && !imageError && (
+          <div className="image-loading">
+            <p>Loading image...</p>
+          </div>
+        )}
+        <button className="zoom-toggle" onClick={onToggleZoom} disabled={!imageLoaded || imageError}>
           {isZoomed ? "Reset zoom 🔍" : "Zoom 🔍"}
         </button>
       </div>
