@@ -49,6 +49,9 @@ export default function ErrorPage({ error, resetError }) {
               Admin Panel
             </button>
           </div>
+          <div style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
+            Created by Gaurav Kaloliya
+          </div>
         </div>
       </div>
     </div>
