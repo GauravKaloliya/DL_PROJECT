@@ -786,6 +786,9 @@ export default function App() {
         <div className="branding-footer" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
           Created by Gaurav Kaloliya
         </div>
+        <div className="branding-header" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
+          <strong>Gaurav Kaloliya</strong> - Innovating Cognitive Research Tools
+        </div>
       </div>
       <Confetti show={showConfetti} />
       <Toasts toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((toast) => toast.id !== id))} />

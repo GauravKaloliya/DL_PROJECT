@@ -2,6 +2,10 @@
 
 This project contains a React + Vite frontend and a Flask backend that serve an image description study workflow. The backend stores submissions in an append-only CSV file and serves local images.
 
+## Author
+
+**Gaurav Kaloliya** - Innovating Cognitive Research Tools
+
 ## Repository Structure
 
 - `frontend/`: React + Vite application

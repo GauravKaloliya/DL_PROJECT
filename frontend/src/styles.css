@@ -1044,6 +1044,14 @@ body.dark .error-message {
   font-weight: 500;
 }
 
+.branding-header {
+  text-align: center;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+}
+
 .user-info {
   color: var(--muted);
   font-size: 14px;
