@@ -79,7 +79,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 2.0.0 • API Documentation
+              Version 2.1.0 • API Documentation
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -143,11 +143,11 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><strong>Image Management:</strong> Fetch random images for the study by type (normal, survey, attention)</li>
-              <li><strong>Data Submission:</strong> Submit participant responses with descriptions and ratings</li>
-              <li><strong>Demographic Collection:</strong> Capture participant information including username, age, gender, and language</li>
-              <li><strong>Admin Dashboard:</strong> Access statistics, export data, and manage the platform</li>
-              <li><strong>Security:</strong> Session-based authentication with rate limiting and CORS protection</li>
+              <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
+              <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
+              <li><strong>Content Pages:</strong> Read public home, about, contact, and FAQ details</li>
+              <li><strong>Admin Operations:</strong> Login, review stats, export CSV data, and manage submissions</li>
+              <li><strong>Security:</strong> Session-token authentication with rate limiting and hardened headers</li>
             </ul>
 
             <h3 style={{ marginTop: '32px' }}>Quick Start</h3>
@@ -235,11 +235,22 @@ export default function ApiDocs() {
                 { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
               ]}
               response={{
-                "image_id": "normal/image1.jpg",
-                "image_url": "/api/images/normal/image1.jpg",
+                "image_id": "normal/aurora-lake.svg",
+                "image_url": "/api/images/normal/aurora-lake.svg",
                 "is_survey": false,
                 "is_attention": false
               }}
+            />
+
+            {/* Get Image */}
+            <EndpointCard
+              method="GET"
+              path="/api/images/{image_id}"
+              description="Serve a specific image file"
+              parameters={[
+                { name: 'image_id', type: 'string', required: true, description: 'ID of the image to retrieve' }
+              ]}
+              response="Binary image data"
             />
 
             {/* Submit Data */}
@@ -272,19 +283,113 @@ export default function ApiDocs() {
               }}
             />
 
-            {/* Get Image */}
             <EndpointCard
               method="GET"
-              path="/api/images/{image_id}"
-              description="Serve a specific image file"
-              parameters={[
-                { name: 'image_id', type: 'string', required: true, description: 'ID of the image to retrieve' }
-              ]}
-              response="Binary image data"
+              path="/api/pages/home"
+              description="Get home page metadata"
+              response={{
+                "title": "C.O.G.N.I.T. - Cognitive Observation & Generalized Narrative Inquiry Tool",
+                "description": "A research tool for studying how people describe visual scenes",
+                "version": "2.1.0",
+                "features": ["Image description tasks", "Demographic data collection"]
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/pages/about"
+              description="Get about page content"
+              response={{
+                "title": "About C.O.G.N.I.T.",
+                "purpose": "To collect anonymous descriptions of images for research"
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/pages/contact"
+              description="Get contact details"
+              response={{
+                "email": "contact@cognit-research.org",
+                "support": "support@cognit-research.org"
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/pages/faq"
+              description="Get frequently asked questions"
+              response={{
+                "title": "Frequently Asked Questions",
+                "faqs": "array of question/answer entries"
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/security/info"
+              description="Get security configuration details"
+              response={{
+                "security": {
+                  "rate_limits": "object",
+                  "cors_allowed_origins": "array",
+                  "security_headers": "array"
+                }
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/docs"
+              description="Retrieve the API documentation"
+              response="Documentation payload"
             />
 
             {/* Admin Endpoints */}
             <h3 style={{ marginTop: '40px' }}>Admin Endpoints (Authentication Required)</h3>
+
+            <EndpointCard
+              method="POST"
+              path="/api/admin/login"
+              description="Authenticate and receive a session token"
+              requestBody={{
+                "username": "string (required)",
+                "password": "string (required)"
+              }}
+              response={{
+                "status": "success",
+                "session_token": "string",
+                "user": { "username": "admin", "role": "admin" }
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/admin/me"
+              description="Get the current admin profile"
+              auth={true}
+              response={{
+                "username": "admin",
+                "role": "admin",
+                "email": "admin@example.com",
+                "auth_method": "session"
+              }}
+            />
+
+            <EndpointCard
+              method="POST"
+              path="/api/admin/change-password"
+              description="Update the current admin password"
+              auth={true}
+              requestBody={{
+                "current_password": "string (required)",
+                "new_password": "string (required, min 6 characters)"
+              }}
+              response={{
+                "status": "success",
+                "message": "Password changed successfully"
+              }}
+            />
 
             <EndpointCard
               method="GET"
@@ -324,6 +429,30 @@ export default function ApiDocs() {
                 "message": "All CSV data has been deleted successfully"
               }}
             />
+
+            <EndpointCard
+              method="GET"
+              path="/admin/security/audit"
+              description="Run the security audit checklist"
+              auth={true}
+              response={{
+                "security_audit": {
+                  "status": "ok",
+                  "recommendations": "array"
+                }
+              }}
+            />
+
+            <EndpointCard
+              method="POST"
+              path="/api/admin/logout"
+              description="Invalidate the current admin session"
+              auth={true}
+              response={{
+                "status": "success",
+                "message": "Logged out successfully"
+              }}
+            />
           </div>
         )}
 
@@ -334,37 +463,51 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '24px' }}>JavaScript / Fetch</h3>
             <CodeBlock code={`// Get a random image
-const response = await fetch('/api/images/random?type=normal');
-const image = await response.json();
-console.log(image.image_url);
+            const response = await fetch('/api/images/random?type=normal');
+            const image = await response.json();
+            console.log(image.image_url);
 
-// Submit participant data
-const submission = {
-  participant_id: 'user-123',
-  session_id: 'session-456',
-  image_id: 'normal/image1.jpg',
-  description: 'The image shows a beautiful sunset over mountains...',
-  rating: 8,
-  feedback: 'Interesting image',
-  time_spent_seconds: 45,
-  is_survey: false,
-  is_attention: false,
-  username: 'john_doe',
-  gender: 'male',
-  age: '25',
-  place: 'New York',
-  native_language: 'English',
-  prior_experience: 'Photography'
-};
+            // Submit participant data
+            const submission = {
+            participant_id: 'user-123',
+            session_id: 'session-456',
+            image_id: 'normal/aurora-lake.svg',
+            description: 'The image shows a beautiful sunset over mountains...',
+            rating: 8,
+            feedback: 'Interesting image',
+            time_spent_seconds: 45,
+            is_survey: false,
+            is_attention: false,
+            username: 'john_doe',
+            gender: 'male',
+            age: '25',
+            place: 'New York',
+            native_language: 'English',
+            prior_experience: 'Photography'
+            };
 
-const submitResponse = await fetch('/api/submit', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify(submission)
-});
+            const submitResponse = await fetch('/api/submit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(submission)
+            });
 
-const result = await submitResponse.json();
-console.log(result.status); // 'ok'`} />
+            const result = await submitResponse.json();
+            console.log(result.status); // 'ok'
+
+            // Admin login + stats
+            const loginResponse = await fetch('/api/admin/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: 'admin', password: 'password' })
+            });
+            const loginData = await loginResponse.json();
+
+            const statsResponse = await fetch('/api/stats', {
+            headers: { 'X-SESSION-TOKEN': loginData.session_token }
+            });
+            const stats = await statsResponse.json();
+            console.log(stats.total_submissions);`} />
 
             <h3 style={{ marginTop: '32px' }}>Python / Requests</h3>
             <CodeBlock code={`import requests
@@ -378,7 +521,7 @@ print(image['image_url'])
 submission = {
     'participant_id': 'user-123',
     'session_id': 'session-456',
-    'image_id': 'normal/image1.jpg',
+    'image_id': 'normal/aurora-lake.svg',
     'description': 'The image shows a beautiful sunset...',
     'rating': 8,
     'feedback': 'Interesting image',
@@ -398,7 +541,20 @@ response = requests.post(
     json=submission
 )
 result = response.json()
-print(result['status'])  # 'ok'`} />
+print(result['status'])  # 'ok'
+
+# Admin login + stats
+login_response = requests.post(
+    'http://localhost:5000/api/admin/login',
+    json={'username': 'admin', 'password': 'password'}
+)
+login_data = login_response.json()
+
+stats_response = requests.get(
+    'http://localhost:5000/api/stats',
+    headers={'X-SESSION-TOKEN': login_data['session_token']}
+)
+print(stats_response.json())`} />
 
             <h3 style={{ marginTop: '32px' }}>cURL</h3>
             <CodeBlock code={`# Get a random image
@@ -410,7 +566,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
   -d '{
     "participant_id": "user-123",
     "session_id": "session-456",
-    "image_id": "normal/image1.jpg",
+    "image_id": "normal/aurora-lake.svg",
     "description": "The image shows...",
     "rating": 8,
     "feedback": "Great image",
@@ -419,6 +575,11 @@ curl -X POST "http://localhost:5000/api/submit" \\
     "is_attention": false,
     "username": "john_doe"
   }'
+
+# Admin login to retrieve session token
+curl -X POST "http://localhost:5000/api/admin/login" \\
+  -H "Content-Type: application/json" \\
+  -d '{"username": "admin", "password": "password"}'
 
 # Get admin stats (requires session token)
 curl -X GET "http://localhost:5000/api/stats" \\
@@ -467,6 +628,11 @@ curl -X GET "http://localhost:5000/api/stats" \\
                   <td style={{ padding: '12px' }}><code>404</code></td>
                   <td style={{ padding: '12px' }}>Not Found</td>
                   <td style={{ padding: '12px' }}>Resource not found</td>
+                </tr>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <td style={{ padding: '12px' }}><code>415</code></td>
+                  <td style={{ padding: '12px' }}>Unsupported Media Type</td>
+                  <td style={{ padding: '12px' }}>Request must use application/json</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px' }}><code>429</code></td>

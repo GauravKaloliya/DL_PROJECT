@@ -110,6 +110,7 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             email TEXT UNIQUE,
+            email_verified BOOLEAN DEFAULT 1,
             api_key TEXT UNIQUE,
             role TEXT DEFAULT 'admin',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -164,7 +165,9 @@ def _migrate_admin_users_table(cursor):
     existing_columns = {row[1] for row in cursor.fetchall()}
     
     # Define columns that should exist
-    required_columns = {}
+    required_columns = {
+        "email_verified": "BOOLEAN DEFAULT 1"
+    }
     
     # Add missing columns
     for col_name, col_def in required_columns.items():
@@ -188,8 +191,8 @@ def _create_default_admin_user(cursor):
     
     cursor.execute(
         """INSERT INTO admin_users 
-           (username, password_hash, email, is_active) 
-           VALUES (?, ?, ?, 1)""",
+           (username, password_hash, email, email_verified, is_active) 
+           VALUES (?, ?, ?, 1, 1)""",
         ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
     
@@ -681,16 +684,17 @@ def api_docs():
     """Comprehensive API documentation"""
     return jsonify({
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "2.0.0",
+        "version": "2.1.0",
         "description": "Complete API documentation for the C.O.G.N.I.T. research platform",
         "base_url": "/api",
         "authentication": {
             "type": "Session Token",
-            "description": "Most admin endpoints require a session token for authentication. Login with username/password to get a session token.",
+            "description": "Admin endpoints require a session token. Login with username/password to obtain a token.",
             "methods": [
                 "X-SESSION-TOKEN header"
             ],
-            "login_endpoint": "/api/admin/login"
+            "login_endpoint": "/api/admin/login",
+            "token_ttl_hours": 24
         },
         "endpoints": {
             "public": {
@@ -745,18 +749,6 @@ def api_docs():
                         }
                     },
                     {
-                        "path": "/admin/settings/csv-delete",
-                        "method": "DELETE",
-                        "description": "Delete all data from CSV file (admin only)",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "status": "string",
-                            "message": "string"
-                        }
-                    },
-                    {
                         "path": "/api/pages/home",
                         "method": "GET",
                         "description": "Get home page information",
@@ -800,54 +792,9 @@ def api_docs():
                         }
                     },
                     {
-                        "path": "/api/docs",
-                        "method": "GET",
-                        "description": "Get API documentation (this endpoint)",
-                        "response": "this documentation"
-                    }
-                ]
-            },
-            "admin": {
-                "description": "Endpoints requiring admin authentication (X-SESSION-TOKEN header required)",
-                "routes": [
-                    {
-                        "path": "/api/stats",
-                        "method": "GET",
-                        "description": "Get statistics about submissions",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "total_submissions": "integer",
-                            "avg_word_count": "number",
-                            "attention_fail_rate": "number"
-                        }
-                    },
-                    {
-                        "path": "/admin/download",
-                        "method": "GET",
-                        "description": "Download CSV file with all submissions",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "CSV file attachment"
-                    },
-                    {
-                        "path": "/admin/csv-data",
-                        "method": "GET",
-                        "description": "Get CSV data as JSON for admin panel",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "array of submission objects"
-                    },
-                    {
                         "path": "/api/security/info",
                         "method": "GET",
-                        "description": "Get security information",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
+                        "description": "Get security configuration information",
                         "response": {
                             "security": {
                                 "rate_limits": "object",
@@ -858,25 +805,20 @@ def api_docs():
                         }
                     },
                     {
-                        "path": "/admin/security/audit",
+                        "path": "/api/docs",
                         "method": "GET",
-                        "description": "Run security audit",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "security_audit": {
-                                "timestamp": "string",
-                                "status": "string",
-                                "checks": "object",
-                                "recommendations": "array"
-                            }
-                        }
-                    },
+                        "description": "Get API documentation (this endpoint)",
+                        "response": "this documentation"
+                    }
+                ]
+            },
+            "admin": {
+                "description": "Endpoints requiring admin authentication (X-SESSION-TOKEN header required unless noted)",
+                "routes": [
                     {
                         "path": "/api/admin/login",
                         "method": "POST",
-                        "description": "Admin login endpoint",
+                        "description": "Admin login endpoint (no token required)",
                         "request_body": {
                             "username": "string (required)",
                             "password": "string (required)"
@@ -930,6 +872,65 @@ def api_docs():
                             "status": "string",
                             "message": "string"
                         }
+                    },
+                    {
+                        "path": "/api/stats",
+                        "method": "GET",
+                        "description": "Get statistics about submissions",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "response": {
+                            "total_submissions": "integer",
+                            "avg_word_count": "number",
+                            "attention_fail_rate": "number"
+                        }
+                    },
+                    {
+                        "path": "/admin/download",
+                        "method": "GET",
+                        "description": "Download CSV file with all submissions",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "response": "CSV file attachment"
+                    },
+                    {
+                        "path": "/admin/csv-data",
+                        "method": "GET",
+                        "description": "Get CSV data as JSON for admin panel",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "response": "array of submission objects"
+                    },
+                    {
+                        "path": "/admin/settings/csv-delete",
+                        "method": "DELETE",
+                        "description": "Delete all data from CSV file",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "response": {
+                            "status": "string",
+                            "message": "string"
+                        }
+                    },
+                    {
+                        "path": "/admin/security/audit",
+                        "method": "GET",
+                        "description": "Run security audit",
+                        "headers": [
+                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
+                        ],
+                        "response": {
+                            "security_audit": {
+                                "timestamp": "string",
+                                "status": "string",
+                                "checks": "object",
+                                "recommendations": "array"
+                            }
+                        }
                     }
                 ]
             }
@@ -965,14 +966,19 @@ def api_docs():
         },
         "error_codes": {
             "400": "Bad Request - Invalid parameters or missing required fields",
-            "401": "Unauthorized - Invalid or missing API key",
+            "401": "Unauthorized - Invalid or missing session token",
             "404": "Not Found - Resource not found",
+            "415": "Unsupported Media Type - JSON required for POST",
             "429": "Too Many Requests - Rate limit exceeded",
             "500": "Internal Server Error - Server-side error"
         },
         "rate_limits": {
             "default": "200 requests per day, 50 requests per hour",
-            "admin_endpoints": "10 requests per minute",
+            "api_docs": "30 requests per minute",
+            "admin_login": "10 requests per minute",
+            "admin_change_password": "5 requests per minute",
+            "admin_csv_data": "10 requests per minute",
+            "admin_csv_delete": "5 requests per minute",
             "security_audit": "5 requests per minute"
         },
         "security": {
@@ -982,6 +988,15 @@ def api_docs():
             "data_storage": "Data is stored in CSV format with restricted access"
         },
         "changelog": [
+            {
+                "version": "2.1.0",
+                "date": "2024",
+                "changes": [
+                    "Expanded image catalog",
+                    "Refreshed API documentation to reflect all routes",
+                    "Aligned admin schema with email verification flag"
+                ]
+            },
             {
                 "version": "2.0.0",
                 "date": "2024",

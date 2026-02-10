@@ -1,18 +1,23 @@
-# Image Description Study
+# Image Description Study (C.O.G.N.I.T.)
 
-This project contains a React + Vite frontend and a Flask backend that serve an image description study workflow. The backend stores submissions in an append-only CSV file and serves local images.
+C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a full-stack research platform for running an image-description study. Participants describe visual scenes, rate them, and provide feedback. Admins can authenticate, review statistics, and export data.
 
-## Author
+## Tech Stack
 
-**Gaurav Kaloliya** - Innovating Cognitive Research Tools
+- **Frontend:** React 18 + Vite 5 (SPA)
+- **Backend:** Python Flask 3 (REST API)
+- **Storage:** CSV submissions log + SQLite admin database
 
 ## Repository Structure
 
-- `frontend/`: React + Vite application
-- `backend/`: Flask API and CSV storage
-- `backend/images/`: Local images grouped into `normal/`, `practice/`, and `attention/`
+- `frontend/`: React application
+- `backend/`: Flask API, SQLite DB, and CSV storage
+- `backend/images/`: Image library (`normal/`, `survey/`, `attention/`)
+- `backend/data/`: Submission CSV
 
-## Backend Setup
+## Getting Started
+
+### Backend
 
 ```bash
 cd backend
@@ -22,40 +27,9 @@ pip install -r requirements.txt
 python app.py
 ```
 
-The backend runs on `http://localhost:5000` by default.
+The backend runs on `http://localhost:5000`.
 
-### Security Features
-
-The backend now includes comprehensive security measures:
-
-- **Rate Limiting**: 200 requests/day, 50 requests/hour (default), with stricter limits for admin endpoints
-- **CORS Restrictions**: Limited to specific origins for enhanced security
-- **Security Headers**: X-Content-Type-Options, X-Frame-Options, X-XSS-Protection, CSP, HSTS, Referrer-Policy
-- **IP Hashing**: SHA-256 hashing with salt for anonymous data collection
-- **API Key Protection**: Required for all admin endpoints
-- **Request Validation**: Content type checking and header validation
-- **CSRF Protection**: Available for form submissions
-
-### Security Endpoints
-
-- `GET /api/security/info` - Get security configuration information
-- `GET /admin/security/audit` - Run security audit (requires API key)
-
-### Environment Variables
-
-- `MIN_WORD_COUNT` (default: 20)
-- `TOO_FAST_SECONDS` (default: 5)
-- `ADMIN_API_KEY` (default: changeme)
-- `IP_HASH_SALT` (default: local-salt)
-
-### Admin Endpoints
-
-- `GET /api/stats` (requires `X-API-KEY` header or `api_key` query param)
-- `GET /admin/download` (requires API key)
-- `GET /admin/csv-data` (requires API key, rate limited)
-- `GET /admin/security/audit` (requires API key, rate limited)
-
-## Frontend Setup
+### Frontend
 
 ```bash
 cd frontend
@@ -63,47 +37,72 @@ npm install
 npm run dev
 ```
 
-The frontend runs on `http://localhost:5173` and proxies API requests to the backend.
+The frontend runs on `http://localhost:5173` and communicates with the backend API. Set `VITE_API_BASE` if the backend is hosted elsewhere.
+
+## Environment Variables
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `MIN_WORD_COUNT` | `30` | Minimum words required in a description |
+| `TOO_FAST_SECONDS` | `5` | Flags submissions as too fast below this duration |
+| `IP_HASH_SALT` | `local-salt` | Salt for anonymizing IP addresses |
+| `SECRET_KEY` | auto-generated | Flask session secret |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` | empty | Optional email config |
+
+## Admin Authentication
+
+Admins authenticate with username/password to receive a session token. Include the token in the `X-SESSION-TOKEN` header for protected endpoints.
+
+Default admin (for local development):
+
+- **Username:** `Gaurav`
+- **Password:** `Gaurav@0809`
+
+## API Documentation
+
+- **Backend JSON docs:** `GET /api/docs`
+- **Frontend viewer:** `/api/docs`
+
+## Key Endpoints
+
+### Public
+
+- `GET /api/images/random` (type: `normal`, `survey`, `attention`)
+- `GET /api/images/<image_id>`
+- `POST /api/submit`
+- `GET /api/pages/home` / `about` / `contact` / `faq`
+- `GET /api/security/info`
+
+### Admin (requires `X-SESSION-TOKEN`)
+
+- `POST /api/admin/login`
+- `POST /api/admin/logout`
+- `GET /api/admin/me`
+- `POST /api/admin/change-password`
+- `GET /api/stats`
+- `GET /admin/download`
+- `GET /admin/csv-data`
+- `DELETE /admin/settings/csv-delete`
+- `GET /admin/security/audit`
 
 ## Images
 
-Place images inside the following folders:
+Add or replace images in:
 
 - `backend/images/normal/`
-- `backend/images/practice/`
+- `backend/images/survey/`
 - `backend/images/attention/`
 
-Sample SVGs are included to get you started.
+The repository now includes 30+ additional SVG scenes in `normal/` to expand the study catalog.
 
-## Enhanced Features
+## Data Storage
 
-### User Data Collection
-The application now collects comprehensive demographic data:
+- **Submissions:** Append-only CSV at `backend/data/submissions.csv`
+- **Admin Users/Sessions:** SQLite database at `backend/COGNIT.db`
 
-- **Required Fields**: Age group, native language, prior experience
-- **Optional Fields**: Education level, gender, country of residence, device type, screen size
+## Security Highlights
 
-### Admin Panel Enhancements
-
-1. **Security Tab**: Comprehensive security overview and controls
-2. **Enhanced Settings**: API key management, security settings, and system information
-3. **Data Explorer**: Search and pagination for large datasets
-4. **Security Audit**: Run comprehensive security checks
-5. **Rate Limiting**: Visual display of current rate limits
-
-### UI/UX Improvements
-
-- **Consent Page**: Enhanced checkbox styling with detailed consent information
-- **Dropdowns**: Custom styled select elements with proper icons
-- **Admin Login**: Improved login panel with gradient header
-- **Security Indicators**: Visual status indicators for security features
-- **Responsive Design**: Improved mobile responsiveness
-
-### Security Best Practices
-
-1. **Rate Limiting**: Prevents brute force attacks
-2. **CORS Restrictions**: Limits cross-origin requests
-3. **Security Headers**: Protects against common web vulnerabilities
-4. **IP Hashing**: Ensures user privacy
-5. **API Key Protection**: Secures admin endpoints
-6. **Request Validation**: Prevents malicious requests
+- CORS restrictions with explicit origins
+- Rate limiting on public/admin endpoints
+- Security headers (CSP, HSTS, X-Frame-Options, etc.)
+- IP hashing for privacy-preserving analytics
