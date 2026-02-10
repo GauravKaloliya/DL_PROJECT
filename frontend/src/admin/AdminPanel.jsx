@@ -6,6 +6,137 @@ import { Bar, Pie, Line } from 'react-chartjs-2';
 // Register ChartJS components
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement);
 
+// Settings Tab Component
+function SettingsTab({ apiKey, csvData, onDataDeleted }) {
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
+  const [deleteSuccess, setDeleteSuccess] = useState(false);
+
+  const handleDeleteCSV = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    setDeleteSuccess(false);
+    
+    try {
+      const response = await fetch(`${API_BASE}/admin/settings/csv-delete?api_key=${apiKey}`, {
+        method: 'DELETE',
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setDeleteSuccess(true);
+        setShowConfirmDelete(false);
+        onDataDeleted();
+        addToast("All CSV data has been deleted successfully", "success");
+      } else {
+        setDeleteError(data.error || "Failed to delete CSV data");
+        addToast(data.error || "Failed to delete CSV data", "error");
+      }
+    } catch (err) {
+      setDeleteError("Network error. Please try again.");
+      addToast("Network error. Please try again.", "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  return (
+    <div className="settings">
+      <h2>Settings</h2>
+      
+      {/* Data Management Section */}
+      <div className="settings-section">
+        <h3>Data Management</h3>
+        <p style={{ color: 'var(--muted)', marginBottom: '20px' }}>
+          Manage your research data. Export or delete submissions as needed.
+        </p>
+        
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '24px' }}>
+          <div style={{ 
+            background: 'var(--panel)', 
+            border: '2px solid var(--border)', 
+            borderRadius: '12px', 
+            padding: '20px',
+            flex: '1',
+            minWidth: '250px'
+          }}>
+            <h4 style={{ marginTop: 0, color: 'var(--primary)' }}>Current Data</h4>
+            <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text)', margin: '8px 0' }}>
+              {csvData.length} submissions
+            </p>
+            <p style={{ color: 'var(--muted)', fontSize: '14px' }}>
+              Total records in the database
+            </p>
+          </div>
+        </div>
+
+        {/* Delete Data Section */}
+        <div className="danger-zone">
+          <h4 style={{ marginTop: 0, color: '#c9444a' }}>⚠️ Danger Zone</h4>
+          <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>
+            Deleting data is permanent and cannot be undone. All submissions will be removed from the CSV file.
+          </p>
+          
+          {!showConfirmDelete ? (
+            <button 
+              className="danger-button"
+              onClick={() => setShowConfirmDelete(true)}
+              disabled={csvData.length === 0}
+            >
+              Delete All CSV Data
+            </button>
+          ) : (
+            <div className="reset-confirm">
+              <p style={{ marginTop: 0, fontWeight: '600', color: '#c9444a' }}>
+                Are you sure? This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  className="danger-button"
+                  onClick={handleDeleteCSV}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Yes, Delete All Data"}
+                </button>
+                <button 
+                  className="ghost"
+                  onClick={() => setShowConfirmDelete(false)}
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {deleteError && (
+            <p style={{ color: '#c9444a', marginTop: '12px' }}>{deleteError}</p>
+          )}
+        </div>
+      </div>
+      
+      {/* System Information Section */}
+      <div className="settings-section">
+        <h3>System Information</h3>
+        <div className="system-info">
+          <p><strong>API Version:</strong> 2.0.0</p>
+          <p><strong>Database:</strong> SQLite + CSV</p>
+          <p><strong>Status:</strong> <span className="status-online">Online</span></p>
+        </div>
+      </div>
+      
+      {deleteSuccess && (
+        <div className="toast success" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 1000 }}>
+          <span>All CSV data has been deleted successfully</span>
+          <button onClick={() => setDeleteSuccess(false)} aria-label="Dismiss">×</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 // Allow copy/paste only in input fields
@@ -314,8 +445,8 @@ export default function AdminPanel() {
   const processChartData = () => {
     if (!csvData || csvData.length === 0) return null;
     
-    // Age group distribution
-    const ageGroups = { '18-24': 0, '25-34': 0, '35-44': 0, '45-54': 0, '55+': 0, 'Unknown': 0 };
+    // Get unique usernames for distribution
+    const usernames = {};
     const genders = {};
     const languages = {};
     const ratings = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0};
@@ -323,12 +454,8 @@ export default function AdminPanel() {
     const timeSpent = [];
     
     csvData.forEach(row => {
-      const ageGroup = row.age_group || 'Unknown';
-      if (ageGroups[ageGroup] !== undefined) {
-        ageGroups[ageGroup]++;
-      } else {
-        ageGroups['Unknown']++;
-      }
+      const username = row.username || 'Anonymous';
+      usernames[username] = (usernames[username] || 0) + 1;
       
       const gender = row.gender || 'Unknown';
       genders[gender] = (genders[gender] || 0) + 1;
@@ -349,7 +476,7 @@ export default function AdminPanel() {
     });
     
     return {
-      ageGroups,
+      usernames: Object.entries(usernames).sort((a, b) => b[1] - a[1]).slice(0, 10),
       genders: Object.entries(genders).sort((a, b) => b[1] - a[1]),
       languages: Object.entries(languages).sort((a, b) => b[1] - a[1]).slice(0, 5),
       ratings,
@@ -363,7 +490,7 @@ export default function AdminPanel() {
   // Get column headers for table (excluding certain fields)
   const getTableHeaders = () => {
     if (csvData.length === 0) return [];
-    const excludedFields = ['age_group', 'gender', 'place', 'native_language', 'rating', 'is_practice', 'is_attention', 'attention_passed'];
+    const excludedFields = ['username', 'gender', 'place', 'native_language', 'rating', 'is_practice', 'is_attention', 'attention_passed'];
     return Object.keys(csvData[0]).filter(key => !excludedFields.includes(key));
   };
   
@@ -452,6 +579,12 @@ export default function AdminPanel() {
         >
           Data Explorer
         </button>
+        <button
+          className={activeTab === "settings" ? "active" : ""}
+          onClick={() => setActiveTab("settings")}
+        >
+          Settings
+        </button>
       </div>
 
       <div className="admin-content">
@@ -500,14 +633,14 @@ export default function AdminPanel() {
                 <h3>Demographic Distribution</h3>
                 <div className="chart-grid">
                   <div className="chart-card">
-                    <h4>Age Groups</h4>
+                    <h4>Top Participants</h4>
                     <Bar
                       data={{
-                        labels: Object.keys(chartData.ageGroups),
+                        labels: chartData.usernames.map(u => u[0]),
                         datasets: [{
-                          label: 'Participants',
-                          data: Object.values(chartData.ageGroups),
-                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40']
+                          label: 'Submissions',
+                          data: chartData.usernames.map(u => u[1]),
+                          backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#FF6B9D', '#4CAF50', '#9C27B0', '#FF9800']
                         }]
                       }}
                       options={{ responsive: true, maintainAspectRatio: true }}
@@ -731,6 +864,17 @@ export default function AdminPanel() {
               </div>
             )}
           </div>
+        )}
+
+        {activeTab === "settings" && (
+          <SettingsTab 
+            apiKey={apiKey} 
+            csvData={csvData}
+            onDataDeleted={() => {
+              fetchStats();
+              fetchCsvData();
+            }}
+          />
         )}
 
       </div>

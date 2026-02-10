@@ -42,7 +42,7 @@ CSV_HEADERS = [
     "too_fast_flag",
     "user_agent",
     "ip_hash",
-    "age_group",
+    "username",
     "gender",
     "age",
     "place",
@@ -581,7 +581,7 @@ def submit():
         "too_fast_flag": too_fast_flag,
         "user_agent": request.headers.get("User-Agent", ""),
         "ip_hash": get_ip_hash(),
-        "age_group": payload.get("age_group", ""),
+        "username": payload.get("username", ""),
         "gender": payload.get("gender", ""),
         "age": payload.get("age", ""),
         "place": payload.get("place", ""),
@@ -761,7 +761,7 @@ def api_docs():
                             "is_practice": "boolean (required)",
                             "is_attention": "boolean (required)",
                             "attention_expected": "string",
-                            "age_group": "string",
+                            "username": "string",
                             "gender": "string",
                             "age": "string",
                             "place": "string",
@@ -772,6 +772,18 @@ def api_docs():
                             "status": "string",
                             "word_count": "integer",
                             "attention_passed": "boolean"
+                        }
+                    },
+                    {
+                        "path": "/admin/settings/csv-delete",
+                        "method": "DELETE",
+                        "description": "Delete all data from CSV file (admin only)",
+                        "parameters": [
+                            {"name": "api_key", "type": "string", "required": True, "description": "Admin API key"}
+                        ],
+                        "response": {
+                            "status": "string",
+                            "message": "string"
                         }
                     },
                     {
@@ -953,7 +965,7 @@ def api_docs():
                     "too_fast_flag": "boolean",
                     "user_agent": "string",
                     "ip_hash": "string (SHA-256 hash)",
-                    "age_group": "string",
+                    "username": "string",
                     "gender": "string",
                     "age": "string",
                     "place": "string",
@@ -1026,6 +1038,27 @@ def get_csv_data():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 500
+
+
+@app.route("/admin/settings/csv-delete", methods=["DELETE"])
+@limiter.limit("5 per minute")
+def delete_csv_data():
+    """Delete all data from CSV file (admin only)"""
+    if not require_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Re-create the CSV file with just the headers
+        with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
+            writer = csv.writer(file)
+            writer.writerow(CSV_HEADERS)
+        
+        return jsonify({
+            "status": "success",
+            "message": "All CSV data has been deleted successfully"
+        })
+    except Exception as e:
+        return jsonify({"error": f"Failed to delete CSV data: {str(e)}"}), 500
 
 
 @app.route("/api/security/info")
