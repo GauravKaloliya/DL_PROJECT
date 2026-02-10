@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
 import { Bar, Pie, Line } from 'react-chartjs-2';
 
@@ -8,139 +8,118 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend,
 
 const API_BASE = import.meta.env.VITE_API_BASE || "";
 
+// Prevent copy/paste functionality
+const preventCopyPaste = (e) => {
+  e.preventDefault();
+  return false;
+};
+
+// Simple toast notification helper
+const addToast = (message, type = "info") => {
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <span>${message}</span>
+    <button onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
+  `;
+  toast.style.position = "fixed";
+  toast.style.top = "20px";
+  toast.style.right = "20px";
+  toast.style.zIndex = "1000";
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.remove();
+  }, 4000);
+};
+
 export default function AdminPanel() {
-  const [apiKey, setApiKey] = useState("");
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Auth state
+  const [authMode, setAuthMode] = useState("login"); // "login", "register", "verify"
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [sessionToken, setSessionToken] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [user, setUser] = useState(null);
+  
+  // Login form state
+  const [loginUsername, setLoginUsername] = useState("");
+  const [loginApiKey, setLoginApiKey] = useState("");
+  
+  // Register form state
+  const [regUsername, setRegUsername] = useState("");
+  const [regEmail, setRegEmail] = useState("");
+  const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
+  
+  // Verification state
+  const [verifyToken, setVerifyToken] = useState("");
+  const [pendingEmail, setPendingEmail] = useState("");
+  
+  // Data state
   const [stats, setStats] = useState(null);
   const [csvData, setCsvData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
+  
+  // Data explorer state
   const [searchTerm, setSearchTerm] = useState("");
-  const [filters, setFilters] = useState({
-    ageGroup: "",
-    gender: "",
-    place: "",
-    language: "",
-    rating: "",
-    isPractice: "",
-    isAttention: "",
-    attentionPassed: ""
-  });
+  const [sortField, setSortField] = useState("timestamp");
+  const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [showApiKeyChange, setShowApiKeyChange] = useState(false);
-  const [newApiKey, setNewApiKey] = useState("");
-  const [confirmApiKey, setConfirmApiKey] = useState("");
-  const [apiKeyError, setApiKeyError] = useState(null);
-  const [showResetConfirm, setShowResetConfirm] = useState(false);
-  const [resetConfirmText, setResetConfirmText] = useState("");
-
-  const navigate = useNavigate();
-
-  // Check if user is already authenticated (e.g., from localStorage)
+  
+  // Check for existing session on mount
   useEffect(() => {
-    const savedAuth = localStorage.getItem("adminAuthenticated");
-    const savedApiKey = localStorage.getItem("adminApiKey");
-    if (savedAuth === "true" && savedApiKey) {
+    const savedSession = sessionStorage.getItem("adminSessionToken");
+    const savedApiKey = sessionStorage.getItem("adminApiKey");
+    const savedUser = sessionStorage.getItem("adminUser");
+    
+    if (savedSession && savedApiKey) {
+      setSessionToken(savedSession);
       setApiKey(savedApiKey);
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
+      }
       setIsAuthenticated(true);
+    }
+    
+    // Check for verification token in URL
+    const params = new URLSearchParams(location.search);
+    const token = params.get("token");
+    if (token) {
+      setVerifyToken(token);
+      setAuthMode("verify");
+    }
+  }, [location]);
+  
+  // Fetch data when authenticated
+  useEffect(() => {
+    if (isAuthenticated && apiKey) {
       fetchStats();
       fetchCsvData();
     }
+  }, [isAuthenticated, apiKey]);
+  
+  // Prevent copy/paste on the entire component
+  useEffect(() => {
+    const handleCopy = (e) => preventCopyPaste(e);
+    const handlePaste = (e) => preventCopyPaste(e);
+    const handleCut = (e) => preventCopyPaste(e);
+    
+    document.addEventListener("copy", handleCopy);
+    document.addEventListener("paste", handlePaste);
+    document.addEventListener("cut", handleCut);
+    
+    return () => {
+      document.removeEventListener("copy", handleCopy);
+      document.removeEventListener("paste", handlePaste);
+      document.removeEventListener("cut", handleCut);
+    };
   }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    if (apiKey.trim() === "") {
-      setError("Please enter an API key");
-      return;
-    }
-    
-    try {
-      setLoading(true);
-      setError(null);
-      
-      // Validate API key with backend
-      const response = await fetch(`${API_BASE}/api/security/info?api_key=${apiKey}`);
-      
-      if (response.ok) {
-        setIsAuthenticated(true);
-        localStorage.setItem("adminAuthenticated", "true");
-        localStorage.setItem("adminApiKey", apiKey);
-        fetchStats();
-        fetchCsvData();
-      } else {
-        setError("Invalid API key");
-      }
-    } catch (err) {
-      setError("Failed to authenticate. Please check your connection.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setApiKey("");
-    setStats(null);
-    setCsvData([]);
-    localStorage.removeItem("adminAuthenticated");
-    navigate("/admin");
-  };
-
-  const handleChangeApiKey = () => {
-    if (newApiKey.length < 8) {
-      setApiKeyError("API key must be at least 8 characters");
-      return;
-    }
-    if (newApiKey !== confirmApiKey) {
-      setApiKeyError("API keys do not match");
-      return;
-    }
-    
-    // In a real app, this would call the backend to change the API key
-    // For now, we'll just update the local storage and state
-    localStorage.setItem("adminApiKey", newApiKey);
-    setApiKey(newApiKey);
-    setShowApiKeyChange(false);
-    setApiKeyError(null);
-    addToast("API key changed successfully! 🎉", "success");
-  };
-
-  const handleResetDatabase = () => {
-    if (resetConfirmText !== "RESET") {
-      setError("Please type RESET to confirm");
-      return;
-    }
-    
-    // In a real app, this would call the backend to reset the database
-    // For now, we'll just clear the local data
-    setCsvData([]);
-    setStats(null);
-    setShowResetConfirm(false);
-    addToast("Database reset completed! 🎉", "success");
-  };
-
-  const addToast = (message, type = "info") => {
-    // Simple toast notification
-    const toastId = Date.now();
-    const toast = document.createElement("div");
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `
-      <span>${message}</span>
-      <button onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
-    `;
-    toast.style.position = "fixed";
-    toast.style.top = "20px";
-    toast.style.right = "20px";
-    toast.style.zIndex = "1000";
-    document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.remove();
-    }, 4000);
-  };
-
+  
   const fetchStats = async () => {
     try {
       setLoading(true);
@@ -156,7 +135,7 @@ export default function AdminPanel() {
       setLoading(false);
     }
   };
-
+  
   const fetchCsvData = async () => {
     try {
       setLoading(true);
@@ -172,7 +151,177 @@ export default function AdminPanel() {
       setLoading(false);
     }
   };
-
+  
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError(null);
+    
+    if (!loginUsername.trim() || !loginApiKey.trim()) {
+      setError("Username and API key are required");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/api/admin/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: loginUsername, api_key: loginApiKey })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSessionToken(data.session_token);
+        setApiKey(data.api_key);
+        setUser(data.user);
+        setIsAuthenticated(true);
+        
+        // Store in sessionStorage
+        sessionStorage.setItem("adminSessionToken", data.session_token);
+        sessionStorage.setItem("adminApiKey", data.api_key);
+        sessionStorage.setItem("adminUser", JSON.stringify(data.user));
+        
+        addToast("Login successful!", "success");
+      } else {
+        if (data.needs_verification) {
+          setPendingEmail(data.email || "");
+          setAuthMode("verify");
+          setError("Please verify your email before logging in");
+        } else {
+          setError(data.error || "Invalid credentials");
+        }
+      }
+    } catch (err) {
+      setError("Failed to login. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setError(null);
+    
+    // Validation
+    if (!regUsername.trim() || regUsername.length < 3) {
+      setError("Username must be at least 3 characters");
+      return;
+    }
+    if (!regEmail.trim() || !regEmail.includes("@")) {
+      setError("Valid email is required");
+      return;
+    }
+    if (!regPassword || regPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/api/admin/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: regUsername,
+          email: regEmail,
+          password: regPassword
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        // Download API key as JSON file
+        const apiKeyData = {
+          username: data.username,
+          api_key: data.api_key,
+          created_at: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(apiKeyData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `API_KEY_${data.username}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        setPendingEmail(regEmail);
+        setAuthMode("verify");
+        addToast("Registration successful! Please check your email to verify your account.", "success");
+      } else {
+        setError(data.error || "Registration failed");
+      }
+    } catch (err) {
+      setError("Failed to register. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setError(null);
+    
+    if (!verifyToken.trim()) {
+      setError("Verification token is required");
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE}/api/admin/verify-email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: verifyToken })
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        setApiKey(data.api_key);
+        setAuthMode("login");
+        addToast("Email verified! You can now login.", "success");
+      } else {
+        setError(data.error || "Verification failed");
+      }
+    } catch (err) {
+      setError("Failed to verify email. Please check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleLogout = async () => {
+    try {
+      await fetch(`${API_BASE}/api/admin/logout`, {
+        method: "POST",
+        headers: { "X-SESSION-TOKEN": sessionToken }
+      });
+    } catch (err) {
+      console.error("Logout error:", err);
+    }
+    
+    // Clear session
+    sessionStorage.removeItem("adminSessionToken");
+    sessionStorage.removeItem("adminApiKey");
+    sessionStorage.removeItem("adminUser");
+    
+    setIsAuthenticated(false);
+    setSessionToken("");
+    setApiKey("");
+    setUser(null);
+    setStats(null);
+    setCsvData([]);
+    navigate("/admin");
+  };
+  
   const downloadCsv = async () => {
     try {
       const response = await fetch(`${API_BASE}/admin/download?api_key=${apiKey}`);
@@ -189,103 +338,96 @@ export default function AdminPanel() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (err) {
-      setError(err.message);
+      addToast(err.message, "error");
     }
   };
-
-  const filteredData = csvData.filter((row) => {
+  
+  // Filter and sort data
+  const processedData = useCallback(() => {
+    let data = [...csvData];
+    
     // Search filter
-    const searchMatch = searchTerm === "" || Object.values(row).some((value) => {
-      return String(value).toLowerCase().includes(searchTerm.toLowerCase());
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      data = data.filter(row => 
+        Object.values(row).some(value => 
+          String(value).toLowerCase().includes(term)
+        )
+      );
+    }
+    
+    // Sort
+    data.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      
+      // Handle numeric sorting
+      if (!isNaN(parseFloat(aVal)) && !isNaN(parseFloat(bVal))) {
+        aVal = parseFloat(aVal);
+        bVal = parseFloat(bVal);
+      } else {
+        aVal = String(aVal).toLowerCase();
+        bVal = String(bVal).toLowerCase();
+      }
+      
+      if (sortDirection === "asc") {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
     });
     
-    // Age group filter
-    const ageMatch = filters.ageGroup === "" || row.age_group === filters.ageGroup;
-    
-    // Gender filter
-    const genderMatch = filters.gender === "" || row.gender === filters.gender;
-    
-    // Place filter
-    const placeMatch = filters.place === "" || 
-      (row.place && row.place.toLowerCase().includes(filters.place.toLowerCase()));
-    
-    // Language filter
-    const languageMatch = filters.language === "" || row.native_language === filters.language;
-    
-    // Rating filter
-    const ratingMatch = filters.rating === "" || String(row.rating) === filters.rating;
-    
-    // Practice filter - handle both string and boolean values
-    const practiceMatch = filters.isPractice === "" || 
-      String(row.is_practice).toLowerCase() === filters.isPractice.toLowerCase();
-    
-    // Attention filter
-    const attentionMatch = filters.isAttention === "" || 
-      String(row.is_attention).toLowerCase() === filters.isAttention.toLowerCase();
-    
-    // Attention passed filter
-    const attentionPassedMatch = filters.attentionPassed === "" || 
-      String(row.attention_passed).toLowerCase() === filters.attentionPassed.toLowerCase();
-    
-    return searchMatch && ageMatch && genderMatch && placeMatch && languageMatch && ratingMatch && practiceMatch && attentionMatch && attentionPassedMatch;
-  });
-
+    return data;
+  }, [csvData, searchTerm, sortField, sortDirection]);
+  
+  const filteredData = processedData();
+  
+  // Pagination
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  
   // Data processing for charts
   const processChartData = () => {
     if (!csvData || csvData.length === 0) return null;
-
+    
     // Age group distribution
-    const ageGroups = {
-      '18-24': 0, '25-34': 0, '35-44': 0, '45-54': 0, '55+': 0, 'Unknown': 0
-    };
-    
-    // Gender distribution
+    const ageGroups = { '18-24': 0, '25-34': 0, '35-44': 0, '45-54': 0, '55+': 0, 'Unknown': 0 };
     const genders = {};
-    
-    // Language distribution
     const languages = {};
-    
-    // Rating distribution
     const ratings = {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0};
-    
-    // Word count distribution
     const wordCounts = [];
-    
-    // Time spent distribution
     const timeSpent = [];
-
+    
     csvData.forEach(row => {
-      // Age groups
       const ageGroup = row.age_group || 'Unknown';
       if (ageGroups[ageGroup] !== undefined) {
         ageGroups[ageGroup]++;
       } else {
         ageGroups['Unknown']++;
       }
-
-      // Gender
+      
       const gender = row.gender || 'Unknown';
       genders[gender] = (genders[gender] || 0) + 1;
-
-      // Languages
+      
       const language = row.native_language || 'Unknown';
       languages[language] = (languages[language] || 0) + 1;
-
-      // Ratings
+      
       const rating = parseInt(row.rating) || 0;
       if (rating >= 1 && rating <= 10) {
         ratings[rating]++;
       }
-
-      // Word counts
+      
       const words = parseInt(row.word_count) || 0;
       wordCounts.push(words);
-
-      // Time spent
+      
       const time = parseFloat(row.time_spent_seconds) || 0;
       timeSpent.push(time);
     });
-
+    
     return {
       ageGroups,
       genders: Object.entries(genders).sort((a, b) => b[1] - a[1]),
@@ -295,54 +437,192 @@ export default function AdminPanel() {
       timeSpent
     };
   };
-
+  
   const chartData = processChartData();
-
-  // Pagination logic
-  const indexOfLastItem = currentPage * itemsPerPage;
-  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-
-  const paginate = (pageNumber) => setCurrentPage(pageNumber);
-
-  if (!isAuthenticated) {
+  
+  // Get column headers for table (excluding certain fields)
+  const getTableHeaders = () => {
+    if (csvData.length === 0) return [];
+    const excludedFields = ['age_group', 'gender', 'place', 'native_language', 'rating', 'is_practice', 'is_attention', 'attention_passed'];
+    return Object.keys(csvData[0]).filter(key => !excludedFields.includes(key));
+  };
+  
+  // Render login form
+  if (!isAuthenticated && authMode === "login") {
     return (
-      <div className="admin-login">
+      <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
         <div className="login-panel">
-          <h1>Admin Login 🔐</h1>
-          <p>Please enter your API key to access the admin panel</p>
+          <div className="login-header">
+            <h1>Admin Login</h1>
+            <p>Enter your username and API key to access the admin panel</p>
+          </div>
+          
           {error && <div className="error-message">{error}</div>}
-          <form onSubmit={handleLogin}>
+          
+          <form onSubmit={handleLogin} className="auth-form">
+            <div className="form-group">
+              <label>Username</label>
+              <input
+                type="text"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
+                placeholder="Enter your username"
+                autoFocus
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
             <div className="form-group">
               <label>API Key</label>
               <input
                 type="password"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                value={loginApiKey}
+                onChange={(e) => setLoginApiKey(e.target.value)}
                 placeholder="Enter your API key"
-                autoFocus
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
               />
             </div>
             <button type="submit" className="primary" disabled={loading}>
               {loading ? "Authenticating..." : "Login"}
             </button>
           </form>
-          <div className="login-help">
-            <p>Forgot your API key? Check the backend configuration or environment variables.</p>
-            <p>Default API key: <code>changeme</code></p>
+          
+          <div className="auth-switch">
+            <p>Don't have an account?</p>
+            <button className="ghost" onClick={() => { setAuthMode("register"); setError(null); }}>
+              Register
+            </button>
           </div>
         </div>
       </div>
     );
   }
-
+  
+  // Render register form
+  if (!isAuthenticated && authMode === "register") {
+    return (
+      <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
+        <div className="login-panel">
+          <div className="login-header">
+            <h1>Register Account</h1>
+            <p>Create a new admin account with your own API key</p>
+          </div>
+          
+          {error && <div className="error-message">{error}</div>}
+          
+          <form onSubmit={handleRegister} className="auth-form">
+            <div className="form-group">
+              <label>Username</label>
+              <input
+                type="text"
+                value={regUsername}
+                onChange={(e) => setRegUsername(e.target.value)}
+                placeholder="Choose a username (min 3 chars)"
+                autoFocus
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
+            <div className="form-group">
+              <label>Email</label>
+              <input
+                type="email"
+                value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value)}
+                placeholder="Enter your email"
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
+            <div className="form-group">
+              <label>Password</label>
+              <input
+                type="password"
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+                placeholder="Create a password (min 8 chars)"
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
+            <div className="form-group">
+              <label>Confirm Password</label>
+              <input
+                type="password"
+                value={regConfirmPassword}
+                onChange={(e) => setRegConfirmPassword(e.target.value)}
+                placeholder="Confirm your password"
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
+            <button type="submit" className="primary" disabled={loading}>
+              {loading ? "Creating Account..." : "Register"}
+            </button>
+          </form>
+          
+          <div className="auth-switch">
+            <p>Already have an account?</p>
+            <button className="ghost" onClick={() => { setAuthMode("login"); setError(null); }}>
+              Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Render verification form
+  if (!isAuthenticated && authMode === "verify") {
+    return (
+      <div className="admin-login" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
+        <div className="login-panel">
+          <div className="login-header">
+            <h1>Verify Email</h1>
+            <p>Enter the verification token sent to your email</p>
+          </div>
+          
+          {error && <div className="error-message">{error}</div>}
+          
+          <form onSubmit={handleVerify} className="auth-form">
+            <div className="form-group">
+              <label>Verification Token</label>
+              <input
+                type="text"
+                value={verifyToken}
+                onChange={(e) => setVerifyToken(e.target.value)}
+                placeholder="Enter verification token"
+                autoFocus
+                onCopy={preventCopyPaste}
+                onPaste={preventCopyPaste}
+              />
+            </div>
+            <button type="submit" className="primary" disabled={loading}>
+              {loading ? "Verifying..." : "Verify Email"}
+            </button>
+          </form>
+          
+          <div className="auth-switch">
+            <button className="ghost" onClick={() => { setAuthMode("login"); setError(null); }}>
+              Back to Login
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Render admin panel
   return (
-    <div className="admin-panel">
+    <div className="admin-panel" onCopy={preventCopyPaste} onPaste={preventCopyPaste}>
       <div className="admin-header">
-        <h1>Admin Panel 🛠️</h1>
+        <div>
+          <h1>Admin Panel</h1>
+          {user && <p className="user-info">Welcome, {user.username}</p>}
+        </div>
         <div className="admin-actions">
-          <button className="ghost" onClick={handleLogout}>Logout 🔒</button>
+          <button className="ghost" onClick={handleLogout}>Logout</button>
         </div>
       </div>
 
@@ -351,32 +631,26 @@ export default function AdminPanel() {
           className={activeTab === "dashboard" ? "active" : ""}
           onClick={() => setActiveTab("dashboard")}
         >
-          Dashboard 📊
+          Dashboard
         </button>
         <button
           className={activeTab === "data" ? "active" : ""}
           onClick={() => setActiveTab("data")}
         >
-          Data Explorer 🔍
+          Data Explorer
         </button>
         <button
           className={activeTab === "security" ? "active" : ""}
           onClick={() => setActiveTab("security")}
         >
-          Security 🔒
-        </button>
-        <button
-          className={activeTab === "settings" ? "active" : ""}
-          onClick={() => setActiveTab("settings")}
-        >
-          Settings ⚙️
+          Security
         </button>
       </div>
 
       <div className="admin-content">
         {activeTab === "dashboard" && (
           <div className="dashboard">
-            <h2>Statistics Overview 📈</h2>
+            <h2>Statistics Overview</h2>
             {loading ? (
               <div className="loading">Loading statistics...</div>
             ) : stats ? (
@@ -416,7 +690,7 @@ export default function AdminPanel() {
 
             {chartData && stats && stats.total_submissions > 0 ? (
               <div className="charts-section">
-                <h3>Demographic Distribution 📊</h3>
+                <h3>Demographic Distribution</h3>
                 <div className="chart-grid">
                   <div className="chart-card">
                     <h4>Age Groups</h4>
@@ -447,7 +721,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                <h3>Performance Metrics 📈</h3>
+                <h3>Performance Metrics</h3>
                 <div className="chart-grid">
                   <div className="chart-card">
                     <h4>Rating Distribution</h4>
@@ -478,7 +752,7 @@ export default function AdminPanel() {
                   </div>
                 </div>
 
-                <h3>Engagement Metrics ⏱️</h3>
+                <h3>Engagement Metrics</h3>
                 <div className="chart-grid">
                   <div className="chart-card">
                     <h4>Word Count Distribution</h4>
@@ -516,16 +790,16 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="no-data-message">
-                <p>No chart data available. Submit some responses to see visualizations 📊</p>
+                <p>No chart data available. Submit some responses to see visualizations.</p>
               </div>
             )}
 
             <div className="quick-actions">
               <h3>Quick Actions</h3>
               <div className="action-buttons">
-                <button className="primary" onClick={downloadCsv}>Download CSV 📥</button>
-                <button className="ghost" onClick={() => setActiveTab("data")}>View Data 👁️</button>
-                <button className="ghost" onClick={fetchStats}>Refresh Stats 🔄</button>
+                <button className="primary" onClick={downloadCsv}>Download CSV</button>
+                <button className="ghost" onClick={() => setActiveTab("data")}>View Data</button>
+                <button className="ghost" onClick={fetchStats}>Refresh Stats</button>
               </div>
             </div>
           </div>
@@ -533,7 +807,8 @@ export default function AdminPanel() {
 
         {activeTab === "data" && (
           <div className="data-explorer">
-            <h2>Data Explorer 🔍</h2>
+            <h2>Data Explorer</h2>
+            
             <div className="data-controls">
               <div className="search-box">
                 <input
@@ -542,146 +817,50 @@ export default function AdminPanel() {
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
-                    setCurrentPage(1); // Reset to first page when searching
+                    setCurrentPage(1);
                   }}
                 />
               </div>
-              <button className="primary" onClick={downloadCsv}>Export CSV 📥</button>
+              <button className="primary" onClick={downloadCsv}>Export CSV</button>
             </div>
             
-            <div className="filters-section">
-              <h4>Filters 🔧</h4>
-              <div className="filter-grid">
-                <div className="filter-group">
-                  <label>Age Group</label>
-                  <select
-                    value={filters.ageGroup}
-                    onChange={(e) => setFilters({...filters, ageGroup: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    <option value="18-24">18-24</option>
-                    <option value="25-34">25-34</option>
-                    <option value="35-44">35-44</option>
-                    <option value="45-54">45-54</option>
-                    <option value="55+">55+</option>
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Gender</label>
-                  <select
-                    value={filters.gender}
-                    onChange={(e) => setFilters({...filters, gender: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    {csvData.length > 0 && [...new Set(csvData.map(row => row.gender).filter(Boolean))].map(gender => (
-                      <option key={gender} value={gender}>{gender}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Place</label>
-                  <input
-                    type="text"
-                    placeholder="Filter by place..."
-                    value={filters.place}
-                    onChange={(e) => setFilters({...filters, place: e.target.value})}
-                  />
-                </div>
-                <div className="filter-group">
-                  <label>Language</label>
-                  <select
-                    value={filters.language}
-                    onChange={(e) => setFilters({...filters, language: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    {csvData.length > 0 && [...new Set(csvData.map(row => row.native_language).filter(Boolean))].map(lang => (
-                      <option key={lang} value={lang}>{lang}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Rating</label>
-                  <select
-                    value={filters.rating}
-                    onChange={(e) => setFilters({...filters, rating: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    {[1,2,3,4,5,6,7,8,9,10].map(num => (
-                      <option key={num} value={String(num)}>{num}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Type</label>
-                  <select
-                    value={filters.isPractice}
-                    onChange={(e) => setFilters({...filters, isPractice: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    <option value="True">Practice</option>
-                    <option value="False">Main Trial</option>
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Attention Check</label>
-                  <select
-                    value={filters.isAttention}
-                    onChange={(e) => setFilters({...filters, isAttention: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    <option value="True">Yes</option>
-                    <option value="False">No</option>
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <label>Attention Passed</label>
-                  <select
-                    value={filters.attentionPassed}
-                    onChange={(e) => setFilters({...filters, attentionPassed: e.target.value})}
-                  >
-                    <option value="">All</option>
-                    <option value="True">Passed</option>
-                    <option value="False">Failed</option>
-                  </select>
-                </div>
-                <div className="filter-group">
-                  <button className="ghost" onClick={() => setFilters({
-                    ageGroup: "",
-                    gender: "",
-                    place: "",
-                    language: "",
-                    rating: "",
-                    isPractice: "",
-                    isAttention: "",
-                    attentionPassed: ""
-                  })}>
-                    Clear Filters 🚫
-                  </button>
-                </div>
-              </div>
+            <div className="sort-controls">
+              <label>Sort by:</label>
+              <select value={sortField} onChange={(e) => setSortField(e.target.value)}>
+                <option value="timestamp">Timestamp</option>
+                <option value="participant_id">Participant ID</option>
+                <option value="word_count">Word Count</option>
+                <option value="time_spent_seconds">Time Spent</option>
+              </select>
+              <button 
+                className="ghost sort-btn" 
+                onClick={() => setSortDirection(sortDirection === "asc" ? "desc" : "asc")}
+              >
+                {sortDirection === "asc" ? "Ascending" : "Descending"}
+              </button>
             </div>
 
             {loading ? (
               <div className="loading">Loading data...</div>
             ) : csvData.length === 0 ? (
               <div className="no-data-message">
-                <p>No data available yet. Start collecting submissions to see data here 📊</p>
+                <p>No data available yet. Start collecting submissions to see data here.</p>
                 <p className="hint">Use the participant interface to submit responses.</p>
               </div>
             ) : filteredData.length > 0 ? (
               <div className="data-table-container">
                 <div className="data-table">
                   <div className="table-header">
-                    {Object.keys(filteredData[0]).map((key) => (
+                    {getTableHeaders().map((key) => (
                       <div key={key} className="table-cell header">{key}</div>
                     ))}
                   </div>
                   <div className="table-body">
                     {currentItems.map((row, index) => (
                       <div key={index} className="table-row">
-                        {Object.values(row).map((value, i) => (
+                        {getTableHeaders().map((key, i) => (
                           <div key={i} className="table-cell">
-                            {String(value).substring(0, 50)}{String(value).length > 50 ? "..." : ""}
+                            {String(row[key] || "").substring(0, 50)}{String(row[key] || "").length > 50 ? "..." : ""}
                           </div>
                         ))}
                       </div>
@@ -715,17 +894,8 @@ export default function AdminPanel() {
               </div>
             ) : (
               <div className="no-data-message">
-                <p>No matching data found. Try adjusting your filters 🔍</p>
-                <button className="ghost" onClick={() => setFilters({
-                  ageGroup: "",
-                  gender: "",
-                  place: "",
-                  language: "",
-                  rating: "",
-                  isPractice: "",
-                  isAttention: "",
-                  attentionPassed: ""
-                })}>Clear Filters 🚫</button>
+                <p>No matching data found. Try adjusting your search.</p>
+                <button className="ghost" onClick={() => { setSearchTerm(""); setCurrentPage(1); }}>Clear Search</button>
               </div>
             )}
           </div>
@@ -733,10 +903,10 @@ export default function AdminPanel() {
 
         {activeTab === "security" && (
           <div className="security">
-            <h2>Security Center 🔒</h2>
+            <h2>Security Center</h2>
             <div className="security-overview">
               <h3>Security Overview</h3>
-              <p>This panel provides comprehensive security information and controls for your C.O.G.N.I.T. application.</p>
+              <p>This panel provides security information for your C.O.G.N.I.T. application.</p>
             </div>
 
             <div className="security-section">
@@ -770,21 +940,10 @@ export default function AdminPanel() {
             </div>
 
             <div className="security-section">
-              <h3>Rate Limiting Configuration</h3>
-              <div className="rate-limit-info">
-                <p><strong>Default Limits:</strong> 200 requests per day, 50 requests per hour</p>
-                <p><strong>Admin Endpoints:</strong> 10 requests per minute</p>
-                <p><strong>Security Endpoints:</strong> 5 requests per minute</p>
-              </div>
-            </div>
-
-            <div className="security-section">
-              <h3>Data Protection</h3>
-              <div className="data-protection-info">
-                <p><strong>IP Address Handling:</strong> SHA-256 hashing with salt for anonymization</p>
-                <p><strong>Data Storage:</strong> CSV format with restricted access</p>
-                <p><strong>Anonymous Data:</strong> No personally identifiable information stored</p>
-                <p><strong>Session Security:</strong> Secure, HTTP-only cookies with SameSite protection</p>
+              <h3>Your API Key</h3>
+              <div className="api-key-display">
+                <code>{apiKey}</code>
+                <p className="api-key-hint">Keep your API key secure. Do not share it with others.</p>
               </div>
             </div>
 
@@ -792,138 +951,16 @@ export default function AdminPanel() {
               <h3>Security Recommendations</h3>
               <div className="security-recommendations">
                 <ul>
-                  <li>🔑 Rotate API keys regularly (every 30-60 days)</li>
-                  <li>🔒 Use strong, unique API keys (minimum 16 characters)</li>
-                  <li>🌐 Enable HTTPS in production environments</li>
-                  <li>🛡️ Review and update CORS origins for production</li>
-                  <li>📊 Monitor failed login attempts and unusual activity</li>
-                  <li>🔄 Regularly backup your data files</li>
-                  <li>🚨 Keep dependencies updated to latest secure versions</li>
+                  <li>Keep your API key secure and never share it</li>
+                  <li>Use strong, unique passwords</li>
+                  <li>Enable HTTPS in production environments</li>
+                  <li>Monitor your account activity regularly</li>
+                  <li>Log out when finished using the admin panel</li>
                 </ul>
               </div>
             </div>
-
-            <div className="security-section">
-              <h3>Security Audit</h3>
-              <button className="primary" onClick={() => {
-                fetch(`${API_BASE}/admin/security/audit?api_key=${apiKey}`)
-                  .then(response => response.json())
-                  .then(data => {
-                    addToast("Security audit completed! Check console for details.", "success");
-                    console.log("Security Audit:", data);
-                  })
-                  .catch(error => {
-                    addToast("Failed to run security audit", "error");
-                    console.error("Security audit error:", error);
-                  });
-              }}>Run Security Audit 🛡️</button>
-            </div>
           </div>
         )}
-
-        {activeTab === "settings" && (
-          <div className="settings">
-            <h2>Admin Settings ⚙️</h2>
-            <div className="settings-section">
-              <h3>API Configuration</h3>
-              <div className="form-group">
-                <label>Current API Key</label>
-                <input type="password" value="********" readOnly />
-                <button className="ghost" onClick={() => setShowApiKeyChange(true)}>Change API Key 🔑</button>
-              </div>
-              
-              {showApiKeyChange && (
-                <div className="api-key-change">
-                  <h4>Change API Key</h4>
-                  <div className="form-group">
-                    <label>New API Key</label>
-                    <input
-                      type="password"
-                      value={newApiKey}
-                      onChange={(e) => setNewApiKey(e.target.value)}
-                      placeholder="Enter new API key (min 8 chars)"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>Confirm API Key</label>
-                    <input
-                      type="password"
-                      value={confirmApiKey}
-                      onChange={(e) => setConfirmApiKey(e.target.value)}
-                      placeholder="Confirm new API key"
-                    />
-                  </div>
-                  {apiKeyError && <div className="error-message">{apiKeyError}</div>}
-                  <div className="action-buttons">
-                    <button className="primary" onClick={handleChangeApiKey}>Save New API Key</button>
-                    <button className="ghost" onClick={() => setShowApiKeyChange(false)}>Cancel</button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="settings-section">
-              <h3>System Information</h3>
-              <div className="system-info">
-                <p><strong>Frontend Version:</strong> 2.0.0</p>
-                <p><strong>Backend Status:</strong> <span className="status-online">Online ✅</span></p>
-                <p><strong>Database Status:</strong> <span className="status-online">Connected ✅</span></p>
-                <p><strong>Total Storage:</strong> {csvData.length > 0 ? `${(JSON.stringify(csvData).length / 1024).toFixed(2)} KB` : '0 KB'}</p>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <h3>Security Settings</h3>
-              <div className="security-settings">
-                <div className="form-group">
-                  <label>Session Timeout</label>
-                  <select defaultValue="30">
-                    <option value="15">15 minutes</option>
-                    <option value="30">30 minutes</option>
-                    <option value="60">60 minutes</option>
-                    <option value="120">120 minutes</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Max Failed Login Attempts</label>
-                  <select defaultValue="5">
-                    <option value="3">3 attempts</option>
-                    <option value="5">5 attempts</option>
-                    <option value="10">10 attempts</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <div className="settings-section">
-              <h3>Danger Zone</h3>
-              <div className="danger-zone">
-                <button className="danger-button" onClick={() => setShowResetConfirm(true)}>Reset Database ⚠️</button>
-                <p className="danger-note">This will permanently delete all data!</p>
-                
-                {showResetConfirm && (
-                  <div className="reset-confirm">
-                    <p style={{ color: '#c9444a', fontWeight: '600' }}>⚠️ WARNING: This action cannot be undone!</p>
-                    <div className="form-group">
-                      <label>Type "RESET" to confirm</label>
-                      <input
-                        type="text"
-                        value={resetConfirmText}
-                        onChange={(e) => setResetConfirmText(e.target.value)}
-                        placeholder="Type RESET to confirm"
-                      />
-                    </div>
-                    <div className="action-buttons">
-                      <button className="danger-button" onClick={handleResetDatabase}>Confirm Reset</button>
-                      <button className="ghost" onClick={() => setShowResetConfirm(false)}>Cancel</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
       </div>
     </div>
   );
