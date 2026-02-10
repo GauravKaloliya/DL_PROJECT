@@ -143,16 +143,16 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><strong>Image Management:</strong> Fetch random images for the study by type (normal, survey, attention)</li>
+              <li><strong>Image Management:</strong> Fetch random images for the study by type (normal, practice, attention)</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions and ratings</li>
               <li><strong>Demographic Collection:</strong> Capture participant information including username, age, gender, and language</li>
               <li><strong>Admin Dashboard:</strong> Access statistics, export data, and manage the platform</li>
-              <li><strong>Security:</strong> API key authentication with rate limiting and CORS protection</li>
+              <li><strong>Security:</strong> Session-based authentication with rate limiting and CORS protection</li>
             </ul>
 
             <h3 style={{ marginTop: '32px' }}>Quick Start</h3>
             <ol style={{ lineHeight: '1.8' }}>
-              <li>Obtain an API key from the admin panel</li>
+              <li>Login to the admin panel with your username and password</li>
               <li>Make your first request to <code>/api/images/random</code></li>
               <li>Submit participant data via <code>/api/submit</code></li>
               <li>Download results from the admin panel</li>
@@ -165,13 +165,14 @@ export default function ApiDocs() {
           <div>
             <h2 style={{ color: 'var(--primary)' }}>Authentication</h2>
             <p>
-              The API uses API key authentication for admin endpoints. Public endpoints for image 
+              The API uses session-based authentication for admin endpoints. Login with your 
+              username and password to obtain a session token. Public endpoints for image 
               retrieval and data submission do not require authentication.
             </p>
 
-            <h3 style={{ marginTop: '24px' }}>API Key Methods</h3>
+            <h3 style={{ marginTop: '24px' }}>Session Token Method</h3>
             <div style={{ marginTop: '16px' }}>
-              <h4>Method 1: Header (Recommended)</h4>
+              <h4>Step 1: Login to get a session token</h4>
               <div style={{ 
                 background: 'var(--bg)', 
                 padding: '16px', 
@@ -180,13 +181,14 @@ export default function ApiDocs() {
                 marginTop: '12px'
               }}>
                 <code style={{ fontSize: '14px' }}>
-                  X-API-KEY: your-api-key-here
+                  POST /api/admin/login<br />
+                  Body: {`{ "username": "your-username", "password": "your-password" }`}
                 </code>
               </div>
             </div>
 
             <div style={{ marginTop: '24px' }}>
-              <h4>Method 2: Query Parameter</h4>
+              <h4>Step 2: Use the session token in headers</h4>
               <div style={{ 
                 background: 'var(--bg)', 
                 padding: '16px', 
@@ -195,7 +197,7 @@ export default function ApiDocs() {
                 marginTop: '12px'
               }}>
                 <code style={{ fontSize: '14px' }}>
-                  GET /api/stats?api_key=your-api-key-here
+                  X-SESSION-TOKEN: your-session-token-here
                 </code>
               </div>
             </div>
@@ -209,8 +211,8 @@ export default function ApiDocs() {
             }}>
               <h4 style={{ marginTop: 0, color: '#d97706' }}>⚠️ Security Notice</h4>
               <p style={{ marginBottom: 0 }}>
-                Keep your API key secure and never expose it in client-side code. 
-                The query parameter method is less secure and should only be used for testing.
+                Keep your session token secure and never expose it in client-side code. 
+                Session tokens expire after 24 hours for security.
               </p>
             </div>
           </div>
@@ -230,12 +232,12 @@ export default function ApiDocs() {
               path="/api/images/random"
               description="Retrieve a random image for the study"
               parameters={[
-                { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
+                { name: 'type', type: 'string', required: false, description: 'Image type: normal, practice, or attention', default: 'normal' }
               ]}
               response={{
                 "image_id": "normal/image1.jpg",
                 "image_url": "/api/images/normal/image1.jpg",
-                "is_survey": false,
+                "is_practice": false,
                 "is_attention": false
               }}
             />
@@ -253,7 +255,7 @@ export default function ApiDocs() {
                 "rating": "integer (required, 1-10)",
                 "feedback": "string (required, min 5 chars)",
                 "time_spent_seconds": "number (required)",
-                "is_survey": "boolean (required)",
+                "is_practice": "boolean (required)",
                 "is_attention": "boolean (required)",
                 "attention_expected": "string (for attention checks)",
                 "username": "string",
@@ -345,7 +347,7 @@ const submission = {
   rating: 8,
   feedback: 'Interesting image',
   time_spent_seconds: 45,
-  is_survey: false,
+  is_practice: false,
   is_attention: false,
   username: 'john_doe',
   gender: 'male',
@@ -381,7 +383,7 @@ submission = {
     'rating': 8,
     'feedback': 'Interesting image',
     'time_spent_seconds': 45,
-    'is_survey': False,
+    'is_practice': False,
     'is_attention': False,
     'username': 'john_doe',
     'gender': 'male',
@@ -413,13 +415,14 @@ curl -X POST "http://localhost:5000/api/submit" \\
     "rating": 8,
     "feedback": "Great image",
     "time_spent_seconds": 45,
-    "is_survey": false,
+    "is_practice": false,
     "is_attention": false,
     "username": "john_doe"
   }'
 
-# Get admin stats (requires API key)
-curl -X GET "http://localhost:5000/api/stats?api_key=YOUR_API_KEY"`} />
+# Get admin stats (requires session token)
+curl -X GET "http://localhost:5000/api/stats" \\
+  -H "X-SESSION-TOKEN: YOUR_SESSION_TOKEN"`} />
           </div>
         )}
 
@@ -458,7 +461,7 @@ curl -X GET "http://localhost:5000/api/stats?api_key=YOUR_API_KEY"`} />
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px' }}><code>401</code></td>
                   <td style={{ padding: '12px' }}>Unauthorized</td>
-                  <td style={{ padding: '12px' }}>Invalid or missing API key</td>
+                  <td style={{ padding: '12px' }}>Invalid or missing session token</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px' }}><code>404</code></td>

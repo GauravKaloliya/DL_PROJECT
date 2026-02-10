@@ -1,13 +1,12 @@
 -- COGNIT Admin Database Schema
 -- This file contains the database schema for admin user management
 
--- Create admin users table with API key support
+-- Create admin users table with password-based authentication
 CREATE TABLE IF NOT EXISTS admin_users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT UNIQUE,
-    api_key TEXT UNIQUE,
     email_verified BOOLEAN DEFAULT 0,
     verification_token TEXT,
     role TEXT DEFAULT 'admin',
@@ -42,7 +41,6 @@ CREATE TABLE IF NOT EXISTS admin_audit_log (
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_admin_users_username ON admin_users(username);
 CREATE INDEX IF NOT EXISTS idx_admin_users_email ON admin_users(email);
-CREATE INDEX IF NOT EXISTS idx_admin_users_api_key ON admin_users(api_key);
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_token ON admin_sessions(session_token);
 CREATE INDEX IF NOT EXISTS idx_admin_sessions_user_id ON admin_sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_admin_audit_log_user_id ON admin_audit_log(user_id);
