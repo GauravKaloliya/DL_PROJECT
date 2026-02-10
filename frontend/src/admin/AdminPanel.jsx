@@ -662,50 +662,66 @@ export default function AdminPanel() {
                 <p className="hint">Use the participant interface to submit responses.</p>
               </div>
             ) : filteredData.length > 0 ? (
-              <div className="data-table-container">
-                <table className="data-table">
-                  <thead>
-                    <tr className="table-header">
-                      {getTableHeaders().map((key) => (
-                        <th key={key} className="table-cell header">{key}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentItems.map((row, index) => (
-                      <tr key={index} className="table-row">
-                        {getTableHeaders().map((key, i) => (
-                          <td key={i} className="table-cell">
-                            {String(row[key] || "").substring(0, 50)}{String(row[key] || "").length > 50 ? "..." : ""}
-                          </td>
+              <div className="data-table-wrapper">
+                <div className="modern-table-container">
+                  <table className="modern-data-table">
+                    <thead>
+                      <tr>
+                        {getTableHeaders().map((key) => (
+                          <th key={key}>
+                            <div className="th-content" title={key}>
+                              {key.replace(/_/g, ' ').toUpperCase()}
+                            </div>
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {currentItems.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {getTableHeaders().map((key, colIndex) => {
+                            const value = row[key] ?? '';
+                            const displayValue = String(value);
+                            return (
+                              <td key={colIndex}>
+                                <div className="td-content" title={displayValue}>
+                                  {displayValue}
+                                </div>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
                 {totalPages > 1 && (
-                  <div className="pagination">
+                  <div className="pagination-modern">
                     <button
+                      className="pagination-btn"
                       onClick={() => paginate(Math.max(1, currentPage - 1))}
                       disabled={currentPage === 1}
                     >
-                      Previous
+                      ← Previous
                     </button>
-                    <span>
-                      Page {currentPage} of {totalPages}
-                    </span>
+                    <div className="pagination-info">
+                      <span className="page-number">{currentPage}</span>
+                      <span className="page-separator">/</span>
+                      <span className="page-total">{totalPages}</span>
+                    </div>
                     <button
+                      className="pagination-btn"
                       onClick={() => paginate(Math.min(totalPages, currentPage + 1))}
                       disabled={currentPage === totalPages}
                     >
-                      Next
+                      Next →
                     </button>
                   </div>
                 )}
 
-                <div className="data-summary">
-                  Showing {indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredData.length)} of {filteredData.length} entries
+                <div className="data-summary-modern">
+                  Showing <strong>{indexOfFirstItem + 1}-{Math.min(indexOfLastItem, filteredData.length)}</strong> of <strong>{filteredData.length}</strong> entries
                 </div>
               </div>
             ) : (
