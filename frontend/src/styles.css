@@ -1848,6 +1848,23 @@ body.dark .reset-confirm {
   background: #166fe5;
 }
 
+/* Dark mode toggle button */
+.dark-mode-toggle {
+  padding: 10px 14px !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dark-mode-toggle:hover {
+  background: var(--secondary);
+  border-color: var(--primary);
+}
+
+.dark-mode-toggle svg {
+  color: var(--text);
+}
+
 /* Dark mode adjustments */
 body.dark .modern-table-container {
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);

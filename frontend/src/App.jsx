@@ -127,7 +127,7 @@ export default function App() {
   const [consentChecked, setConsentChecked] = useState(getStoredValue("consentChecked", false));
   const [demographics, setDemographics] = useState(
     getStoredValue("demographics", {
-      ageGroup: "",
+      username: "",
       gender: "",
       age: "",
       place: "",
@@ -308,7 +308,7 @@ export default function App() {
 
   const validateForm = () => {
     const errors = {};
-    if (!demographics.ageGroup) errors.ageGroup = "Age group is required";
+    if (!demographics.username || demographics.username.trim().length < 2) errors.username = "Username is required (min 2 characters)";
     if (!demographics.gender) errors.gender = "Gender is required";
     if (!demographics.age || isNaN(demographics.age) || demographics.age < 1 || demographics.age > 120) {
       errors.age = "Please enter a valid age (1-120)";
@@ -344,7 +344,7 @@ export default function App() {
       return;
     }
     if (rating === 0) {
-      addToast("Please provide a general rating 💕", "error");
+      addToast("Please provide an image rating 💕", "error");
       return;
     }
     if (comments.trim().length < 5) {
@@ -367,7 +367,7 @@ export default function App() {
       is_practice: trial.is_practice,
       is_attention: trial.is_attention,
       attention_expected: attentionMeta?.expected || "",
-      age_group: demographics.ageGroup,
+      username: demographics.username,
       gender: demographics.gender,
       age: demographics.age,
       place: demographics.place,
@@ -423,12 +423,8 @@ export default function App() {
   const handleNext = async () => {
     clearNextTimeout();
     setReadyForNext(false);
-    if (stage === "practice" && practiceCompleted < PRACTICE_TARGET) {
-      await fetchImage("practice");
-      return;
-    }
     if (stage === "practice") {
-      await startMain();
+      await fetchImage("practice");
       return;
     }
     if (mainCompleted >= MAIN_TARGET) {
@@ -463,8 +459,28 @@ export default function App() {
             <p className="subtitle">Describe each image with as much detail as possible</p>
           </div>
           <div className="header-actions">
-            <button className="ghost" onClick={() => setDarkMode((prev) => !prev)}>
-              {darkMode ? "Light mode" : "Dark mode"}
+            <button 
+              className="ghost dark-mode-toggle" 
+              onClick={() => setDarkMode((prev) => !prev)}
+              title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {darkMode ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"/>
+                  <line x1="12" y1="1" x2="12" y2="3"/>
+                  <line x1="12" y1="21" x2="12" y2="23"/>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                  <line x1="1" y1="12" x2="3" y2="12"/>
+                  <line x1="21" y1="12" x2="23" y2="12"/>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+              )}
             </button>
             <button className="ghost" onClick={() => navigate("/api/docs")}>
               API Docs
@@ -486,63 +502,99 @@ export default function App() {
 
         {stage === "consent" && (
           <div className="panel">
-            <h2>Welcome to C.O.G.N.I.T.!</h2>
-            <p>
-              Thank you for your interest in our research study. C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
-              is designed to explore how people perceive and describe visual information. Your participation will help us better understand 
-              cognitive processes involved in image description and visual analysis.
+            <h2>Research Study Consent Form</h2>
+            <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
+              <strong>C.O.G.N.I.T. Study: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
             </p>
             
             <div className="welcome-info">
-              <h3>What to Expect</h3>
+              <h3>Purpose of the Study</h3>
+              <p>
+                This research aims to understand how individuals perceive, interpret, and describe visual content. 
+                Your participation will contribute to advancing knowledge in cognitive science, computer vision, 
+                and natural language processing. The insights gained may help improve image understanding systems 
+                and descriptive language models.
+              </p>
+              
+              <h3>What You Will Do</h3>
               <ul>
-                <li>You will be shown a series of images and asked to describe them in detail</li>
-                <li>Each description should be at least 30 words to ensure quality responses</li>
-                <li>You will rate the complexity of each image on a scale of 1-10</li>
-                <li>The study includes practice trials to help you get started</li>
-                <li>You may include additional comments about each image</li>
+                <li>View a series of images presented on your screen</li>
+                <li>Provide detailed written descriptions of each image (minimum 30 words)</li>
+                <li>Rate each image on a scale of 1-10 based on visual complexity</li>
+                <li>Complete a brief practice session before the main study</li>
+                <li>Share any additional observations or comments about the images</li>
               </ul>
               
-              <h3>Time Commitment</h3>
+              <h3>Time and Duration</h3>
               <p>
-                The study typically takes 15-20 minutes to complete. You can take breaks between images, 
-                and you have the option to finish early at any time. Your progress will be saved automatically.
+                The study takes approximately 15-20 minutes to complete. You may take breaks between images as needed. 
+                You have the option to exit the study at any point without penalty. Your progress is automatically saved.
               </p>
               
-              <h3>Privacy & Data Protection</h3>
+              <h3>Benefits and Risks</h3>
               <p>
-                All responses are collected anonymously and stored securely. Your personal information 
-                will never be shared with third parties. Data is used solely for academic research purposes 
-                to improve our understanding of visual cognition and descriptive language patterns.
+                <strong>Benefits:</strong> You will contribute to scientific research that may lead to better 
+                image understanding technologies and accessibility tools. There is no monetary compensation for participation.
+              </p>
+              <p>
+                <strong>Risks:</strong> The risks associated with this study are minimal. Some images may contain 
+                mildly complex visual scenes. If you feel uncomfortable at any time, you may stop immediately.
               </p>
               
-              <h3>Consent</h3>
+              <h3>Data Privacy and Confidentiality</h3>
+              <ul>
+                <li>All responses are collected anonymously and stored securely</li>
+                <li>No personally identifiable information will be published or shared</li>
+                <li>Your IP address is hashed and cannot be traced back to you</li>
+                <li>Data will be used solely for academic research purposes</li>
+                <li>Aggregated results may be published in research papers or presented at conferences</li>
+              </ul>
+              
+              <h3>Your Rights</h3>
               <p>
-                By participating, you consent to having your descriptions stored anonymously for research 
-                purposes. Participation is completely voluntary, and you may stop at any time without penalty.
+                Participation in this study is entirely voluntary. You have the right to:
               </p>
+              <ul>
+                <li>Decline to participate without any consequences</li>
+                <li>Withdraw from the study at any time without penalty</li>
+                <li>Skip any question you do not wish to answer</li>
+                <li>Request deletion of your data (contact the research team)</li>
+              </ul>
+              
+              <h3>Contact Information</h3>
+              <p>
+                If you have any questions about this study, please contact the research team at 
+                <strong>research@cognit-study.org</strong>. For questions about your rights as a research participant, 
+                contact the Institutional Review Board.
+              </p>
+              
+              <h3>Consent Statement</h3>
+              <p>
+                By checking the consent box below and clicking "Start", you confirm that:
+              </p>
+              <ul>
+                <li>You are at least 18 years of age</li>
+                <li>You have read and understood this consent form</li>
+                <li>You agree to participate in this research study voluntarily</li>
+                <li>You understand that your responses will be collected anonymously</li>
+              </ul>
             </div>
             
             <h3 style={{ color: 'var(--primary)', marginTop: '24px', marginBottom: '16px' }}>Participant Information</h3>
             <div className="consent-form-grid">
-              <div className={`form-field ${formErrors.ageGroup ? 'error' : ''}`}>
-                <label>Age group</label>
-                <select
-                  value={demographics.ageGroup}
+              <div className={`form-field ${formErrors.username ? 'error' : ''}`}>
+                <label>Username</label>
+                <input
+                  type="text"
+                  placeholder="Enter your preferred username"
+                  value={demographics.username}
                   onChange={(event) => {
-                    setDemographics((prev) => ({ ...prev, ageGroup: event.target.value }));
-                    if (formErrors.ageGroup) setFormErrors(prev => ({ ...prev, ageGroup: null }));
+                    setDemographics((prev) => ({ ...prev, username: event.target.value }));
+                    if (formErrors.username) setFormErrors(prev => ({ ...prev, username: null }));
                   }}
-                  className={formErrors.ageGroup ? 'error-input' : ''}
-                >
-                  <option value="">Select age group</option>
-                  <option value="18-24">18-24</option>
-                  <option value="25-34">25-34</option>
-                  <option value="35-44">35-44</option>
-                  <option value="45-54">45-54</option>
-                  <option value="55+">55+</option>
-                </select>
-                {formErrors.ageGroup && <span className="error-text">{formErrors.ageGroup}</span>}
+                  className={formErrors.username ? 'error-input' : ''}
+                />
+                {formErrors.username && <span className="error-text">{formErrors.username}</span>}
               </div>
               
               <div className={`form-field ${formErrors.gender ? 'error' : ''}`}>
@@ -661,9 +713,11 @@ export default function App() {
                 id="consent-check"
               />
               <label htmlFor="consent-check">
-                I consent to participate ✨
+                <strong>I consent to participate in this research study</strong>
                 <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
-                  By checking this box, I agree to participate in this study and understand that my responses will be collected anonymously for research purposes.
+                  I confirm that I am 18 years or older, I have read and understood the consent form, 
+                  and I agree to participate voluntarily. I understand my responses will be collected anonymously 
+                  and used for research purposes only.
                 </p>
               </label>
               {formErrors.consent && <span className="error-text consent-error">{formErrors.consent}</span>}
@@ -671,7 +725,7 @@ export default function App() {
             
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
               <button className="primary" onClick={handleConsentStart}>
-                Start
+                Start Study
               </button>
             </div>
           </div>
@@ -680,18 +734,27 @@ export default function App() {
         {stage === "practice" && trial && (
           <div className="panel">
             <div className="progress">
-              <span>Practice {practiceCompleted + 1} / {PRACTICE_TARGET} 🎯</span>
+              <span>Practice Session 🎯</span>
             </div>
             {practiceFeedbackReady ? (
               <div className="guidance">
-                <h2>Great job! 🎉</h2>
+                <h2>Practice Complete! 🎉</h2>
                 <p>
-                  You're doing amazing! Aim to describe colors, textures, relationships, and any notable objects.
-                  Remember to write at least {MIN_WORDS} words ✨
+                  Great job on your practice trial! You can now choose to continue with more practice 
+                  images or proceed to the main study.
                 </p>
-                <button className="primary" onClick={handleNext}>
-                  Continue! 💕
-                </button>
+                <p style={{ color: 'var(--muted)', margin: '16px 0' }}>
+                  <em>Tip: Aim to describe colors, textures, relationships, and any notable objects. 
+                  Remember to write at least {MIN_WORDS} words per description.</em>
+                </p>
+                <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="ghost" onClick={handleNext}>
+                    Continue Practice 💕
+                  </button>
+                  <button className="primary" onClick={startMain}>
+                    Start Main Study ➡️
+                  </button>
+                </div>
               </div>
             ) : (
               <TrialForm
@@ -872,9 +935,9 @@ function TrialForm({
         </span>
       </div>
       
-      {/* Effort Rating - Radio buttons */}
+      {/* Image Rating - Radio buttons */}
       <div className="field effort-rating">
-        <label>General rating {rating > 0 ? `${rating}/10` : ""}</label>
+        <label>Image rating {rating > 0 ? `${rating}/10` : ""}</label>
         <div className="rating-scale">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((val) => (
             <label key={val} className="rating-option">
