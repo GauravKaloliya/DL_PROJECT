@@ -1198,6 +1198,195 @@ def security_info():
 
 # ============== API DOCUMENTATION ==============
 
+@app.route("/api/schema")
+@limiter.limit("30 per minute")
+@track_performance
+def api_schema():
+    """Get the complete database schema including tables, indexes, triggers, and views"""
+    schema = {
+        "title": "C.O.G.N.I.T. Database Schema",
+        "version": "3.2.0",
+        "description": "Complete SQLite database schema for the C.O.G.N.I.T. research platform",
+        "tables": {
+            "participants": {
+                "description": "Stores participant information and demographics",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "constraints": "PRIMARY KEY AUTOINCREMENT"},
+                    {"name": "participant_id", "type": "TEXT", "constraints": "UNIQUE NOT NULL CHECK(LENGTH <= 100)"},
+                    {"name": "session_id", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 100)"},
+                    {"name": "username", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 100)"},
+                    {"name": "email", "type": "TEXT", "constraints": "CHECK(LENGTH <= 255, valid email format)"},
+                    {"name": "phone", "type": "TEXT", "constraints": "CHECK(LENGTH <= 30)"},
+                    {"name": "gender", "type": "TEXT", "constraints": "CHECK(LENGTH <= 50)"},
+                    {"name": "age", "type": "INTEGER", "constraints": "CHECK(BETWEEN 1 AND 120)"},
+                    {"name": "place", "type": "TEXT", "constraints": "CHECK(LENGTH <= 100)"},
+                    {"name": "native_language", "type": "TEXT", "constraints": "CHECK(LENGTH <= 50)"},
+                    {"name": "prior_experience", "type": "TEXT", "constraints": "CHECK(LENGTH <= 100)"},
+                    {"name": "consent_given", "type": "BOOLEAN", "constraints": "DEFAULT 0"},
+                    {"name": "consent_timestamp", "type": "TIMESTAMP", "constraints": ""},
+                    {"name": "ip_hash", "type": "TEXT", "constraints": "CHECK(LENGTH = 64)"},
+                    {"name": "user_agent", "type": "TEXT", "constraints": "CHECK(LENGTH <= 500)"},
+                    {"name": "created_at", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"}
+                ]
+            },
+            "submissions": {
+                "description": "Stores participant submissions for image descriptions",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "constraints": "PRIMARY KEY AUTOINCREMENT"},
+                    {"name": "participant_id", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 100), FK to participants"},
+                    {"name": "session_id", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 100)"},
+                    {"name": "image_id", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 200), FK to images"},
+                    {"name": "image_url", "type": "TEXT", "constraints": "CHECK(LENGTH <= 500)"},
+                    {"name": "trial_index", "type": "INTEGER", "constraints": "NOT NULL"},
+                    {"name": "description", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 10000)"},
+                    {"name": "word_count", "type": "INTEGER", "constraints": "CHECK(BETWEEN 0 AND 10000)"},
+                    {"name": "rating", "type": "INTEGER", "constraints": "CHECK(BETWEEN 1 AND 10)"},
+                    {"name": "feedback", "type": "TEXT", "constraints": "CHECK(LENGTH <= 2000)"},
+                    {"name": "time_spent_seconds", "type": "REAL", "constraints": "CHECK(>= 0)"},
+                    {"name": "is_survey", "type": "BOOLEAN", "constraints": "DEFAULT 0"},
+                    {"name": "is_attention", "type": "BOOLEAN", "constraints": "DEFAULT 0"},
+                    {"name": "attention_passed", "type": "BOOLEAN", "constraints": ""},
+                    {"name": "too_fast_flag", "type": "BOOLEAN", "constraints": "DEFAULT 0"},
+                    {"name": "user_agent", "type": "TEXT", "constraints": "CHECK(LENGTH <= 500)"},
+                    {"name": "ip_hash", "type": "TEXT", "constraints": "CHECK(LENGTH = 64)"},
+                    {"name": "created_at", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"}
+                ]
+            },
+            "consent_records": {
+                "description": "Stores participant consent records",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "constraints": "PRIMARY KEY AUTOINCREMENT"},
+                    {"name": "participant_id", "type": "TEXT", "constraints": "UNIQUE NOT NULL CHECK(LENGTH <= 100), FK to participants"},
+                    {"name": "consent_given", "type": "BOOLEAN", "constraints": "DEFAULT 0"},
+                    {"name": "consent_timestamp", "type": "TIMESTAMP", "constraints": ""},
+                    {"name": "ip_hash", "type": "TEXT", "constraints": "CHECK(LENGTH = 64)"},
+                    {"name": "user_agent", "type": "TEXT", "constraints": "CHECK(LENGTH <= 500)"},
+                    {"name": "created_at", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"}
+                ]
+            },
+            "images": {
+                "description": "Stores image metadata",
+                "columns": [
+                    {"name": "image_id", "type": "TEXT", "constraints": "PRIMARY KEY"},
+                    {"name": "category", "type": "TEXT", "constraints": ""},
+                    {"name": "difficulty_score", "type": "REAL", "constraints": ""},
+                    {"name": "object_count", "type": "INTEGER", "constraints": ""},
+                    {"name": "width", "type": "INTEGER", "constraints": ""},
+                    {"name": "height", "type": "INTEGER", "constraints": ""},
+                    {"name": "created_at", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"}
+                ]
+            },
+            "audit_log": {
+                "description": "Security audit log for tracking all significant events",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "constraints": "PRIMARY KEY AUTOINCREMENT"},
+                    {"name": "timestamp", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"},
+                    {"name": "event_type", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 50)"},
+                    {"name": "user_id", "type": "TEXT", "constraints": "CHECK(LENGTH <= 100)"},
+                    {"name": "participant_id", "type": "TEXT", "constraints": "CHECK(LENGTH <= 100)"},
+                    {"name": "endpoint", "type": "TEXT", "constraints": "CHECK(LENGTH <= 100)"},
+                    {"name": "method", "type": "TEXT", "constraints": "CHECK(LENGTH <= 10)"},
+                    {"name": "status_code", "type": "INTEGER", "constraints": ""},
+                    {"name": "ip_hash", "type": "TEXT", "constraints": "CHECK(LENGTH = 64)"},
+                    {"name": "user_agent", "type": "TEXT", "constraints": "CHECK(LENGTH <= 500)"},
+                    {"name": "details", "type": "TEXT", "constraints": "CHECK(LENGTH <= 2000)"}
+                ]
+            },
+            "performance_metrics": {
+                "description": "API endpoint performance metrics",
+                "columns": [
+                    {"name": "id", "type": "INTEGER", "constraints": "PRIMARY KEY AUTOINCREMENT"},
+                    {"name": "timestamp", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"},
+                    {"name": "endpoint", "type": "TEXT", "constraints": "NOT NULL CHECK(LENGTH <= 100)"},
+                    {"name": "response_time_ms", "type": "INTEGER", "constraints": "CHECK(>= 0)"},
+                    {"name": "status_code", "type": "INTEGER", "constraints": ""},
+                    {"name": "request_size_bytes", "type": "INTEGER", "constraints": "CHECK(>= 0)"},
+                    {"name": "response_size_bytes", "type": "INTEGER", "constraints": "CHECK(>= 0)"}
+                ]
+            },
+            "database_metadata": {
+                "description": "Database version and configuration metadata",
+                "columns": [
+                    {"name": "key", "type": "TEXT", "constraints": "PRIMARY KEY"},
+                    {"name": "value", "type": "TEXT", "constraints": ""},
+                    {"name": "updated_at", "type": "TIMESTAMP", "constraints": "DEFAULT CURRENT_TIMESTAMP"}
+                ]
+            }
+        },
+        "indexes": [
+            {"name": "idx_participants_id", "table": "participants", "column": "participant_id"},
+            {"name": "idx_participants_session", "table": "participants", "column": "session_id"},
+            {"name": "idx_participants_created", "table": "participants", "column": "created_at"},
+            {"name": "idx_participants_consent", "table": "participants", "column": "consent_given"},
+            {"name": "idx_participants_email", "table": "participants", "column": "email"},
+            {"name": "idx_submissions_participant", "table": "submissions", "column": "participant_id"},
+            {"name": "idx_submissions_session", "table": "submissions", "column": "session_id"},
+            {"name": "idx_submissions_created", "table": "submissions", "column": "created_at"},
+            {"name": "idx_submissions_image", "table": "submissions", "column": "image_id"},
+            {"name": "idx_submissions_survey", "table": "submissions", "column": "is_survey"},
+            {"name": "idx_submissions_attention", "table": "submissions", "column": "is_attention"},
+            {"name": "idx_submissions_rating", "table": "submissions", "column": "rating"},
+            {"name": "idx_submissions_word_count", "table": "submissions", "column": "word_count"},
+            {"name": "idx_consent_participant", "table": "consent_records", "column": "participant_id"},
+            {"name": "idx_consent_timestamp", "table": "consent_records", "column": "consent_timestamp"},
+            {"name": "idx_images_id", "table": "images", "column": "image_id"},
+            {"name": "idx_images_category", "table": "images", "column": "category"},
+            {"name": "idx_images_created", "table": "images", "column": "created_at"},
+            {"name": "idx_audit_timestamp", "table": "audit_log", "column": "timestamp"},
+            {"name": "idx_audit_user", "table": "audit_log", "column": "user_id"},
+            {"name": "idx_audit_participant", "table": "audit_log", "column": "participant_id"},
+            {"name": "idx_audit_endpoint", "table": "audit_log", "column": "endpoint"},
+            {"name": "idx_performance_timestamp", "table": "performance_metrics", "column": "timestamp"},
+            {"name": "idx_performance_endpoint", "table": "performance_metrics", "column": "endpoint"}
+        ],
+        "triggers": [
+            {
+                "name": "trg_participant_insert_audit",
+                "event": "AFTER INSERT ON participants",
+                "description": "Logs participant creation events to audit_log"
+            },
+            {
+                "name": "trg_consent_insert_audit",
+                "event": "AFTER INSERT ON consent_records",
+                "description": "Logs consent recording events to audit_log"
+            },
+            {
+                "name": "trg_submission_insert_audit",
+                "event": "AFTER INSERT ON submissions",
+                "description": "Logs submission creation events to audit_log"
+            }
+        ],
+        "views": [
+            {
+                "name": "vw_participant_summary",
+                "description": "Aggregated participant data with submission statistics",
+                "columns": ["participant_id", "username", "email", "age", "gender", "place", "native_language", "prior_experience", "consent_given", "submission_count", "avg_word_count", "last_submission_time"]
+            },
+            {
+                "name": "vw_submission_stats",
+                "description": "Per-participant submission statistics",
+                "columns": ["participant_id", "total_submissions", "survey_count", "attention_count", "attention_passed_count", "avg_word_count", "avg_rating", "avg_time_seconds"]
+            },
+            {
+                "name": "vw_image_coverage",
+                "description": "Image utilization analysis with coverage metrics",
+                "columns": ["image_id", "category", "difficulty_score", "object_count", "width", "height", "submission_count", "unique_participants", "avg_word_count", "avg_rating", "avg_time_seconds", "survey_submissions", "attention_submissions", "attention_passed_submissions", "first_submission_time", "last_submission_time", "usage_category"]
+            },
+            {
+                "name": "vw_submission_quality",
+                "description": "Data quality scoring for submissions (0-100 scale)",
+                "columns": ["id", "participant_id", "image_id", "trial_index", "word_count", "rating", "time_spent_seconds", "is_survey", "is_attention", "attention_passed", "too_fast_flag", "created_at", "data_quality_score", "quality_category"]
+            }
+        ],
+        "foreign_keys": [
+            {"from_table": "submissions", "from_column": "participant_id", "to_table": "participants", "to_column": "participant_id", "on_delete": "CASCADE"},
+            {"from_table": "submissions", "from_column": "image_id", "to_table": "images", "to_column": "image_id"},
+            {"from_table": "consent_records", "from_column": "participant_id", "to_table": "participants", "to_column": "participant_id", "on_delete": "CASCADE"}
+        ]
+    }
+    return jsonify(schema)
+
+
 @app.route("/api/docs")
 @limiter.limit("30 per minute")
 def api_docs():
@@ -1361,6 +1550,14 @@ def api_docs():
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "response": "Array of submission objects with details"
+            },
+            "get_schema": {
+                "path": "/api/schema",
+                "method": "GET",
+                "description": "Get the complete database schema including tables, indexes, triggers, and views",
+                "auth_required": False,
+                "rate_limit": "30 per minute",
+                "response": "Complete schema definition with all database objects"
             }
         },
         "error_handling": {

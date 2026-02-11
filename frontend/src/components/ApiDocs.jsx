@@ -5,6 +5,7 @@ import { API_BASE } from "../utils/apiBase";
 export default function ApiDocs() {
   const navigate = useNavigate();
   const [docs, setDocs] = useState(null);
+  const [schema, setSchema] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeSection, setActiveSection] = useState('overview');
@@ -16,12 +17,19 @@ export default function ApiDocs() {
   const fetchApiDocs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/docs`);
-      if (!response.ok) {
+      const [docsResponse, schemaResponse] = await Promise.all([
+        fetch(`${API_BASE}/api/docs`),
+        fetch(`${API_BASE}/api/schema`)
+      ]);
+      if (!docsResponse.ok) {
         throw new Error('Failed to fetch API documentation');
       }
-      const data = await response.json();
-      setDocs(data);
+      const docsData = await docsResponse.json();
+      setDocs(docsData);
+      if (schemaResponse.ok) {
+        const schemaData = await schemaResponse.json();
+        setSchema(schemaData);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -90,7 +98,7 @@ export default function ApiDocs() {
           borderBottom: '2px solid var(--border)',
           flexWrap: 'wrap'
         }}>
-          {['overview', 'endpoints', 'examples', 'errors'].map((section) => (
+          {['overview', 'endpoints', 'schema', 'examples', 'errors'].map((section) => (
             <button
               key={section}
               onClick={() => setActiveSection(section)}
@@ -321,6 +329,13 @@ export default function ApiDocs() {
               description="Retrieve the API documentation"
               response="Documentation payload"
             />
+
+            <EndpointCard
+              method="GET"
+              path="/api/schema"
+              description="Get the complete database schema including tables, indexes, triggers, and views"
+              response="Complete schema definition with all database objects"
+            />
           </div>
         )}
 
@@ -416,6 +431,117 @@ curl -X POST "http://localhost:5000/api/submit" \\
     "is_survey": false,
     "is_attention": false
   }'`} />
+          </div>
+        )}
+
+        {/* Schema Section */}
+        {activeSection === 'schema' && schema && (
+          <div>
+            <h2 style={{ color: 'var(--primary)' }}>Database Schema</h2>
+            <p style={{ marginBottom: '24px' }}>
+              {schema.description} (Version {schema.version})
+            </p>
+
+            {/* Tables */}
+            <h3 style={{ marginTop: '32px', color: 'var(--primary)' }}>Tables</h3>
+            {Object.entries(schema.tables).map(([tableName, tableInfo]) => (
+              <div key={tableName} style={{ marginBottom: '24px' }}>
+                <h4 style={{ marginBottom: '8px' }}>{tableName}</h4>
+                <p style={{ color: 'var(--muted)', fontSize: '14px', marginBottom: '12px' }}>
+                  {tableInfo.description}
+                </p>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--primary)', color: 'white' }}>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Column</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Type</th>
+                      <th style={{ padding: '10px', textAlign: 'left' }}>Constraints</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableInfo.columns.map((col, idx) => (
+                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '10px' }}><code>{col.name}</code></td>
+                        <td style={{ padding: '10px' }}>{col.type}</td>
+                        <td style={{ padding: '10px', color: 'var(--muted)' }}>{col.constraints || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+
+            {/* Indexes */}
+            <h3 style={{ marginTop: '32px', color: 'var(--primary)' }}>Indexes</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: 'var(--primary)', color: 'white' }}>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Index Name</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Table</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>Column</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schema.indexes.map((idx, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px' }}><code>{idx.name}</code></td>
+                    <td style={{ padding: '10px' }}>{idx.table}</td>
+                    <td style={{ padding: '10px' }}>{idx.column}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Views */}
+            <h3 style={{ marginTop: '32px', color: 'var(--primary)' }}>Views</h3>
+            {schema.views.map((view, idx) => (
+              <div key={idx} style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+                <h4 style={{ marginBottom: '8px' }}>{view.name}</h4>
+                <p style={{ color: 'var(--muted)', fontSize: '14px', marginBottom: '8px' }}>
+                  {view.description}
+                </p>
+                <p style={{ fontSize: '13px' }}>
+                  <strong>Columns:</strong> {view.columns.join(', ')}
+                </p>
+              </div>
+            ))}
+
+            {/* Triggers */}
+            <h3 style={{ marginTop: '32px', color: 'var(--primary)' }}>Triggers</h3>
+            {schema.triggers.map((trigger, idx) => (
+              <div key={idx} style={{ marginBottom: '16px', padding: '16px', background: 'var(--bg)', borderRadius: '8px' }}>
+                <h4 style={{ marginBottom: '8px' }}>{trigger.name}</h4>
+                <p style={{ color: 'var(--muted)', fontSize: '14px', marginBottom: '8px' }}>
+                  <strong>Event:</strong> {trigger.event}
+                </p>
+                <p style={{ fontSize: '14px' }}>{trigger.description}</p>
+              </div>
+            ))}
+
+            {/* Foreign Keys */}
+            <h3 style={{ marginTop: '32px', color: 'var(--primary)' }}>Foreign Keys</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+              <thead>
+                <tr style={{ background: 'var(--primary)', color: 'white' }}>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>From Table</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>From Column</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>To Table</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>To Column</th>
+                  <th style={{ padding: '10px', textAlign: 'left' }}>On Delete</th>
+                </tr>
+              </thead>
+              <tbody>
+                {schema.foreign_keys.map((fk, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '10px' }}>{fk.from_table}</td>
+                    <td style={{ padding: '10px' }}><code>{fk.from_column}</code></td>
+                    <td style={{ padding: '10px' }}>{fk.to_table}</td>
+                    <td style={{ padding: '10px' }}><code>{fk.to_column}</code></td>
+                    <td style={{ padding: '10px' }}>{fk.on_delete || 'RESTRICT'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
 
