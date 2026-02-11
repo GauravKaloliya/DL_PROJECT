@@ -60,7 +60,7 @@ export default function ConsentPage({
         <h3>What Participation Involves</h3>
         <ul>
           <li>Review a series of images presented one at a time</li>
-          <li>Write a descriptive response for each image (at least 30 words)</li>
+          <li>Write a descriptive response for each image (at least 60 words)</li>
           <li>Rate each image on a 1-10 scale based on perceived complexity</li>
           <li>Complete a short survey set before starting the main image set</li>
         </ul>

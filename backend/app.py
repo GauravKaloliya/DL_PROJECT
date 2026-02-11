@@ -20,7 +20,7 @@ DATA_DIR = BASE_DIR / "data"
 CSV_PATH = DATA_DIR / "submissions.csv"
 DB_PATH = BASE_DIR / "COGNIT.db"
 
-MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
+MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 
