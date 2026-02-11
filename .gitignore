@@ -13,8 +13,5 @@ node_modules/
 # Env
 .env
 
-# Data
-/backend/data/*.csv
-
 # Logs
 *.log
