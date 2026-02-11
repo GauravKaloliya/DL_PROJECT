@@ -36,6 +36,7 @@ export default function TrialPage({
   const [comments, setComments] = useState("");
   const [isZoomed, setIsZoomed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -44,6 +45,7 @@ export default function TrialPage({
   const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
   const charCount = description.length;
   const commentsValid = comments.trim().length >= 5;
+  const canSubmit = wordCount >= MIN_WORDS && rating !== 0 && commentsValid && !submitting;
   const currentInstruction = trial?.is_attention ? attentionInstruction[trial.image_id] : null;
 
   const handleRetryImage = () => {
@@ -65,6 +67,7 @@ export default function TrialPage({
     setImageLoaded(false);
     setImageError(false);
     setIsZoomed(false);
+    setSubmitError("");
     trialStartTime.current = Date.now();
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
@@ -72,13 +75,20 @@ export default function TrialPage({
     return () => clearInterval(interval);
   }, [trial?.image_id]);
 
+  useEffect(() => {
+    if (submitError) {
+      setSubmitError("");
+    }
+  }, [description, rating, comments]);
+
   const handleSubmit = async () => {
-    if (submitting) return;
-    if (wordCount < MIN_WORDS) return;
-    if (rating === 0) return;
-    if (!commentsValid) return;
+    if (!canSubmit) {
+      setSubmitError(getSubmitTooltip());
+      return;
+    }
 
     setSubmitting(true);
+    setSubmitError("");
     const timeSpentSeconds = Math.round((Date.now() - trialStartTime.current) / 1000);
 
     try {
@@ -89,11 +99,13 @@ export default function TrialPage({
         timeSpentSeconds,
         attentionExpected: currentInstruction?.expected || ""
       });
-      
+
       // Reset form after successful submission
       setDescription("");
       setRating(0);
       setComments("");
+    } catch (error) {
+      setSubmitError(error?.message || "Submission failed. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -295,11 +307,13 @@ export default function TrialPage({
         />
       </div>
 
+      {submitError && <div className="banner warning">{submitError}</div>}
+
       <div className="actions">
         <button
           className={`primary ${submitting ? "wiggle" : ""}`}
           onClick={handleSubmit}
-          disabled={submitting || wordCount < MIN_WORDS || rating === 0 || !commentsValid}
+          disabled={!canSubmit}
           title={getSubmitTooltip()}
         >
           {submitting ? "Submitting..." : "Submit"}

@@ -57,6 +57,8 @@ export default function ApiDocs() {
     );
   }
 
+  const apiBaseUrl = API_BASE ? `${API_BASE}/api` : `${window.location.origin}/api`;
+
   return (
     <div className="app">
       <div className="panel">
@@ -130,7 +132,7 @@ export default function ApiDocs() {
               fontFamily: 'monospace',
               fontSize: '14px'
             }}>
-              {window.location.origin}/api
+              {apiBaseUrl}
             </div>
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>

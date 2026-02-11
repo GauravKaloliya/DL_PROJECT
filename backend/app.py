@@ -33,10 +33,20 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 
+def _get_cors_origins():
+    env_origins = os.getenv("CORS_ORIGINS", "").strip()
+    if env_origins:
+        origins = [origin.strip() for origin in env_origins.split(",") if origin.strip()]
+        if "*" in origins:
+            return "*"
+        return origins
+    return ["http://localhost:5173"]
+
+
 # CORS Configuration with enhanced security
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["http://localhost:5173", "https://your-production-domain.com"],
+        "origins": _get_cors_origins(),
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": False,
@@ -1449,4 +1459,6 @@ if __name__ == "__main__":
     print("API Documentation available at: http://localhost:5000/api/docs")
     print("API available at: http://localhost:5000/api/")
     print("Security Info available at: http://localhost:5000/api/security/info")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    port = int(os.getenv("PORT", "5000"))
+    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
+    app.run(debug=debug_mode, host="0.0.0.0", port=port)
