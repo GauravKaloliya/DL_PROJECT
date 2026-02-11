@@ -5,8 +5,7 @@ import ConsentPage from "./pages/ConsentPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
 import TrialPage from "./pages/TrialPage.jsx";
 import FinishedPage from "./pages/FinishedPage.jsx";
-
-const API_BASE = import.meta.env.VITE_API_BASE || "";
+import { API_BASE } from "./utils/apiBase";
 
 function createId() {
   if (crypto?.randomUUID) {
@@ -402,7 +401,6 @@ export default function App() {
         return (
           <ConsentPage
             onConsentGiven={handleConsentGiven}
-            onBack={() => window.location.reload()}
             systemReady={systemReady}
           />
         );

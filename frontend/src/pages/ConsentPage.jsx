@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 
 export default function ConsentPage({ 
   onConsentGiven, 
-  onBack,
   systemReady 
 }) {
   const [consentChecked, setConsentChecked] = useState(false);
@@ -12,6 +11,14 @@ export default function ConsentPage({
   useEffect(() => {
     document.title = "Consent Form - C.O.G.N.I.T.";
   }, []);
+
+  const getErrorMessage = (err) => {
+    const message = err?.message || "";
+    if (message.toLowerCase().includes("expected pattern")) {
+      return "Unable to reach the server. Please check your connection and try again.";
+    }
+    return message || "Failed to record consent. Please try again.";
+  };
 
   const handleSubmit = async () => {
     if (!systemReady) {
@@ -30,7 +37,7 @@ export default function ConsentPage({
     try {
       await onConsentGiven();
     } catch (err) {
-      setError(err.message || "Failed to record consent. Please try again.");
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -38,65 +45,59 @@ export default function ConsentPage({
 
   return (
     <div className="panel">
-      <h2>Survey Consent Form</h2>
+      <h2>Research Consent Form</h2>
       <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
         <strong>C.O.G.N.I.T.: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
       </p>
       
       <div className="welcome-info">
-        <h3>Purpose of the Research</h3>
+        <h3>About the Study</h3>
         <p>
-          This research aims to understand how individuals perceive, interpret, and describe visual content. 
-          Your participation will contribute to advancing knowledge in cognitive science, computer vision, 
-          and natural language processing.
+          C.O.G.N.I.T. explores how people describe visual scenes and how language captures what we see. 
+          Your responses help us advance research in cognition, language understanding, and visual computing.
         </p>
-        
-        <h3>What You Will Do</h3>
+
+        <h3>What Participation Involves</h3>
         <ul>
-          <li>View a series of images presented on your screen</li>
-          <li>Provide detailed written descriptions of each image (minimum 30 words)</li>
-          <li>Rate each image on a scale of 1-10 based on visual complexity</li>
-          <li>Complete a brief survey session before the main research</li>
+          <li>Review a series of images presented one at a time</li>
+          <li>Write a descriptive response for each image (at least 30 words)</li>
+          <li>Rate each image on a 1-10 scale based on perceived complexity</li>
+          <li>Complete a short survey set before starting the main image set</li>
         </ul>
-        
-        <h3>Time and Duration</h3>
+
+        <h3>Time Commitment</h3>
         <p>
-          The survey takes approximately 15-20 minutes to complete. You may take breaks between images as needed. 
-          You have the option to exit the survey at any point without penalty.
+          The session takes about 15-20 minutes. You may pause between images and you can stop at any time.
         </p>
-        
-        <h3>Data Privacy and Confidentiality</h3>
+
+        <h3>Privacy &amp; Data Use</h3>
         <ul>
-          <li>All responses are collected anonymously and stored securely</li>
-          <li>No personally identifiable information will be published or shared</li>
-          <li>Data will be used solely for academic research purposes</li>
-          <li>Aggregated results may be published in research papers or presented at conferences</li>
+          <li>Responses are stored without directly identifying information</li>
+          <li>Data is used only for academic research and analysis</li>
+          <li>Results may be summarized in publications or presentations</li>
+          <li>Your data is stored securely and handled with care</li>
         </ul>
-        
-        <h3>Your Rights</h3>
+
+        <h3>Voluntary Participation</h3>
         <p>
-          Participation in this survey is entirely voluntary. You have the right to:
+          Taking part is completely optional. You can decline or exit at any time without penalty.
         </p>
-        <ul>
-          <li>Decline to participate without any consequences</li>
-          <li>Withdraw from the survey at any time without penalty</li>
-        </ul>
-        
-        <h3>Contact Information</h3>
+
+        <h3>Questions or Concerns</h3>
         <p>
-          If you have any questions about this survey, please contact the research team at 
+          For questions about the study, contact the research team at
           <strong> research@cognit.org</strong>.
         </p>
-        
-        <h3>Consent Statement</h3>
+
+        <h3>Consent Acknowledgement</h3>
         <p>
-          By checking the consent box below and clicking "Start Survey", you confirm that:
+          By checking the consent box below and clicking "Continue", you confirm that:
         </p>
         <ul>
-          <li>You are at least 18 years of age</li>
-          <li>You have read and understood this consent form</li>
-          <li>You agree to participate in this research survey voluntarily</li>
-          <li>You understand that your responses will be collected</li>
+          <li>You are at least 18 years old</li>
+          <li>You have read and understood the information above</li>
+          <li>You agree to participate voluntarily</li>
+          <li>You understand your responses will be recorded for research use</li>
         </ul>
       </div>
       
@@ -128,18 +129,11 @@ export default function ConsentPage({
       
       <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
         <button
-          className="ghost"
-          onClick={onBack}
-          disabled={submitting}
-        >
-          Back
-        </button>
-        <button
           className="primary"
           onClick={handleSubmit}
-          disabled={!systemReady || submitting}
+          disabled={!systemReady || submitting || !consentChecked}
         >
-          {submitting ? "Processing..." : "I Agree - Continue"}
+          {submitting ? "Processing..." : "Continue"}
         </button>
       </div>
     </div>
