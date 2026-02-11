@@ -2,42 +2,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Settings Tab Component
-function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
+function SettingsTab({ sessionToken, Data = [], onDataDeleted, onToast }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   
-  const handleDeleteCSV = async () => {
-    setIsDeleting(true);
-    setDeleteError(null);
-    setDeleteSuccess(false);
-    
-    try {
-      const response = await fetch(`${API_BASE}/admin/settings/csv-delete`, {
-        method: 'DELETE',
-        headers: { 'X-SESSION-TOKEN': sessionToken }
-      });
-      
-      const data = await response.json();
-      
-      if (response.ok) {
-        setDeleteSuccess(true);
-        setShowConfirmDelete(false);
-        onDataDeleted();
-        onToast("All CSV data has been deleted successfully", "success");
-      } else {
-        setDeleteError(data.error || "Failed to delete CSV data");
-        onToast(data.error || "Failed to delete CSV data", "error");
-      }
-    } catch (err) {
-      setDeleteError("Network error. Please try again.");
-      onToast("Network error. Please try again.", "error");
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
   return (
     <div className="settings">
       <h2>Settings</h2>
@@ -60,75 +30,24 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
           }}>
             <h4 style={{ marginTop: 0, color: 'var(--primary)' }}>Current Data</h4>
             <p style={{ fontSize: '24px', fontWeight: '700', color: 'var(--text)', margin: '8px 0' }}>
-              {csvData.length} submissions
+              {Data.length} submissions
             </p>
             <p style={{ color: 'var(--muted)', fontSize: '14px' }}>
               Total records in the database
             </p>
           </div>
         </div>
-
-        {/* Delete Data Section */}
-        <div className="danger-zone">
-          <h4 style={{ marginTop: 0, color: '#c9444a' }}>⚠️ Danger Zone</h4>
-          <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>
-            Deleting data is permanent and cannot be undone. All submissions will be removed from the CSV file.
-          </p>
-          
-          {!showConfirmDelete ? (
-            <button 
-              className="danger-button"
-              onClick={() => setShowConfirmDelete(true)}
-              disabled={csvData.length === 0}
-            >
-              Delete All CSV Data
-            </button>
-          ) : (
-            <div className="reset-confirm">
-              <p style={{ marginTop: 0, fontWeight: '600', color: '#c9444a' }}>
-                Are you sure? This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button 
-                  className="danger-button"
-                  onClick={handleDeleteCSV}
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? "Deleting..." : "Yes, Delete All Data"}
-                </button>
-                <button 
-                  className="ghost"
-                  onClick={() => setShowConfirmDelete(false)}
-                  disabled={isDeleting}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          
-          {deleteError && (
-            <p style={{ color: '#c9444a', marginTop: '12px' }}>{deleteError}</p>
-          )}
-        </div>
       </div>
-      
+
       {/* System Information Section */}
       <div className="settings-section">
         <h3>System Information</h3>
         <div className="system-info">
           <p><strong>API Version:</strong> 2.0.0</p>
-          <p><strong>Database:</strong> SQLite + CSV</p>
+          <p><strong>Database:</strong> SQLite </p>
           <p><strong>Status:</strong> <span className="status-online">Online</span></p>
         </div>
       </div>
-      
-      {deleteSuccess && (
-        <div className="toast success" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 1000 }}>
-          <span>All CSV data has been deleted successfully</span>
-          <button onClick={() => setDeleteSuccess(false)} aria-label="Dismiss">×</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -170,8 +89,8 @@ export default function AdminPanel() {
     const saved = sessionStorage.getItem("adminStats");
     return saved ? JSON.parse(saved) : null;
   });
-  const [csvData, setCsvData] = useState(() => {
-    const saved = sessionStorage.getItem("adminCsvData");
+  const [Data, setData] = useState(() => {
+    const saved = sessionStorage.getItem("adminData");
     return saved ? JSON.parse(saved) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -219,7 +138,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (isAuthenticated && sessionToken && !dataLoaded) {
       fetchStats();
-      fetchCsvData();
+      fetchData();
       setDataLoaded(true);
     }
   }, [isAuthenticated, sessionToken, dataLoaded]);
@@ -227,11 +146,11 @@ export default function AdminPanel() {
   // Fetch data when switching to data analysis tab
   useEffect(() => {
     if (isAuthenticated && sessionToken && activeTab === "data") {
-      fetchCsvData();
+      fetchData();
     }
   }, [activeTab, isAuthenticated, sessionToken]);
 
-  // Persist stats, csvData and activeTab
+  // Persist stats, Data and activeTab
   useEffect(() => {
     if (stats) {
       sessionStorage.setItem("adminStats", JSON.stringify(stats));
@@ -239,9 +158,9 @@ export default function AdminPanel() {
   }, [stats]);
 
   useEffect(() => {
-    // Always save csvData to sessionStorage, even if empty
-    sessionStorage.setItem("adminCsvData", JSON.stringify(csvData));
-  }, [csvData]);
+    // Always save Data to sessionStorage, even if empty
+    sessionStorage.setItem("adminData", JSON.stringify(Data));
+  }, [Data]);
 
   useEffect(() => {
     sessionStorage.setItem("adminActiveTab", activeTab);
@@ -286,10 +205,10 @@ export default function AdminPanel() {
     }
   };
   
-  const fetchCsvData = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/admin/csv-data`, {
+      const response = await fetch(`${API_BASE}/admin/data`, {
         headers: { 'X-SESSION-TOKEN': sessionToken }
       });
       if (!response.ok) {
@@ -297,13 +216,13 @@ export default function AdminPanel() {
           handleLogout();
           throw new Error("Session expired. Please login again.");
         }
-        throw new Error("Failed to fetch CSV data");
+        throw new Error("Failed to fetch data");
       }
       const data = await response.json();
-      setCsvData(Array.isArray(data) ? data : []);
+      setData(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
-      setCsvData([]);
+      setData([]);
     } finally {
       setLoading(false);
     }
@@ -365,7 +284,7 @@ export default function AdminPanel() {
     sessionStorage.removeItem("adminSessionToken");
     sessionStorage.removeItem("adminUser");
     sessionStorage.removeItem("adminStats");
-    sessionStorage.removeItem("adminCsvData");
+    sessionStorage.removeItem("adminData");
     sessionStorage.removeItem("adminActiveTab");
 
     // Clear all state
@@ -373,38 +292,16 @@ export default function AdminPanel() {
     setSessionToken("");
     setUser(null);
     setStats(null);
-    setCsvData([]);
+    setData([]);
     setError(null);
     setLoading(false);
     setDataLoaded(false);
     navigate("/admin");
   };
-  
-  const downloadCsv = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/admin/download`, {
-        headers: { 'X-SESSION-TOKEN': sessionToken }
-      });
-      if (!response.ok) {
-        throw new Error("Failed to download CSV");
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "submissions.csv";
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err) {
-      addToast(err.message, "error");
-    }
-  };
 
   // Filter and sort data
   const processedData = useCallback(() => {
-    let data = [...csvData];
+    let data = [...Data];
     
     // Search filter
     if (searchTerm) {
@@ -438,7 +335,7 @@ export default function AdminPanel() {
     });
     
     return data;
-  }, [csvData, searchTerm, sortField, sortDirection]);
+  }, [Data, searchTerm, sortField, sortDirection]);
   
   const filteredData = processedData();
   
@@ -452,9 +349,9 @@ export default function AdminPanel() {
   
   // Get column headers for table (excluding certain fields)
   const getTableHeaders = () => {
-    if (csvData.length === 0) return [];
+    if (Data.length === 0) return [];
     const excludedFields = ['username', 'gender', 'place', 'native_language', 'rating', 'is_survey', 'is_attention', 'attention_passed'];
-    return Object.keys(csvData[0]).filter(key => !excludedFields.includes(key));
+    return Object.keys(Data[0]).filter(key => !excludedFields.includes(key));
   };
   
   // Render login form
@@ -528,12 +425,6 @@ export default function AdminPanel() {
 
       <div className="admin-tabs">
         <button
-          className={activeTab === "dashboard" ? "active" : ""}
-          onClick={() => setActiveTab("dashboard")}
-        >
-          Dashboard
-        </button>
-        <button
           className={activeTab === "data" ? "active" : ""}
           onClick={() => setActiveTab("data")}
         >
@@ -548,59 +439,6 @@ export default function AdminPanel() {
       </div>
 
       <div className="admin-content">
-        {activeTab === "dashboard" && (
-          <div className="dashboard">
-            <div className="quick-actions">
-              <h2>Statistics Overview</h2>
-              <div className="action-buttons">
-                <button className="primary" onClick={downloadCsv}>Download CSV</button>
-                <button className="ghost refresh-btn" onClick={fetchStats} title="Refresh Stats">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="23 4 23 10 17 10"></polyline>
-                    <polyline points="1 20 1 14 7 14"></polyline>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                  </svg>
-                </button>
-              </div>
-            </div>
-            {loading ? (
-              <div className="loading">Loading statistics...</div>
-            ) : stats ? (
-              <div className="stats-grid">
-                <div className="stat-card">
-                  <h3>Total Submissions</h3>
-                  <div className="stat-value">{stats.total_submissions}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Average Word Count</h3>
-                  <div className="stat-value">{stats.avg_word_count.toFixed(1)}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Attention Fail Rate</h3>
-                  <div className="stat-value">{(stats.attention_fail_rate * 100).toFixed(1)}%</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Completion Rate</h3>
-                  <div className="stat-value">
-                    {stats.total_submissions > 0 ? 
-                      (((stats.total_submissions - (stats.attention_fail_rate * stats.total_submissions)) / stats.total_submissions) * 100).toFixed(1) + "%" 
-                      : "N/A"}
-                  </div>
-                </div>
-                <div className="stat-card">
-                  <h3>Unique Participants</h3>
-                  <div className="stat-value">{csvData.length > 0 ? new Set(csvData.map(row => row.participant_id)).size : 0}</div>
-                </div>
-                <div className="stat-card">
-                  <h3>Unique Sessions</h3>
-                  <div className="stat-value">{csvData.length > 0 ? new Set(csvData.map(row => row.session_id)).size : 0}</div>
-                </div>
-              </div>
-            ) : (
-              <div className="error-message">No statistics available</div>
-            )}
-          </div>
-        )}
 
         {activeTab === "data" && (
           <div className="data-analysis">
@@ -630,9 +468,6 @@ export default function AdminPanel() {
                   </button>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="primary" onClick={downloadCsv}>Export CSV</button>
-              </div>
             </div>
             
             <div className="sort-controls">
@@ -653,7 +488,7 @@ export default function AdminPanel() {
 
             {loading ? (
               <div className="loading">Loading data...</div>
-            ) : csvData.length === 0 ? (
+            ) : Data.length === 0 ? (
               <div className="no-data-message">
                 <p>No data available yet. Start collecting submissions to see data here.</p>
                 <p className="hint">Use the participant interface to submit responses.</p>
@@ -733,11 +568,11 @@ export default function AdminPanel() {
         {activeTab === "settings" && (
           <SettingsTab 
             sessionToken={sessionToken} 
-            csvData={csvData}
+            Data={Data}
             onDataDeleted={() => {
-              setCsvData([]);
+              setData([]);
               fetchStats().then(() => {
-                fetchCsvData();
+                fetchData();
               });
             }}
             onToast={addToast}

@@ -1,4 +1,3 @@
-import csv
 import hashlib
 import os
 import random
@@ -18,44 +17,11 @@ import time
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
-CSV_PATH = DATA_DIR / "submissions.csv"
 DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
-
-CSV_HEADERS = [
-    "timestamp",
-    "participant_id",
-    "session_id",
-    "image_id",
-    "image_url",
-    "description",
-    "word_count",
-    "rating",
-    "feedback",
-    "time_spent_seconds",
-    "is_survey",
-    "is_attention",
-    "attention_passed",
-    "too_fast_flag",
-    "user_agent",
-    "ip_hash",
-    "username",
-    "gender",
-    "age",
-    "place",
-    "native_language",
-    "prior_experience",
-]
-
-# Email configuration (for development, using console output)
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@cognit-research.org")
 
 app = Flask(__name__)
 
@@ -90,14 +56,6 @@ def add_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
 
-def ensure_csv():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if not CSV_PATH.exists():
-        with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(CSV_HEADERS)
-
-
 def init_db():
     """Initialize the SQLite database"""
     conn = sqlite3.connect(DB_PATH)
@@ -110,8 +68,6 @@ def init_db():
             username TEXT UNIQUE NOT NULL,
             password_hash TEXT NOT NULL,
             email TEXT UNIQUE,
-            email_verified BOOLEAN DEFAULT 1,
-            api_key TEXT UNIQUE,
             role TEXT DEFAULT 'admin',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
@@ -191,8 +147,8 @@ def _create_default_admin_user(cursor):
     
     cursor.execute(
         """INSERT INTO admin_users 
-           (username, password_hash, email, email_verified, is_active) 
-           VALUES (?, ?, ?, 1, 1)""",
+           (username, password_hash, email, is_active) 
+           VALUES (?, ?, ?, 1)""",
         ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
     
@@ -436,52 +392,6 @@ def validate_session(session_token):
     finally:
         conn.close()
 
-
-@app.route("/api/health")
-def health_check():
-    """Health check endpoint to verify all system connectivity"""
-    status = {
-        "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "services": {}
-    }
-    
-    # Check database connectivity
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        conn.close()
-        status["services"]["database"] = "connected"
-    except Exception as e:
-        status["services"]["database"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    # Check CSV/data directory
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        test_file = DATA_DIR / ".health_check"
-        test_file.write_text("test")
-        test_file.unlink()
-        status["services"]["data_storage"] = "accessible"
-    except Exception as e:
-        status["services"]["data_storage"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    # Check images directory
-    try:
-        if IMAGES_DIR.exists():
-            status["services"]["images"] = "accessible"
-        else:
-            status["services"]["images"] = "not found"
-            status["status"] = "degraded"
-    except Exception as e:
-        status["services"]["images"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    return jsonify(status)
-
-
 @app.route("/api/images/random")
 def random_image():
     requested_type = request.args.get("type", "normal")
@@ -504,7 +414,6 @@ def serve_image(image_id):
 
 @app.route("/api/submit", methods=["POST"])
 def submit():
-    ensure_csv()
     payload = request.get_json(silent=True) or {}
     description = (payload.get("description") or "").strip()
     image_id = payload.get("image_id")
@@ -575,10 +484,6 @@ def submit():
         "prior_experience": payload.get("prior_experience", ""),
     }
 
-    with CSV_PATH.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
-        writer.writerow(row)
-
     return jsonify({"status": "ok", "word_count": word_count, "attention_passed": attention_passed})
 
 
@@ -588,24 +493,10 @@ def stats():
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
 
-    ensure_csv()
     total = 0
     total_words = 0
     attention_total = 0
     attention_failed = 0
-
-    with CSV_PATH.open("r", newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            total += 1
-            try:
-                total_words += int(row.get("word_count") or 0)
-            except ValueError:
-                pass
-            if row.get("is_attention") in {"True", "true", True}:
-                attention_total += 1
-                if row.get("attention_passed") in {"False", "false", "", None}:
-                    attention_failed += 1
 
     avg_word_count = (total_words / total) if total else 0
     attention_fail_rate = (attention_failed / attention_total) if attention_total else 0
@@ -617,17 +508,6 @@ def stats():
             "attention_fail_rate": attention_fail_rate,
         }
     )
-
-
-@app.route("/admin/download")
-def download_csv():
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    ensure_csv()
-    return send_from_directory(DATA_DIR, CSV_PATH.name, as_attachment=True)
-
 
 @app.route("/api/docs")
 @limiter.limit("30 per minute")
@@ -793,36 +673,6 @@ def api_docs():
                         }
                     },
                     {
-                        "path": "/admin/download",
-                        "method": "GET",
-                        "description": "Download CSV file with all submissions",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "CSV file attachment"
-                    },
-                    {
-                        "path": "/admin/csv-data",
-                        "method": "GET",
-                        "description": "Get CSV data as JSON for admin panel",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "array of submission objects"
-                    },
-                    {
-                        "path": "/admin/settings/csv-delete",
-                        "method": "DELETE",
-                        "description": "Delete all data from CSV file",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "status": "string",
-                            "message": "string"
-                        }
-                    },
-                    {
                         "path": "/admin/security/audit",
                         "method": "GET",
                         "description": "Run security audit",
@@ -883,95 +733,16 @@ def api_docs():
             "api_docs": "30 requests per minute",
             "admin_login": "10 requests per minute",
             "admin_change_password": "5 requests per minute",
-            "admin_csv_data": "10 requests per minute",
-            "admin_csv_delete": "5 requests per minute",
             "security_audit": "5 requests per minute"
         },
         "security": {
             "cors": "Cross-Origin Resource Sharing is restricted to specific origins",
             "headers": "Security headers are applied to all responses",
             "ip_hashing": "IP addresses are hashed with SHA-256 and salt for privacy",
-            "data_storage": "Data is stored in CSV format with restricted access"
+            "data_storage": "Data is stored format with restricted access"
         },
-        "changelog": [
-            {
-                "version": "2.1.0",
-                "date": "2024",
-                "changes": [
-                    "Expanded image catalog",
-                    "Refreshed API documentation to reflect all routes",
-                    "Aligned admin schema with email verification flag"
-                ]
-            },
-            {
-                "version": "2.0.0",
-                "date": "2024",
-                "changes": [
-                    "Added SQLite database for admin user management",
-                    "Enhanced admin authentication system",
-                    "Added comprehensive API documentation",
-                    "Improved admin dashboard with charts and filters",
-                    "Fixed data explorer search functionality",
-                    "Added demographic data collection",
-                    "Removed NASA-TLX workload assessment",
-                    "Added gender, age, and place fields to demographics"
-                ]
-            },
-            {
-                "version": "1.0.0",
-                "date": "2023",
-                "changes": [
-                    "Initial release of C.O.G.N.I.T. platform",
-                    "Basic participant workflow",
-                    "Admin panel with statistics",
-                    "CSV data export functionality"
-                ]
-            }
         ]
     })
-
-
-@app.route("/admin/csv-data")
-@limiter.limit("10 per minute")
-def get_csv_data():
-    """Get CSV data as JSON for admin panel"""
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    ensure_csv()
-    
-    try:
-        with CSV_PATH.open("r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            data = [row for row in reader]
-        
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 500
-
-
-@app.route("/admin/settings/csv-delete", methods=["DELETE"])
-@limiter.limit("5 per minute")
-def delete_csv_data():
-    """Delete all data from CSV file (admin only)"""
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        # Re-create the CSV file with just the headers
-        with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(CSV_HEADERS)
-        
-        return jsonify({
-            "status": "success",
-            "message": "All CSV data has been deleted successfully"
-        })
-    except Exception as e:
-        return jsonify({"error": f"Failed to delete CSV data: {str(e)}"}), 500
-
 
 @app.route("/api/security/info")
 def security_info():
@@ -994,7 +765,7 @@ def security_info():
             "data_protection": {
                 "ip_hashing": "SHA-256 with salt",
                 "anonymous_data": True,
-                "storage": "CSV with restricted access"
+                "storage": "restricted access"
             }
         }
     })
@@ -1048,9 +819,9 @@ def admin_login():
     cursor = conn.cursor()
     
     try:
-        # Check if user exists and is verified
+        # Check if user exists
         cursor.execute(
-            "SELECT id, password_hash, email_verified, role, is_active FROM admin_users WHERE username = ?",
+            "SELECT id, password_hash, role, is_active FROM admin_users WHERE username = ?",
             (username,)
         )
         user = cursor.fetchone()
@@ -1058,7 +829,7 @@ def admin_login():
         if not user:
             return jsonify({"error": "Invalid credentials"}), 401
         
-        user_id, stored_password_hash, email_verified, role, is_active = user
+        user_id, stored_password_hash, role, is_active = user
         
         if not is_active:
             return jsonify({"error": "Account is deactivated"}), 401
@@ -1155,77 +926,7 @@ def admin_me():
     
     return jsonify({"error": "Unauthorized"}), 401
 
-
-@app.route("/api/admin/change-password", methods=["POST"])
-@limiter.limit("5 per minute")
-def change_password():
-    """Change admin user password"""
-    session_token = request.headers.get("X-SESSION-TOKEN")
-    
-    if not session_token:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    user = validate_session(session_token)
-    if not user:
-        return jsonify({"error": "Invalid or expired session"}), 401
-    
-    data = request.get_json(silent=True) or {}
-    current_password = data.get("current_password", "").strip()
-    new_password = data.get("new_password", "").strip()
-    
-    if not current_password or not new_password:
-        return jsonify({"error": "Current password and new password are required"}), 400
-    
-    if len(new_password) < 6:
-        return jsonify({"error": "New password must be at least 6 characters long"}), 400
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        # Get current password hash
-        cursor.execute(
-            "SELECT password_hash FROM admin_users WHERE id = ?",
-            (user["id"],)
-        )
-        result = cursor.fetchone()
-        
-        if not result:
-            return jsonify({"error": "User not found"}), 404
-        
-        stored_hash = result[0]
-        
-        # Verify current password
-        if hash_password(current_password) != stored_hash:
-            return jsonify({"error": "Current password is incorrect"}), 401
-        
-        # Update password
-        new_hash = hash_password(new_password)
-        cursor.execute(
-            "UPDATE admin_users SET password_hash = ? WHERE id = ?",
-            (new_hash, user["id"])
-        )
-        
-        # Log password change
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (user["id"], 'password_change', 'Password changed successfully', ip_address)
-        )
-        
-        conn.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Password changed successfully"
-        })
-        
-    finally:
-        conn.close()
-
-
 if __name__ == "__main__":
-    ensure_csv()
     init_db()
     print("Starting C.O.G.N.I.T. backend server...")
     print("API Documentation available at: http://localhost:5000/api/docs")
