@@ -5,11 +5,59 @@ Tests all pages, database integration, API integration and routes
 """
 
 import unittest
-import requests
 import json
 import sqlite3
 import os
 from pathlib import Path
+import urllib.request
+import urllib.error
+import socket
+from urllib.parse import urlparse
+
+
+class SimpleResponse:
+    def __init__(self, status_code, headers, body):
+        self.status_code = status_code
+        self.headers = headers
+        self._body = body
+
+    def json(self):
+        body_text = self._body.decode("utf-8") if self._body else ""
+        return json.loads(body_text or "{}")
+
+
+def server_available(url):
+    parsed = urlparse(url)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except OSError:
+        return False
+
+
+def send_request(method, url, payload=None):
+    data = None
+    headers = {}
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+    request = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(request) as response:
+            return SimpleResponse(response.status, response.headers, response.read())
+    except urllib.error.HTTPError as error:
+        return SimpleResponse(error.code, error.headers, error.read())
+
+
+def get(url):
+    return send_request("GET", url)
+
+
+def post(url, json=None, json_payload=None):
+    payload = json if json is not None else json_payload
+    return send_request("POST", url, payload=payload)
 
 BASE_DIR = Path(__file__).resolve().parent
 BACKEND_DIR = BASE_DIR / "backend"
@@ -24,13 +72,15 @@ class TestBackendAPI(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if not server_available(BASE_URL):
+            raise unittest.SkipTest("Backend server not running")
         import time
         cls.test_participant_id = f"test-participant-{int(time.time())}"
         cls.test_session_id = f"test-session-{int(time.time())}"
 
     def test_health_endpoint(self):
         """Test health check endpoint"""
-        response = requests.get(f"{BASE_URL}/api/health")
+        response = get(f"{BASE_URL}/api/health")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "healthy")
@@ -41,7 +91,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_api_docs_endpoint(self):
         """Test API documentation endpoint"""
-        response = requests.get(f"{BASE_URL}/api/docs")
+        response = get(f"{BASE_URL}/api/docs")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("endpoints", data)
@@ -49,7 +99,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_security_info_endpoint(self):
         """Test security info endpoint"""
-        response = requests.get(f"{BASE_URL}/api/security/info")
+        response = get(f"{BASE_URL}/api/security/info")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("security", data)
@@ -67,7 +117,7 @@ class TestBackendAPI(unittest.TestCase):
             "native_language": "English",
             "prior_experience": "Photography"
         }
-        response = requests.post(f"{BASE_URL}/api/participants", json=payload)
+        response = post(f"{BASE_URL}/api/participants", json=payload)
         self.assertEqual(response.status_code, 201)
         data = response.json()
         self.assertEqual(data["status"], "success")
@@ -75,7 +125,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_get_participant(self):
         """Test getting participant details"""
-        response = requests.get(f"{BASE_URL}/api/participants/{self.test_participant_id}")
+        response = get(f"{BASE_URL}/api/participants/{self.test_participant_id}")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["participant_id"], self.test_participant_id)
@@ -87,14 +137,14 @@ class TestBackendAPI(unittest.TestCase):
             "participant_id": self.test_participant_id,
             "consent_given": True
         }
-        response = requests.post(f"{BASE_URL}/api/consent", json=payload)
+        response = post(f"{BASE_URL}/api/consent", json=payload)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "success")
 
     def test_get_consent(self):
         """Test getting consent status"""
-        response = requests.get(f"{BASE_URL}/api/consent/{self.test_participant_id}")
+        response = get(f"{BASE_URL}/api/consent/{self.test_participant_id}")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["participant_id"], self.test_participant_id)
@@ -102,7 +152,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_random_image_normal(self):
         """Test random normal image endpoint"""
-        response = requests.get(f"{BASE_URL}/api/images/random?type=normal")
+        response = get(f"{BASE_URL}/api/images/random?type=normal")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("image_id", data)
@@ -112,7 +162,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_random_image_survey(self):
         """Test random survey image endpoint"""
-        response = requests.get(f"{BASE_URL}/api/images/random?type=survey")
+        response = get(f"{BASE_URL}/api/images/random?type=survey")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("image_id", data)
@@ -121,7 +171,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_random_image_attention(self):
         """Test random attention image endpoint"""
-        response = requests.get(f"{BASE_URL}/api/images/random?type=attention")
+        response = get(f"{BASE_URL}/api/images/random?type=attention")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn("image_id", data)
@@ -130,7 +180,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_serve_image(self):
         """Test image serving"""
-        response = requests.get(f"{BASE_URL}/api/images/normal/aurora-lake.svg")
+        response = get(f"{BASE_URL}/api/images/normal/aurora-lake.svg")
         self.assertEqual(response.status_code, 200)
         self.assertIn("image/svg+xml", response.headers["Content-Type"])
 
@@ -148,7 +198,7 @@ class TestBackendAPI(unittest.TestCase):
             "is_survey": False,
             "is_attention": False
         }
-        response = requests.post(f"{BASE_URL}/api/submit", json=payload)
+        response = post(f"{BASE_URL}/api/submit", json=payload)
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["status"], "ok")
@@ -156,7 +206,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_get_submissions(self):
         """Test getting participant submissions"""
-        response = requests.get(f"{BASE_URL}/api/submissions/{self.test_participant_id}")
+        response = get(f"{BASE_URL}/api/submissions/{self.test_participant_id}")
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIsInstance(data, list)
@@ -247,22 +297,27 @@ class TestDatabaseIntegration(unittest.TestCase):
 class TestFrontendRoutes(unittest.TestCase):
     """Test frontend routes"""
 
+    @classmethod
+    def setUpClass(cls):
+        if not server_available(FRONTEND_URL):
+            raise unittest.SkipTest("Frontend server not running")
+
     def test_main_page(self):
         """Test main page loads"""
-        response = requests.get(FRONTEND_URL)
+        response = get(FRONTEND_URL)
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["Content-Type"])
 
     def test_api_docs_page(self):
         """Test API docs page loads (returns JSON from backend via proxy)"""
-        response = requests.get(f"{FRONTEND_URL}/api/docs")
+        response = get(f"{FRONTEND_URL}/api/docs")
         self.assertEqual(response.status_code, 200)
         # Via proxy, this returns JSON from the backend
         self.assertIn("application/json", response.headers["Content-Type"])
 
     def test_404_page(self):
         """Test 404 page (SPA fallback)"""
-        response = requests.get(f"{FRONTEND_URL}/nonexistent")
+        response = get(f"{FRONTEND_URL}/nonexistent")
         self.assertEqual(response.status_code, 200)
         self.assertIn("text/html", response.headers["Content-Type"])
 
@@ -294,6 +349,8 @@ class TestValidationFeatures(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        if not server_available(BASE_URL):
+            raise unittest.SkipTest("Backend server not running")
         cls.participant_id = "validation-test-user"
         cls.session_id = "validation-test-session"
         
@@ -308,8 +365,8 @@ class TestValidationFeatures(unittest.TestCase):
             "native_language": "English",
             "prior_experience": "None"
         }
-        requests.post(f"{BASE_URL}/api/participants", json=payload)
-        requests.post(f"{BASE_URL}/api/consent", json={
+        post(f"{BASE_URL}/api/participants", json=payload)
+        post(f"{BASE_URL}/api/consent", json={
             "participant_id": cls.participant_id,
             "consent_given": True
         })
@@ -325,7 +382,7 @@ class TestValidationFeatures(unittest.TestCase):
             "feedback": "Test",
             "time_spent_seconds": 10
         }
-        response = requests.post(f"{BASE_URL}/api/submit", json=payload)
+        response = post(f"{BASE_URL}/api/submit", json=payload)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertIn("error", data)
@@ -341,7 +398,7 @@ class TestValidationFeatures(unittest.TestCase):
             "feedback": "Test feedback",
             "time_spent_seconds": 10
         }
-        response = requests.post(f"{BASE_URL}/api/submit", json=payload)
+        response = post(f"{BASE_URL}/api/submit", json=payload)
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertIn("error", data)
@@ -360,7 +417,7 @@ class TestValidationFeatures(unittest.TestCase):
             "native_language": "English",
             "prior_experience": "None"
         }
-        requests.post(f"{BASE_URL}/api/participants", json=payload)
+        post(f"{BASE_URL}/api/participants", json=payload)
         
         # Try to submit without consent
         submit_payload = {
@@ -372,7 +429,7 @@ class TestValidationFeatures(unittest.TestCase):
             "feedback": "Test feedback",
             "time_spent_seconds": 10
         }
-        response = requests.post(f"{BASE_URL}/api/submit", json=submit_payload)
+        response = post(f"{BASE_URL}/api/submit", json=submit_payload)
         self.assertEqual(response.status_code, 403)
 
 
