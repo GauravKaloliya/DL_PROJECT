@@ -265,8 +265,21 @@ def create_participant():
             request.headers.get('User-Agent', '')
         ))
         
+        cursor.execute('''
+            SELECT consent_given, consent_timestamp
+            FROM consent_records
+            WHERE participant_id = ? AND consent_given = 1
+        ''', (data['participant_id'],))
+        consent_row = cursor.fetchone()
+        if consent_row:
+            cursor.execute('''
+                UPDATE participants
+                SET consent_given = 1, consent_timestamp = ?
+                WHERE participant_id = ?
+            ''', (consent_row[1], data['participant_id']))
+
         conn.commit()
-        
+
         return jsonify({
             "status": "success",
             "participant_id": data['participant_id'],
@@ -331,21 +344,18 @@ def record_consent():
     conn = get_db()
     cursor = conn.cursor()
     
-    # Check if participant exists
     cursor.execute("SELECT id FROM participants WHERE participant_id = ?", (participant_id,))
-    if not cursor.fetchone():
-        return jsonify({"error": "Participant not found"}), 404
-    
+    participant_row = cursor.fetchone()
+
     timestamp = datetime.now(timezone.utc).isoformat()
-    
-    # Update participant consent status
-    cursor.execute('''
-        UPDATE participants 
-        SET consent_given = 1, consent_timestamp = ?
-        WHERE participant_id = ?
-    ''', (timestamp, participant_id))
-    
-    # Insert or update consent record
+
+    if participant_row:
+        cursor.execute('''
+            UPDATE participants 
+            SET consent_given = 1, consent_timestamp = ?
+            WHERE participant_id = ?
+        ''', (timestamp, participant_id))
+
     cursor.execute('''
         INSERT INTO consent_records (participant_id, consent_given, consent_timestamp, ip_hash, user_agent)
         VALUES (?, 1, ?, ?, ?)
@@ -355,9 +365,9 @@ def record_consent():
         ip_hash = excluded.ip_hash,
         user_agent = excluded.user_agent
     ''', (participant_id, timestamp, get_ip_hash(), request.headers.get('User-Agent', '')))
-    
+
     conn.commit()
-    
+
     return jsonify({
         "status": "success",
         "message": "Consent recorded successfully",

@@ -100,6 +100,7 @@ export default function App() {
   const [stage, setStage] = useState(getStoredValue("stage", "consent"));
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
   const [sessionId] = useState(() => getStoredValue("sessionId", createId()));
+  const [consentGiven, setConsentGiven] = useState(() => getStoredValue("consentGiven", false));
   
   // Demographics state
   const [demographics, setDemographics] = useState(
@@ -130,6 +131,7 @@ export default function App() {
   // Persist state
   useEffect(() => { saveStoredValue("participantId", participantId); }, [participantId]);
   useEffect(() => { saveStoredValue("sessionId", sessionId); }, [sessionId]);
+  useEffect(() => { saveStoredValue("consentGiven", consentGiven); }, [consentGiven]);
   useEffect(() => { saveStoredValue("demographics", demographics); }, [demographics]);
   useEffect(() => { saveStoredValue("stage", stage); }, [stage]);
   useEffect(() => { saveStoredValue("trial", trial); }, [trial]);
@@ -236,6 +238,9 @@ export default function App() {
   const handleUserDetailsSubmit = async () => {
     try {
       await createParticipant();
+      if (consentGiven) {
+        await recordConsent();
+      }
       setStage("payment");
       addToast("Details saved successfully", "success");
     } catch (err) {
@@ -246,7 +251,7 @@ export default function App() {
 
   // Handle consent given
   const handleConsentGiven = async () => {
-    await recordConsent();
+    setConsentGiven(true);
     setStage("user-details");
     addToast("Consent recorded successfully", "success");
   };
