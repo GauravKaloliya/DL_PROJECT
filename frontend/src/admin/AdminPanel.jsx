@@ -450,11 +450,10 @@ export default function AdminPanel() {
   
   const paginate = (pageNumber) => setCurrentPage(pageNumber);
   
-  // Get column headers for table (excluding certain fields)
+  // Get column headers for table
   const getTableHeaders = () => {
     if (csvData.length === 0) return [];
-    const excludedFields = ['username', 'gender', 'place', 'native_language', 'rating', 'is_survey', 'is_attention', 'attention_passed'];
-    return Object.keys(csvData[0]).filter(key => !excludedFields.includes(key));
+    return Object.keys(csvData[0]);
   };
   
   // Render login form
