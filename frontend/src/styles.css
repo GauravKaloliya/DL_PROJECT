@@ -619,6 +619,10 @@ body.dark .counts {
   margin-top: 24px;
 }
 
+.survey-button {
+  margin-top: 12px;
+}
+
 .hint {
   font-size: 13px;
   color: var(--muted);

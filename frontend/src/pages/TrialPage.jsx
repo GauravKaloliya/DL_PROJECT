@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { API_BASE } from "../utils/apiBase";
 
-const MIN_WORDS = 30;
+const MIN_WORDS = 60;
 
 const attentionInstruction = {
   "attention/attention-red.svg": {
@@ -62,6 +62,9 @@ export default function TrialPage({
 
   useEffect(() => {
     setElapsed(0);
+    setImageLoaded(false);
+    setImageError(false);
+    setIsZoomed(false);
     trialStartTime.current = Date.now();
     const interval = setInterval(() => {
       setElapsed((prev) => prev + 1);
@@ -148,7 +151,7 @@ export default function TrialPage({
           </div>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
             <button
-              className="primary"
+              className="primary survey-button"
               onClick={onSurveyContinue}
               style={{ padding: '14px 32px', backgroundColor: 'var(--primary)', color: 'white', fontSize: '16px' }}
             >
@@ -195,6 +198,7 @@ export default function TrialPage({
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
         {!imageError ? (
           <img
+            key={imageSrc}
             src={imageSrc}
             alt="Prompt"
             onClick={() => setIsZoomed(!isZoomed)}

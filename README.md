@@ -1,19 +1,27 @@
-# Image Description Study (C.O.G.N.I.T.)
+# C.O.G.N.I.T. Image Description Study
 
-C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a full-stack research platform for running an image-description study. Participants describe visual scenes, rate them, and provide feedback.
+C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a full-stack research platform for running an image-description study. Participants review a sequence of images, write detailed descriptions, rate complexity, and provide feedback. The system includes survey and attention-check images to support research quality.
+
+## Highlights
+
+- Participant onboarding (details, consent, payment simulation)
+- Survey and main image trials with attention checks
+- Minimum 60-word descriptions with rating/feedback validation
+- Privacy-preserving IP hashing and audit logging
+- Interactive API documentation (`/api/docs`)
 
 ## Tech Stack
 
 - **Frontend:** React 18 + Vite 5 (SPA)
 - **Backend:** Python Flask 3 (REST API)
-- **Storage:** SQLite database for submissions and participant data
+- **Storage:** SQLite database for participants, consent, submissions, and audit logs
 
 ## Repository Structure
 
 - `frontend/`: React application
 - `backend/`: Flask API and SQLite database
 - `backend/images/`: Image library (`normal/`, `survey/`, `attention/`)
-- `backend/data/`: Data directory
+- `backend/data/`: Local data directory
 
 ## Getting Started
 
@@ -37,21 +45,16 @@ npm install
 npm run dev
 ```
 
-The frontend runs on `http://localhost:5173` and communicates with the backend API. Set `VITE_API_BASE` if the backend is hosted elsewhere.
+The frontend runs on `http://localhost:5173` and connects to the backend API. Set `VITE_API_BASE` if the backend is hosted elsewhere.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `MIN_WORD_COUNT` | `30` | Minimum words required in a description |
+| `MIN_WORD_COUNT` | `60` | Minimum words required in a description |
 | `TOO_FAST_SECONDS` | `5` | Flags submissions as too fast below this duration |
 | `IP_HASH_SALT` | `local-salt` | Salt for anonymizing IP addresses |
 | `SECRET_KEY` | auto-generated | Flask session secret |
-
-## API Documentation
-
-- **Backend JSON docs:** `GET /api/docs`
-- **Frontend viewer:** `/api/docs`
 
 ## Key Endpoints
 
@@ -77,11 +80,10 @@ Add or replace images in:
 - `backend/images/survey/`
 - `backend/images/attention/`
 
-The repository includes SVG scenes in `normal/` to expand the study catalog.
-
 ## Data Storage
 
-- **Participants, Submissions, Consent:** SQLite database at `backend/COGNIT.db`
+- **SQLite database:** `backend/COGNIT.db`
+- Stores participants, consent records, submissions, audit logs, and performance metrics.
 
 ## Security Highlights
 
