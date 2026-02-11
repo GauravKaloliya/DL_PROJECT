@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Settings Tab Component
-function SettingsTab({ sessionToken, csvData, onDataDeleted }) {
+function SettingsTab({ sessionToken, csvData = [], onDataDeleted }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
@@ -204,6 +204,7 @@ export default function AdminPanel() {
   const [sortDirection, setSortDirection] = useState("desc");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [dataLoaded, setDataLoaded] = useState(false);
   
   // Check for existing session on mount
   useEffect(() => {
@@ -221,11 +222,19 @@ export default function AdminPanel() {
   
   // Fetch data when authenticated
   useEffect(() => {
-    if (isAuthenticated && sessionToken) {
+    if (isAuthenticated && sessionToken && !dataLoaded) {
       fetchStats();
       fetchCsvData();
+      setDataLoaded(true);
     }
-  }, [isAuthenticated, sessionToken]);
+  }, [isAuthenticated, sessionToken, dataLoaded]);
+
+  // Fetch data when switching to data analysis tab
+  useEffect(() => {
+    if (isAuthenticated && sessionToken && activeTab === "data") {
+      fetchCsvData();
+    }
+  }, [activeTab, isAuthenticated, sessionToken]);
 
   // Persist stats, csvData and activeTab
   useEffect(() => {
@@ -297,9 +306,10 @@ export default function AdminPanel() {
         throw new Error("Failed to fetch CSV data");
       }
       const data = await response.json();
-      setCsvData(data);
+      setCsvData(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err.message);
+      setCsvData([]);
     } finally {
       setLoading(false);
     }
@@ -372,6 +382,7 @@ export default function AdminPanel() {
     setCsvData([]);
     setError(null);
     setLoading(false);
+    setDataLoaded(false);
     navigate("/admin");
   };
   
@@ -612,6 +623,18 @@ export default function AdminPanel() {
                     setCurrentPage(1);
                   }}
                 />
+                {searchTerm && (
+                  <button 
+                    className="clear-search"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setCurrentPage(1);
+                    }}
+                    aria-label="Clear search"
+                  >
+                    ×
+                  </button>
+                )}
               </div>
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button className="primary" onClick={downloadCsv}>Export CSV</button>
@@ -718,6 +741,7 @@ export default function AdminPanel() {
             sessionToken={sessionToken} 
             csvData={csvData}
             onDataDeleted={() => {
+              setCsvData([]);
               fetchStats();
               fetchCsvData();
             }}

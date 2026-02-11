@@ -1231,9 +1231,42 @@ body.dark .error-message {
   flex-wrap: wrap;
 }
 
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .search-box input {
   flex: 1;
   min-width: 300px;
+  padding-right: 40px;
+}
+
+.clear-search {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--muted);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.clear-search:hover {
+  background: var(--primary);
+  transform: translateY(-50%) scale(1.1);
 }
 
 .filters-section {
