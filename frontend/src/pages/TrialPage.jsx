@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
+import { API_BASE } from "../utils/apiBase";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "";
 const MIN_WORDS = 30;
 
 const attentionInstruction = {
