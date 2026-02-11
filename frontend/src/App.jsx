@@ -209,7 +209,8 @@ export default function App() {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || "Failed to create participant");
+      const errorMessage = data.error || "Failed to create participant";
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -228,7 +229,8 @@ export default function App() {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || "Failed to record consent");
+      const errorMessage = data.error || "Failed to record consent";
+      throw new Error(errorMessage);
     }
 
     return response.json();
@@ -244,8 +246,22 @@ export default function App() {
       setStage("payment");
       addToast("Details saved successfully", "success");
     } catch (err) {
-      addToast(err.message, "error");
-      throw err;
+      // If participant already exists (409), that's okay - just continue
+      if (err.message && err.message.includes("already exists")) {
+        if (consentGiven) {
+          try {
+            await recordConsent();
+          } catch (consentErr) {
+            // Consent might already be recorded too, ignore error
+            console.log("Consent already recorded or failed:", consentErr.message);
+          }
+        }
+        setStage("payment");
+        addToast("Details saved successfully", "success");
+      } else {
+        addToast(err.message, "error");
+        throw err;
+      }
     }
   };
 
@@ -259,8 +275,13 @@ export default function App() {
   // Handle payment completion
   const handlePaymentComplete = async () => {
     setStage("survey");
-    await fetchImage("survey");
-    addToast("Payment completed successfully", "success");
+    try {
+      await fetchImage("survey");
+      addToast("Payment completed successfully", "success");
+    } catch (err) {
+      addToast("Failed to load first survey image. Please try again.", "error");
+      // Stay on survey page but show error
+    }
   };
 
   // Fetch image
@@ -268,16 +289,19 @@ export default function App() {
     setFetchingImage(true);
     setReadyForNext(false);
     setSurveyFeedbackReady(false);
-    
+
     try {
       const response = await fetch(`${API_BASE}/api/images/random?type=${type}&session_id=${sessionId}`);
       if (!response.ok) {
-        throw new Error("Unable to fetch image");
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Unable to fetch image");
       }
       const data = await response.json();
       setTrial(data);
     } catch (error) {
       addToast(error.message || "Failed to load image", "error");
+      // Don't set trial to null, keep previous state or set to empty object
+      setTrial(null);
     } finally {
       setFetchingImage(false);
     }
@@ -344,17 +368,20 @@ export default function App() {
   // Handle next trial
   const handleNext = async () => {
     setReadyForNext(false);
-    
+
     if (stage === "survey") {
-      await fetchImage("survey");
+      // Transition from survey to main trials
+      addToast("Starting main trials...", "success");
+      await fetchImage(getNextType());
+      setStage("trial");
       return;
     }
-    
+
     if (mainCompleted >= 15) {
       setStage("finished");
       return;
     }
-    
+
     await fetchImage(getNextType());
   };
 

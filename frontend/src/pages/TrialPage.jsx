@@ -39,12 +39,26 @@ export default function TrialPage({
   const [elapsed, setElapsed] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
-  
+
   const trialStartTime = useRef(Date.now());
   const wordCount = description.trim() ? description.trim().split(/\s+/).length : 0;
   const charCount = description.length;
   const commentsValid = comments.trim().length >= 5;
   const currentInstruction = trial?.is_attention ? attentionInstruction[trial.image_id] : null;
+
+  const handleRetryImage = () => {
+    setImageError(false);
+    setImageLoaded(false);
+    // Force reload the image by adding a timestamp
+    const img = document.querySelector('.image-container img');
+    if (img && img.src) {
+      const originalSrc = img.src;
+      img.src = originalSrc.split('?')[0] + '?retry=' + Date.now();
+    } else {
+      // If img element not found, trigger a reload through parent
+      console.warn('Image element not found, cannot retry');
+    }
+  };
 
   useEffect(() => {
     setElapsed(0);
@@ -98,7 +112,7 @@ export default function TrialPage({
     return (
       <div className="panel">
         <div className="guidance" style={{ textAlign: 'center' }}>
-          <div style={{ 
+          <div style={{
             background: 'linear-gradient(135deg, var(--success), var(--primary))',
             width: '100px',
             height: '100px',
@@ -116,34 +130,41 @@ export default function TrialPage({
           <h2 style={{ color: 'var(--success)', marginBottom: '16px' }}>Survey Complete!</h2>
           <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>
             Great job on your survey trial! You can now choose to continue with more survey 
-            images or finish the session.
+            images or start the main study.
           </p>
-          <div style={{ 
-            backgroundColor: 'var(--accent-bg)', 
-            padding: '16px', 
+          <div style={{
+            backgroundColor: 'var(--accent-bg)',
+            padding: '16px',
             borderRadius: '12px',
             marginBottom: '24px',
             borderLeft: '4px solid var(--primary)'
           }}>
             <p style={{ margin: '0', color: 'var(--muted)' }}>
-              <em>Tip: Aim to describe colors, textures, relationships, and any notable objects. 
+              <em>Tip: Aim to describe colors, textures, relationships, and any notable objects.
               Remember to write at least {MIN_WORDS} words per description.</em>
             </p>
           </div>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button 
+            <button
               className="primary"
               onClick={onSurveyContinue}
               style={{ padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white' }}
             >
               Continue Survey
             </button>
-            <button 
+            <button
+              className="primary"
+              onClick={onNext}
+              style={{ padding: '12px 24px', backgroundColor: 'var(--success)', color: 'white' }}
+            >
+              Start Main Trials
+            </button>
+            <button
               className="ghost"
               onClick={onSurveyFinish}
-              style={{ padding: '12px 24px', border: '2px solid var(--primary)', color: 'var(--primary)' }}
+              style={{ padding: '12px 24px', border: '2px solid var(--error)', color: 'var(--error)' }}
             >
-              Finish Survey
+              Finish
             </button>
           </div>
         </div>
@@ -154,6 +175,7 @@ export default function TrialPage({
   if (!trial) {
     return (
       <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="spinner" style={{ margin: '20px auto' }}></div>
         <p>Loading trial...</p>
       </div>
     );
@@ -177,9 +199,9 @@ export default function TrialPage({
 
       <div className={`image-container ${isZoomed ? "zoomed" : ""}`}>
         {!imageError ? (
-          <img 
-            src={imageSrc} 
-            alt="Prompt" 
+          <img
+            src={imageSrc}
+            alt="Prompt"
             onClick={() => setIsZoomed(!isZoomed)}
             onLoad={handleImageLoad}
             onError={handleImageError}
@@ -187,16 +209,24 @@ export default function TrialPage({
           />
         ) : (
           <div className="image-error">
-            <p>Image failed to load. Please refresh the page.</p>
+            <p>Image failed to load.</p>
+            <button
+              className="primary"
+              onClick={handleRetryImage}
+              style={{ marginTop: '12px', padding: '8px 16px' }}
+            >
+              Retry
+            </button>
           </div>
         )}
         {!imageLoaded && !imageError && (
           <div className="image-loading">
+            <div className="spinner" style={{ margin: '20px auto' }}></div>
             <p>Loading image...</p>
           </div>
         )}
-        <button 
-          className="zoom-toggle" 
+        <button
+          className="zoom-toggle"
           onClick={() => setIsZoomed(!isZoomed)}
           disabled={!imageLoaded || imageError}
         >
