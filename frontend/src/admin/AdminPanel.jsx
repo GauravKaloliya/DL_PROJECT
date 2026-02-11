@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
 // Settings Tab Component
-function SettingsTab({ sessionToken, csvData = [], onDataDeleted }) {
+function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
@@ -25,14 +25,14 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted }) {
         setDeleteSuccess(true);
         setShowConfirmDelete(false);
         onDataDeleted();
-        addToast("All CSV data has been deleted successfully", "success");
+        onToast("All CSV data has been deleted successfully", "success");
       } else {
         setDeleteError(data.error || "Failed to delete CSV data");
-        addToast(data.error || "Failed to delete CSV data", "error");
+        onToast(data.error || "Failed to delete CSV data", "error");
       }
     } catch (err) {
       setDeleteError("Network error. Please try again.");
-      addToast("Network error. Please try again.", "error");
+      onToast("Network error. Please try again.", "error");
     } finally {
       setIsDeleting(false);
     }
@@ -152,24 +152,6 @@ const preventCopyPaste = (e) => {
   }
 };
 
-// Simple toast notification helper
-const addToast = (message, type = "info") => {
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `
-    <span>${message}</span>
-    <button onclick="this.parentElement.remove()" aria-label="Dismiss">×</button>
-  `;
-  toast.style.position = "fixed";
-  toast.style.top = "20px";
-  toast.style.right = "20px";
-  toast.style.zIndex = "1000";
-  document.body.appendChild(toast);
-  setTimeout(() => {
-    toast.remove();
-  }, 4000);
-};
-
 export default function AdminPanel() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -205,6 +187,19 @@ export default function AdminPanel() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [dataLoaded, setDataLoaded] = useState(false);
+  
+  // Toast notification state
+  const [toasts, setToasts] = useState([]);
+  
+  // Toast notification helper
+  const addToast = useCallback((message, type = "info") => {
+    const id = Date.now() + Math.random();
+    const newToast = { id, message, type };
+    setToasts(prev => [...prev, newToast]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
   
   // Check for existing session on mount
   useEffect(() => {
@@ -745,6 +740,7 @@ export default function AdminPanel() {
               fetchStats();
               fetchCsvData();
             }}
+            onToast={addToast}
           />
         )}
       </div>
@@ -754,6 +750,18 @@ export default function AdminPanel() {
       <div className="branding-header" style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
         <strong>Gaurav Kaloliya</strong> - Founder of C.O.G.N.I.T. 
       </div>
+      
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div className="toast-container">
+          {toasts.map(toast => (
+            <div key={toast.id} className={`toast ${toast.type}`}>
+              <span>{toast.message}</span>
+              <button onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))} aria-label="Dismiss">×</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

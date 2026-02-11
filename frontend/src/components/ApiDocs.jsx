@@ -145,7 +145,7 @@ export default function ApiDocs() {
             <ul style={{ lineHeight: '1.8' }}>
               <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
-              <li><strong>Content Pages:</strong> Read public home, about, contact, and FAQ details</li>
+              <li><strong>Health Monitoring:</strong> Check system connectivity and service status</li>
               <li><strong>Admin Operations:</strong> Login, review stats, export CSV data, and manage submissions</li>
               <li><strong>Security:</strong> Session-token authentication with rate limiting and hardened headers</li>
             </ul>
@@ -225,6 +225,22 @@ export default function ApiDocs() {
             
             {/* Public Endpoints */}
             <h3 style={{ marginTop: '24px' }}>Public Endpoints</h3>
+
+            {/* Health Check */}
+            <EndpointCard
+              method="GET"
+              path="/api/health"
+              description="Check system health and connectivity status"
+              response={{
+                "status": "healthy",
+                "timestamp": "2024-01-01T00:00:00Z",
+                "services": {
+                  "database": "connected",
+                  "data_storage": "accessible",
+                  "images": "accessible"
+                }
+              }}
+            />
             
             {/* Get Random Image */}
             <EndpointCard
@@ -280,48 +296,6 @@ export default function ApiDocs() {
                 "status": "ok",
                 "word_count": 45,
                 "attention_passed": true
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/pages/home"
-              description="Get home page metadata"
-              response={{
-                "title": "C.O.G.N.I.T. - Cognitive Observation & Generalized Narrative Inquiry Tool",
-                "description": "A research tool for studying how people describe visual scenes",
-                "version": "2.1.0",
-                "features": ["Image description tasks", "Demographic data collection"]
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/pages/about"
-              description="Get about page content"
-              response={{
-                "title": "About C.O.G.N.I.T.",
-                "purpose": "To collect anonymous descriptions of images for research"
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/pages/contact"
-              description="Get contact details"
-              response={{
-                "email": "contact@cognit-research.org",
-                "support": "support@cognit-research.org"
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/pages/faq"
-              description="Get frequently asked questions"
-              response={{
-                "title": "Frequently Asked Questions",
-                "faqs": "array of question/answer entries"
               }}
             />
 
@@ -462,7 +436,12 @@ export default function ApiDocs() {
             <h2 style={{ color: 'var(--primary)' }}>Code Examples</h2>
 
             <h3 style={{ marginTop: '24px' }}>JavaScript / Fetch</h3>
-            <CodeBlock code={`// Get a random image
+            <CodeBlock code={`// Check system health
+            const healthResponse = await fetch('/api/health');
+            const health = await healthResponse.json();
+            console.log(health.status); // 'healthy' or 'degraded'
+
+            // Get a random image
             const response = await fetch('/api/images/random?type=normal');
             const image = await response.json();
             console.log(image.image_url);
@@ -512,6 +491,11 @@ export default function ApiDocs() {
             <h3 style={{ marginTop: '32px' }}>Python / Requests</h3>
             <CodeBlock code={`import requests
 
+# Check system health
+health_response = requests.get('http://localhost:5000/api/health')
+health = health_response.json()
+print(health['status'])  # 'healthy' or 'degraded'
+
 # Get a random image
 response = requests.get('http://localhost:5000/api/images/random?type=normal')
 image = response.json()
@@ -557,7 +541,10 @@ stats_response = requests.get(
 print(stats_response.json())`} />
 
             <h3 style={{ marginTop: '32px' }}>cURL</h3>
-            <CodeBlock code={`# Get a random image
+            <CodeBlock code={`# Check system health
+curl -X GET "http://localhost:5000/api/health"
+
+# Get a random image
 curl -X GET "http://localhost:5000/api/images/random?type=normal"
 
 # Submit participant data

@@ -6,28 +6,6 @@ import NotFound from "./components/NotFound.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
 import ApiDocs from "./components/ApiDocs.jsx";
 
-// Allow copy/paste only in input fields
-const preventCopyPaste = (e) => {
-  const target = e.target;
-  const isInputField = target.tagName === 'INPUT' || 
-                       target.tagName === 'TEXTAREA' || 
-                       target.contentEditable === 'true' ||
-                       target.closest('input') ||
-                       target.closest('textarea') ||
-                       target.closest('[contenteditable="true"]');
-  
-  // Allow copy/paste only in input fields
-  if (!isInputField) {
-    e.preventDefault();
-    return false;
-  }
-};
-
-// Initialize copy/paste prevention when component loads
-document.addEventListener("copy", preventCopyPaste);
-document.addEventListener("paste", preventCopyPaste);
-document.addEventListener("cut", preventCopyPaste);
-
 function MainApp() {
   const [error, setError] = React.useState(null);
 
