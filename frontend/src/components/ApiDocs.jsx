@@ -79,7 +79,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 2.1.0 • API Documentation
+              Version 3.0.0 • Full Database Integration
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -241,6 +241,76 @@ export default function ApiDocs() {
                 }
               }}
             />
+
+            {/* Participants */}
+            <EndpointCard
+              method="POST"
+              path="/api/participants"
+              description="Create a new participant record with user details"
+              requestBody={{
+                "participant_id": "string (required)",
+                "session_id": "string (required)",
+                "username": "string (required)",
+                "email": "string (optional)",
+                "phone": "string (optional)",
+                "gender": "string (required)",
+                "age": "integer (required)",
+                "place": "string (required)",
+                "native_language": "string (required)",
+                "prior_experience": "string (required)"
+              }}
+              response={{
+                "status": "success",
+                "participant_id": "uuid-string",
+                "message": "Participant created successfully"
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/participants/{participant_id}"
+              description="Get participant details"
+              response={{
+                "participant_id": "uuid-string",
+                "username": "john_doe",
+                "email": "john@example.com",
+                "phone": "+1234567890",
+                "gender": "male",
+                "age": 25,
+                "place": "New York",
+                "native_language": "English",
+                "prior_experience": "Photography",
+                "consent_given": true,
+                "created_at": "2024-01-01T00:00:00Z"
+              }}
+            />
+
+            {/* Consent */}
+            <EndpointCard
+              method="POST"
+              path="/api/consent"
+              description="Record participant consent"
+              requestBody={{
+                "participant_id": "string (required)",
+                "consent_given": "boolean (required)"
+              }}
+              response={{
+                "status": "success",
+                "message": "Consent recorded successfully",
+                "timestamp": "2024-01-01T00:00:00Z"
+              }}
+            />
+
+            <EndpointCard
+              method="GET"
+              path="/api/consent/{participant_id}"
+              description="Get consent status for a participant"
+              response={{
+                "participant_id": "uuid-string",
+                "consent_given": true,
+                "consent_timestamp": "2024-01-01T00:00:00Z"
+              }}
+            />
             
             {/* Get Random Image */}
             <EndpointCard
@@ -273,7 +343,7 @@ export default function ApiDocs() {
             <EndpointCard
               method="POST"
               path="/api/submit"
-              description="Submit participant response data"
+              description="Submit participant response data (requires prior consent)"
               requestBody={{
                 "participant_id": "string (required)",
                 "session_id": "string (required)",
@@ -282,21 +352,23 @@ export default function ApiDocs() {
                 "rating": "integer (required, 1-10)",
                 "feedback": "string (required, min 5 chars)",
                 "time_spent_seconds": "number (required)",
-                "is_survey": "boolean (required)",
-                "is_attention": "boolean (required)",
-                "attention_expected": "string (for attention checks)",
-                "username": "string",
-                "gender": "string",
-                "age": "string",
-                "place": "string",
-                "native_language": "string",
-                "prior_experience": "string"
+                "is_survey": "boolean",
+                "is_attention": "boolean",
+                "attention_expected": "string (for attention checks)"
               }}
               response={{
                 "status": "ok",
                 "word_count": 45,
                 "attention_passed": true
               }}
+            />
+
+            {/* Get Submissions */}
+            <EndpointCard
+              method="GET"
+              path="/api/submissions/{participant_id}"
+              description="Get all submissions for a participant"
+              response="[{...submission objects...}]"
             />
 
             <EndpointCard

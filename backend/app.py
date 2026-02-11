@@ -3,17 +3,16 @@ import hashlib
 import os
 import random
 import sqlite3
+import secrets
+import hmac
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, abort
+from flask import Flask, jsonify, request, send_from_directory, abort, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-import secrets
-import hashlib
-import hmac
-import time
 
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
@@ -25,38 +24,6 @@ MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "30"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 
-CSV_HEADERS = [
-    "timestamp",
-    "participant_id",
-    "session_id",
-    "image_id",
-    "image_url",
-    "description",
-    "word_count",
-    "rating",
-    "feedback",
-    "time_spent_seconds",
-    "is_survey",
-    "is_attention",
-    "attention_passed",
-    "too_fast_flag",
-    "user_agent",
-    "ip_hash",
-    "username",
-    "gender",
-    "age",
-    "place",
-    "native_language",
-    "prior_experience",
-]
-
-# Email configuration (for development, using console output)
-SMTP_HOST = os.getenv("SMTP_HOST", "")
-SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASS = os.getenv("SMTP_PASS", "")
-FROM_EMAIL = os.getenv("FROM_EMAIL", "noreply@cognit-research.org")
-
 app = Flask(__name__)
 
 # Security Configuration
@@ -66,7 +33,7 @@ app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 
-# CORS Configuration - restrict to specific origins in production
+# CORS Configuration
 CORS(app, resources={
     r"/api/*": {"origins": ["http://localhost:5173", "https://your-production-domain.com"]},
     r"/admin/*": {"origins": ["http://localhost:5173", "https://your-production-domain.com"]}
@@ -90,20 +57,29 @@ def add_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     return response
 
-def ensure_csv():
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    if not CSV_PATH.exists():
-        with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(CSV_HEADERS)
+
+def get_db():
+    """Get database connection for current request context"""
+    if 'db' not in g:
+        g.db = sqlite3.connect(DB_PATH)
+        g.db.row_factory = sqlite3.Row
+    return g.db
+
+
+@app.teardown_appcontext
+def close_db(exception):
+    """Close database connection at end of request"""
+    db = g.pop('db', None)
+    if db is not None:
+        db.close()
 
 
 def init_db():
-    """Initialize the SQLite database"""
+    """Initialize the SQLite database with all required schemas"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Create admin users table with API key support
+    # Create admin users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS admin_users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -111,7 +87,6 @@ def init_db():
             password_hash TEXT NOT NULL,
             email TEXT UNIQUE,
             email_verified BOOLEAN DEFAULT 1,
-            api_key TEXT UNIQUE,
             role TEXT DEFAULT 'admin',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_login TIMESTAMP,
@@ -129,7 +104,7 @@ def init_db():
             expires_at TIMESTAMP,
             ip_address TEXT,
             user_agent TEXT,
-            FOREIGN KEY (user_id) REFERENCES admin_users (id)
+            FOREIGN KEY (user_id) REFERENCES admin_users (id) ON DELETE CASCADE
         )
     ''')
     
@@ -142,53 +117,113 @@ def init_db():
             details TEXT,
             timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             ip_address TEXT,
-            FOREIGN KEY (user_id) REFERENCES admin_users (id)
+            FOREIGN KEY (user_id) REFERENCES admin_users (id) ON DELETE SET NULL
+        )
+    ''')
+    
+    # Create participants table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS participants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            participant_id TEXT UNIQUE NOT NULL,
+            session_id TEXT NOT NULL,
+            username TEXT NOT NULL,
+            email TEXT,
+            phone TEXT,
+            gender TEXT,
+            age INTEGER,
+            place TEXT,
+            native_language TEXT,
+            prior_experience TEXT,
+            consent_given BOOLEAN DEFAULT 0,
+            consent_timestamp TIMESTAMP,
+            ip_hash TEXT,
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Create submissions table (replaces CSV)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS submissions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            participant_id TEXT NOT NULL,
+            session_id TEXT NOT NULL,
+            image_id TEXT NOT NULL,
+            image_url TEXT,
+            description TEXT NOT NULL,
+            word_count INTEGER,
+            rating INTEGER,
+            feedback TEXT,
+            time_spent_seconds REAL,
+            is_survey BOOLEAN DEFAULT 0,
+            is_attention BOOLEAN DEFAULT 0,
+            attention_passed BOOLEAN,
+            too_fast_flag BOOLEAN DEFAULT 0,
+            user_agent TEXT,
+            ip_hash TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create consent records table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS consent_records (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            participant_id TEXT UNIQUE NOT NULL,
+            consent_given BOOLEAN DEFAULT 0,
+            consent_timestamp TIMESTAMP,
+            ip_hash TEXT,
+            user_agent TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
         )
     ''')
     
     conn.commit()
     
-    # Run migrations to add missing columns if they don't exist
-    _migrate_admin_users_table(cursor)
+    # Create indexes for performance
+    _create_indexes(cursor)
     
-    # Create default admin user if it doesn't exist
+    # Create default admin user
     _create_default_admin_user(cursor)
     
     conn.commit()
     conn.close()
 
 
-def _migrate_admin_users_table(cursor):
-    """Add missing columns to admin_users table if they don't exist"""
-    # Get existing columns
-    cursor.execute("PRAGMA table_info(admin_users)")
-    existing_columns = {row[1] for row in cursor.fetchall()}
+def _create_indexes(cursor):
+    """Create database indexes for performance optimization"""
+    indexes = [
+        ("idx_participants_id", "participants", "participant_id"),
+        ("idx_participants_session", "participants", "session_id"),
+        ("idx_participants_created", "participants", "created_at"),
+        ("idx_submissions_participant", "submissions", "participant_id"),
+        ("idx_submissions_session", "submissions", "session_id"),
+        ("idx_submissions_created", "submissions", "created_at"),
+        ("idx_submissions_image", "submissions", "image_id"),
+        ("idx_admin_sessions_token", "admin_sessions", "session_token"),
+        ("idx_admin_sessions_user", "admin_sessions", "user_id"),
+        ("idx_admin_audit_user", "admin_audit_log", "user_id"),
+        ("idx_admin_audit_timestamp", "admin_audit_log", "timestamp"),
+        ("idx_consent_participant", "consent_records", "participant_id"),
+    ]
     
-    # Define columns that should exist
-    required_columns = {
-        "email_verified": "BOOLEAN DEFAULT 1"
-    }
-    
-    # Add missing columns
-    for col_name, col_def in required_columns.items():
-        if col_name not in existing_columns:
-            try:
-                cursor.execute(f"ALTER TABLE admin_users ADD COLUMN {col_name} {col_def}")
-            except sqlite3.OperationalError:
-                # Column might already exist or there's another issue
-                pass
+    for idx_name, table, column in indexes:
+        try:
+            cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
+        except sqlite3.OperationalError:
+            pass  # Index might already exist
 
 
 def _create_default_admin_user(cursor):
     """Create default admin user if it doesn't exist"""
-    # Check if default user already exists
     cursor.execute("SELECT id FROM admin_users WHERE username = ?", ("Gaurav",))
     if cursor.fetchone():
-        return  # User already exists
+        return
     
-    # Create default admin user with password-based authentication
     default_password_hash = hash_password("Gaurav@0809")
-    
     cursor.execute(
         """INSERT INTO admin_users 
            (username, password_hash, email, email_verified, is_active) 
@@ -196,111 +231,276 @@ def _create_default_admin_user(cursor):
         ("Gaurav", default_password_hash, "gaurav@admin.com")
     )
     
-    # Log the creation
     cursor.execute(
         "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
         (cursor.lastrowid, 'system_create', 'Default admin user created', 'system')
     )
+
 
 def hash_password(password):
     """Hash password using SHA-256"""
     return hashlib.sha256(password.encode()).hexdigest()
 
 
-def authenticate_admin(username, password):
-    """Authenticate admin user using username/password"""
-    conn = sqlite3.connect(DB_PATH)
+def get_ip_hash():
+    """Generate hash of IP address for privacy"""
+    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+    digest = hashlib.sha256(f"{ip_address}{IP_HASH_SALT}".encode("utf-8")).hexdigest()
+    return digest
+
+
+def count_words(text: str):
+    """Count words in text"""
+    return len([word for word in text.strip().split() if word])
+
+
+def validate_session(session_token):
+    """Validate session token and return user info"""
+    conn = get_db()
     cursor = conn.cursor()
     
+    cursor.execute(
+        """SELECT u.id, u.username, u.role, u.is_active 
+           FROM admin_users u 
+           JOIN admin_sessions s ON u.id = s.user_id 
+           WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
+        (session_token, datetime.now(timezone.utc).isoformat())
+    )
+    user = cursor.fetchone()
+    
+    if user:
+        return {
+            "id": user[0],
+            "username": user[1],
+            "role": user[2],
+            "is_active": user[3]
+        }
+    return None
+
+
+def require_auth():
+    """Check if user is authenticated via session token"""
+    session_token = request.headers.get("X-SESSION-TOKEN")
+    if not session_token:
+        return False
+    return validate_session(session_token)
+
+
+# ============== HEALTH & SYSTEM ENDPOINTS ==============
+
+@app.route("/api/health")
+def health_check():
+    """Health check endpoint to verify all system connectivity"""
+    status = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": {}
+    }
+    
+    # Check database connectivity
     try:
-        # Username/password authentication
-        cursor.execute(
-            "SELECT id, password_hash, role, is_active FROM admin_users WHERE username = ?",
-            (username,)
-        )
-        user = cursor.fetchone()
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        status["services"]["database"] = "connected"
+    except Exception as e:
+        status["services"]["database"] = f"error: {str(e)}"
+        status["status"] = "degraded"
+    
+    # Check images directory
+    try:
+        if IMAGES_DIR.exists():
+            status["services"]["images"] = "accessible"
+        else:
+            status["services"]["images"] = "not found"
+            status["status"] = "degraded"
+    except Exception as e:
+        status["services"]["images"] = f"error: {str(e)}"
+        status["status"] = "degraded"
+    
+    return jsonify(status)
+
+
+# ============== PARTICIPANT ENDPOINTS ==============
+
+@app.route("/api/participants", methods=["POST"])
+@limiter.limit("30 per minute")
+def create_participant():
+    """Create a new participant record with user details"""
+    data = request.get_json(silent=True) or {}
+    
+    # Validate required fields
+    required_fields = ['participant_id', 'session_id', 'username', 'gender', 'age', 'place', 'native_language', 'prior_experience']
+    errors = {}
+    
+    for field in required_fields:
+        if not data.get(field):
+            errors[field] = f"{field.replace('_', ' ').title()} is required"
+    
+    if errors:
+        return jsonify({"error": "Validation failed", "details": errors}), 400
+    
+    # Validate email format if provided
+    email = data.get('email', '').strip()
+    if email and not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+        return jsonify({"error": "Invalid email format"}), 400
+    
+    # Validate phone format if provided (basic validation)
+    phone = data.get('phone', '').strip()
+    if phone and not re.match(r'^[\d\s\-\+\(\)]{7,20}$', phone):
+        return jsonify({"error": "Invalid phone number format"}), 400
+    
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
         
-        if user and user[3]:  # Check active status
-            user_id, stored_hash, role, is_active = user
-            # Verify password
-            input_hash = hash_password(password)
-            if input_hash == stored_hash:
-                # Log successful login
-                ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-                cursor.execute(
-                    "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-                    (user_id, 'login_success', 'User logged in', ip_address)
-                )
-                cursor.execute(
-                    "UPDATE admin_users SET last_login = ? WHERE id = ?",
-                    (datetime.now(timezone.utc).isoformat(), user_id)
-                )
-                conn.commit()
-                return True
+        cursor.execute('''
+            INSERT INTO participants 
+            (participant_id, session_id, username, email, phone, gender, age, place, native_language, prior_experience, ip_hash, user_agent)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['participant_id'],
+            data['session_id'],
+            data['username'],
+            email or None,
+            phone or None,
+            data['gender'],
+            int(data['age']),
+            data['place'],
+            data['native_language'],
+            data['prior_experience'],
+            get_ip_hash(),
+            request.headers.get('User-Agent', '')
+        ))
         
-        # Log failed login attempt
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (None, 'login_failed', f'Failed login for user: {username}', ip_address)
-        )
         conn.commit()
         
-        return False
+        return jsonify({
+            "status": "success",
+            "participant_id": data['participant_id'],
+            "message": "Participant created successfully"
+        }), 201
         
-    finally:
-        conn.close()
+    except sqlite3.IntegrityError as e:
+        if "participant_id" in str(e).lower():
+            return jsonify({"error": "Participant ID already exists"}), 409
+        return jsonify({"error": "Database error", "details": str(e)}), 500
+    except Exception as e:
+        return jsonify({"error": "Failed to create participant", "details": str(e)}), 500
 
 
-def get_user_by_username(username):
-    """Get user details by username"""
-    conn = sqlite3.connect(DB_PATH)
+@app.route("/api/participants/<participant_id>")
+def get_participant(participant_id):
+    """Get participant details"""
+    conn = get_db()
     cursor = conn.cursor()
     
-    try:
-        cursor.execute(
-            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE username = ?",
-            (username,)
-        )
-        user = cursor.fetchone()
-        if user:
-            return {
-                "id": user[0],
-                "username": user[1],
-                "email": user[2],
-                "role": user[3],
-                "created_at": user[4],
-                "last_login": user[5]
-            }
-        return None
-    finally:
-        conn.close()
+    cursor.execute('''
+        SELECT participant_id, username, email, phone, gender, age, place, native_language, prior_experience, consent_given, created_at
+        FROM participants WHERE participant_id = ?
+    ''', (participant_id,))
+    
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({"error": "Participant not found"}), 404
+    
+    return jsonify({
+        "participant_id": row[0],
+        "username": row[1],
+        "email": row[2],
+        "phone": row[3],
+        "gender": row[4],
+        "age": row[5],
+        "place": row[6],
+        "native_language": row[7],
+        "prior_experience": row[8],
+        "consent_given": bool(row[9]),
+        "created_at": row[10]
+    })
 
 
-def get_user_by_id(user_id):
-    """Get user details by ID"""
-    conn = sqlite3.connect(DB_PATH)
+# ============== CONSENT ENDPOINTS ==============
+
+@app.route("/api/consent", methods=["POST"])
+@limiter.limit("20 per minute")
+def record_consent():
+    """Record participant consent"""
+    data = request.get_json(silent=True) or {}
+    
+    participant_id = data.get('participant_id')
+    consent_given = data.get('consent_given', False)
+    
+    if not participant_id:
+        return jsonify({"error": "participant_id is required"}), 400
+    
+    if not consent_given:
+        return jsonify({"error": "Consent must be given to proceed"}), 400
+    
+    conn = get_db()
     cursor = conn.cursor()
     
-    try:
-        cursor.execute(
-            "SELECT id, username, email, role, created_at, last_login FROM admin_users WHERE id = ?",
-            (user_id,)
-        )
-        user = cursor.fetchone()
-        if user:
-            return {
-                "id": user[0],
-                "username": user[1],
-                "email": user[2],
-                "role": user[3],
-                "created_at": user[4],
-                "last_login": user[5]
-            }
-        return None
-    finally:
-        conn.close()
+    # Check if participant exists
+    cursor.execute("SELECT id FROM participants WHERE participant_id = ?", (participant_id,))
+    if not cursor.fetchone():
+        return jsonify({"error": "Participant not found"}), 404
+    
+    timestamp = datetime.now(timezone.utc).isoformat()
+    
+    # Update participant consent status
+    cursor.execute('''
+        UPDATE participants 
+        SET consent_given = 1, consent_timestamp = ?
+        WHERE participant_id = ?
+    ''', (timestamp, participant_id))
+    
+    # Insert or update consent record
+    cursor.execute('''
+        INSERT INTO consent_records (participant_id, consent_given, consent_timestamp, ip_hash, user_agent)
+        VALUES (?, 1, ?, ?, ?)
+        ON CONFLICT(participant_id) DO UPDATE SET
+        consent_given = 1,
+        consent_timestamp = excluded.consent_timestamp,
+        ip_hash = excluded.ip_hash,
+        user_agent = excluded.user_agent
+    ''', (participant_id, timestamp, get_ip_hash(), request.headers.get('User-Agent', '')))
+    
+    conn.commit()
+    
+    return jsonify({
+        "status": "success",
+        "message": "Consent recorded successfully",
+        "timestamp": timestamp
+    })
 
+
+@app.route("/api/consent/<participant_id>")
+def get_consent(participant_id):
+    """Get consent status for a participant"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT consent_given, consent_timestamp FROM consent_records 
+        WHERE participant_id = ?
+    ''', (participant_id,))
+    
+    row = cursor.fetchone()
+    if not row:
+        return jsonify({
+            "participant_id": participant_id,
+            "consent_given": False,
+            "consent_timestamp": None
+        })
+    
+    return jsonify({
+        "participant_id": participant_id,
+        "consent_given": bool(row[0]),
+        "consent_timestamp": row[1]
+    })
+
+
+# ============== IMAGE ENDPOINTS ==============
 
 def list_images(image_type: str):
     folder = IMAGES_DIR / image_type
@@ -324,164 +524,6 @@ def build_image_payload(image_path: Path, image_type: str):
     }
 
 
-def get_ip_hash():
-    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-    digest = hashlib.sha256(f"{ip_address}{IP_HASH_SALT}".encode("utf-8")).hexdigest()
-    return digest
-
-
-def validate_request():
-    """Validate incoming requests for security"""
-    # Check content type for POST requests
-    if request.method == "POST" and not request.is_json:
-        if 'Content-Type' not in request.headers or 'application/json' not in request.headers['Content-Type']:
-            abort(415, description="Unsupported Media Type: Please use application/json")
-    
-    # Check for suspicious headers
-    suspicious_headers = ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto']
-    for header in suspicious_headers:
-        if header in request.headers and len(request.headers[header]) > 255:
-            abort(400, description="Invalid header length")
-    
-    # Rate limiting check
-    if hasattr(request, 'limit') and request.limit:
-        return True
-    
-    return True
-
-
-def generate_csrf_token():
-    """Generate CSRF token for forms"""
-    if 'csrf_token' not in request.cookies:
-        token = secrets.token_hex(16)
-        # In a real app, you would set this in the response cookies
-        return token
-    return request.cookies['csrf_token']
-
-
-def verify_csrf_token(token):
-    """Verify CSRF token"""
-    if 'csrf_token' not in request.cookies:
-        return False
-    return hmac.compare_digest(token, request.cookies['csrf_token'])
-
-
-def count_words(text: str):
-    return len([word for word in text.strip().split() if word])
-
-
-def require_auth():
-    """Check if user is authenticated via session token"""
-    session_token = request.headers.get("X-SESSION-TOKEN")
-    if not session_token:
-        return False
-    
-    return validate_session(session_token)
-
-
-def get_user_from_session(session_token):
-    """Get user info from session token"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute(
-            """SELECT u.id, u.username, u.email, u.role, u.created_at, u.last_login 
-               FROM admin_users u 
-               JOIN admin_sessions s ON u.id = s.user_id 
-               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
-            (session_token, datetime.now(timezone.utc).isoformat())
-        )
-        user = cursor.fetchone()
-        
-        if user:
-            return {
-                "id": user[0],
-                "username": user[1],
-                "email": user[2],
-                "role": user[3],
-                "created_at": user[4],
-                "last_login": user[5]
-            }
-        return None
-    finally:
-        conn.close()
-
-
-def validate_session(session_token):
-    """Validate session token and return user info"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute(
-            """SELECT u.id, u.username, u.role, u.is_active 
-               FROM admin_users u 
-               JOIN admin_sessions s ON u.id = s.user_id 
-               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
-            (session_token, datetime.now(timezone.utc).isoformat())
-        )
-        user = cursor.fetchone()
-        
-        if user:
-            user_id, username, role, is_active = user
-            return {
-                "id": user_id,
-                "username": username,
-                "role": role,
-                "is_active": is_active
-            }
-        return None
-        
-    finally:
-        conn.close()
-
-
-@app.route("/api/health")
-def health_check():
-    """Health check endpoint to verify all system connectivity"""
-    status = {
-        "status": "healthy",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "services": {}
-    }
-    
-    # Check database connectivity
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        conn.close()
-        status["services"]["database"] = "connected"
-    except Exception as e:
-        status["services"]["database"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    # Check CSV/data directory
-    try:
-        DATA_DIR.mkdir(parents=True, exist_ok=True)
-        test_file = DATA_DIR / ".health_check"
-        test_file.write_text("test")
-        test_file.unlink()
-        status["services"]["data_storage"] = "accessible"
-    except Exception as e:
-        status["services"]["data_storage"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    # Check images directory
-    try:
-        if IMAGES_DIR.exists():
-            status["services"]["images"] = "accessible"
-        else:
-            status["services"]["images"] = "not found"
-            status["status"] = "degraded"
-    except Exception as e:
-        status["services"]["images"] = f"error: {str(e)}"
-        status["status"] = "degraded"
-    
-    return jsonify(status)
-
-
 @app.route("/api/images/random")
 def random_image():
     requested_type = request.args.get("type", "normal")
@@ -502,14 +544,33 @@ def serve_image(image_id):
     return send_from_directory(IMAGES_DIR, image_id)
 
 
+# ============== SUBMISSION ENDPOINTS ==============
+
 @app.route("/api/submit", methods=["POST"])
+@limiter.limit("60 per minute")
 def submit():
-    ensure_csv()
+    """Submit a new description/rating for an image"""
     payload = request.get_json(silent=True) or {}
+    
+    participant_id = payload.get("participant_id")
+    if not participant_id:
+        return jsonify({"error": "participant_id is required"}), 400
+    
+    # Verify participant exists and has given consent
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT consent_given FROM participants WHERE participant_id = ?", (participant_id,))
+    result = cursor.fetchone()
+    
+    if not result:
+        return jsonify({"error": "Participant not found. Please complete registration first."}), 400
+    
+    if not result[0]:
+        return jsonify({"error": "Consent required. Please complete the consent process."}), 403
+    
     description = (payload.get("description") or "").strip()
     image_id = payload.get("image_id")
-    image_url = payload.get("image_url") or f"/api/images/{image_id}" if image_id else ""
-
+    
     if not image_id:
         return jsonify({"error": "image_id is required"}), 400
 
@@ -549,570 +610,148 @@ def submit():
     except (TypeError, ValueError):
         time_spent_seconds = None
 
-    timestamp = datetime.now(timezone.utc).isoformat()
-    row = {
-        "timestamp": timestamp,
-        "participant_id": payload.get("participant_id", ""),
-        "session_id": payload.get("session_id", ""),
-        "image_id": image_id,
-        "image_url": image_url,
-        "description": description,
-        "word_count": word_count,
-        "rating": rating,
-        "feedback": feedback,
-        "time_spent_seconds": time_spent_seconds,
-        "is_survey": is_survey,
-        "is_attention": is_attention,
-        "attention_passed": attention_passed,
-        "too_fast_flag": too_fast_flag,
-        "user_agent": request.headers.get("User-Agent", ""),
-        "ip_hash": get_ip_hash(),
-        "username": payload.get("username", ""),
-        "gender": payload.get("gender", ""),
-        "age": payload.get("age", ""),
-        "place": payload.get("place", ""),
-        "native_language": payload.get("native_language", ""),
-        "prior_experience": payload.get("prior_experience", ""),
-    }
-
-    with CSV_PATH.open("a", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
-        writer.writerow(row)
-
-    return jsonify({"status": "ok", "word_count": word_count, "attention_passed": attention_passed})
-
-
-@app.route("/api/stats")
-def stats():
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    ensure_csv()
-    total = 0
-    total_words = 0
-    attention_total = 0
-    attention_failed = 0
-
-    with CSV_PATH.open("r", newline="", encoding="utf-8") as file:
-        reader = csv.DictReader(file)
-        for row in reader:
-            total += 1
-            try:
-                total_words += int(row.get("word_count") or 0)
-            except ValueError:
-                pass
-            if row.get("is_attention") in {"True", "true", True}:
-                attention_total += 1
-                if row.get("attention_passed") in {"False", "false", "", None}:
-                    attention_failed += 1
-
-    avg_word_count = (total_words / total) if total else 0
-    attention_fail_rate = (attention_failed / attention_total) if attention_total else 0
-
-    return jsonify(
-        {
-            "total_submissions": total,
-            "avg_word_count": avg_word_count,
-            "attention_fail_rate": attention_fail_rate,
-        }
-    )
-
-
-@app.route("/admin/download")
-def download_csv():
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    ensure_csv()
-    return send_from_directory(DATA_DIR, CSV_PATH.name, as_attachment=True)
-
-
-@app.route("/api/docs")
-@limiter.limit("30 per minute")
-def api_docs():
-    """Comprehensive API documentation"""
-    return jsonify({
-        "title": "C.O.G.N.I.T. API Documentation",
-        "version": "2.1.0",
-        "description": "Complete API documentation for the C.O.G.N.I.T. research platform",
-        "base_url": "/api",
-        "authentication": {
-            "type": "Session Token",
-            "description": "Admin endpoints require a session token. Login with username/password to obtain a token.",
-            "methods": [
-                "X-SESSION-TOKEN header"
-            ],
-            "login_endpoint": "/api/admin/login",
-            "token_ttl_hours": 24
-        },
-        "endpoints": {
-            "public": {
-                "description": "Endpoints accessible without authentication",
-                "routes": [
-                    {
-                        "path": "/api/health",
-                        "method": "GET",
-                        "description": "Health check endpoint to verify system connectivity",
-                        "response": {
-                            "status": "string (healthy/degraded)",
-                            "timestamp": "ISO format timestamp",
-                            "services": {
-                                "database": "string",
-                                "data_storage": "string",
-                                "images": "string"
-                            }
-                        }
-                    },
-                    {
-                        "path": "/api/images/random",
-                        "method": "GET",
-                        "description": "Get a random image for the study",
-                        "parameters": [
-                            {"name": "type", "type": "string", "required": False, "description": "Image type (normal, survey, attention)", "default": "normal"}
-                        ],
-                        "response": {
-                            "image_id": "string",
-                            "image_url": "string",
-                            "is_survey": "boolean",
-                            "is_attention": "boolean"
-                        }
-                    },
-                    {
-                        "path": "/api/images/<image_id>",
-                        "method": "GET",
-                        "description": "Get a specific image file",
-                        "response": "image file"
-                    },
-                    {
-                        "path": "/api/submit",
-                        "method": "POST",
-                        "description": "Submit participant data",
-                        "request_body": {
-                            "participant_id": "string (required)",
-                            "session_id": "string (required)",
-                            "image_id": "string (required)",
-                            "description": "string (required, min 30 words)",
-                            "rating": "integer (required, 1-10)",
-                            "feedback": "string (required, min 5 chars)",
-                            "time_spent_seconds": "number (required)",
-                            "is_survey": "boolean (required)",
-                            "is_attention": "boolean (required)",
-                            "attention_expected": "string",
-                            "username": "string",
-                            "gender": "string",
-                            "age": "string",
-                            "place": "string",
-                            "native_language": "string",
-                            "prior_experience": "string"
-                        },
-                        "response": {
-                            "status": "string",
-                            "word_count": "integer",
-                            "attention_passed": "boolean"
-                        }
-                    },
-                    {
-                        "path": "/api/security/info",
-                        "method": "GET",
-                        "description": "Get security configuration information",
-                        "response": {
-                            "security": {
-                                "rate_limits": "object",
-                                "cors_allowed_origins": "array",
-                                "security_headers": "array",
-                                "data_protection": "object"
-                            }
-                        }
-                    },
-                    {
-                        "path": "/api/docs",
-                        "method": "GET",
-                        "description": "Get API documentation (this endpoint)",
-                        "response": "this documentation"
-                    }
-                ]
-            },
-            "admin": {
-                "description": "Endpoints requiring admin authentication (X-SESSION-TOKEN header required unless noted)",
-                "routes": [
-                    {
-                        "path": "/api/admin/login",
-                        "method": "POST",
-                        "description": "Admin login endpoint (no token required)",
-                        "request_body": {
-                            "username": "string (required)",
-                            "password": "string (required)"
-                        },
-                        "response": {
-                            "status": "string",
-                            "session_token": "string",
-                            "user": "object"
-                        }
-                    },
-                    {
-                        "path": "/api/admin/logout",
-                        "method": "POST",
-                        "description": "Admin logout endpoint",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": False, "description": "Session token to invalidate"}
-                        ],
-                        "response": {
-                            "status": "string",
-                            "message": "string"
-                        }
-                    },
-                    {
-                        "path": "/api/admin/me",
-                        "method": "GET",
-                        "description": "Get current admin user info",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "username": "string",
-                            "role": "string",
-                            "email": "string",
-                            "created_at": "string",
-                            "last_login": "string",
-                            "auth_method": "string"
-                        }
-                    },
-                    {
-                        "path": "/api/stats",
-                        "method": "GET",
-                        "description": "Get statistics about submissions",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "total_submissions": "integer",
-                            "avg_word_count": "number",
-                            "attention_fail_rate": "number"
-                        }
-                    },
-                    {
-                        "path": "/admin/download",
-                        "method": "GET",
-                        "description": "Download CSV file with all submissions",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "CSV file attachment"
-                    },
-                    {
-                        "path": "/admin/csv-data",
-                        "method": "GET",
-                        "description": "Get CSV data as JSON for admin panel",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": "array of submission objects"
-                    },
-                    {
-                        "path": "/admin/settings/csv-delete",
-                        "method": "DELETE",
-                        "description": "Delete all data from CSV file",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "status": "string",
-                            "message": "string"
-                        }
-                    },
-                    {
-                        "path": "/admin/security/audit",
-                        "method": "GET",
-                        "description": "Run security audit",
-                        "headers": [
-                            {"name": "X-SESSION-TOKEN", "type": "string", "required": True, "description": "Session token from login"}
-                        ],
-                        "response": {
-                            "security_audit": {
-                                "timestamp": "string",
-                                "status": "string",
-                                "checks": "object",
-                                "recommendations": "array"
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        "data_structures": {
-            "submission": {
-                "description": "Structure of a submission record",
-                "fields": {
-                    "timestamp": "ISO format timestamp",
-                    "participant_id": "UUID string",
-                    "session_id": "UUID string",
-                    "image_id": "string (path to image)",
-                    "image_url": "string (URL to image)",
-                    "description": "string (participant description)",
-                    "word_count": "integer",
-                    "rating": "integer (1-10)",
-                    "feedback": "string (participant comments)",
-                    "time_spent_seconds": "number",
-                    "is_survey": "boolean",
-                    "is_attention": "boolean",
-                    "attention_passed": "boolean",
-                    "too_fast_flag": "boolean",
-                    "user_agent": "string",
-                    "ip_hash": "string (SHA-256 hash)",
-                    "username": "string",
-                    "gender": "string",
-                    "age": "string",
-                    "place": "string",
-                    "native_language": "string",
-                    "prior_experience": "string"
-                }
-            }
-        },
-        "error_codes": {
-            "400": "Bad Request - Invalid parameters or missing required fields",
-            "401": "Unauthorized - Invalid or missing session token",
-            "404": "Not Found - Resource not found",
-            "415": "Unsupported Media Type - JSON required for POST",
-            "429": "Too Many Requests - Rate limit exceeded",
-            "500": "Internal Server Error - Server-side error"
-        },
-        "rate_limits": {
-            "default": "200 requests per day, 50 requests per hour",
-            "api_docs": "30 requests per minute",
-            "admin_login": "10 requests per minute",
-            "admin_change_password": "5 requests per minute",
-            "admin_csv_data": "10 requests per minute",
-            "admin_csv_delete": "5 requests per minute",
-            "security_audit": "5 requests per minute"
-        },
-        "security": {
-            "cors": "Cross-Origin Resource Sharing is restricted to specific origins",
-            "headers": "Security headers are applied to all responses",
-            "ip_hashing": "IP addresses are hashed with SHA-256 and salt for privacy",
-            "data_storage": "Data is stored in CSV format with restricted access"
-        },
-        "changelog": [
-            {
-                "version": "2.1.0",
-                "date": "2024",
-                "changes": [
-                    "Expanded image catalog",
-                    "Refreshed API documentation to reflect all routes",
-                    "Aligned admin schema with email verification flag"
-                ]
-            },
-            {
-                "version": "2.0.0",
-                "date": "2024",
-                "changes": [
-                    "Added SQLite database for admin user management",
-                    "Enhanced admin authentication system",
-                    "Added comprehensive API documentation",
-                    "Improved admin dashboard with charts and filters",
-                    "Fixed data explorer search functionality",
-                    "Added demographic data collection",
-                    "Removed NASA-TLX workload assessment",
-                    "Added gender, age, and place fields to demographics"
-                ]
-            },
-            {
-                "version": "1.0.0",
-                "date": "2023",
-                "changes": [
-                    "Initial release of C.O.G.N.I.T. platform",
-                    "Basic participant workflow",
-                    "Admin panel with statistics",
-                    "CSV data export functionality"
-                ]
-            }
-        ]
-    })
-
-
-@app.route("/admin/csv-data")
-@limiter.limit("10 per minute")
-def get_csv_data():
-    """Get CSV data as JSON for admin panel"""
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-
-    ensure_csv()
-    
+    # Insert into database
     try:
-        with CSV_PATH.open("r", newline="", encoding="utf-8") as file:
-            reader = csv.DictReader(file)
-            data = [row for row in reader]
-        
-        return jsonify(data)
-    except Exception as e:
-        return jsonify({"error": f"Failed to read CSV: {str(e)}"}), 500
-
-
-@app.route("/admin/settings/csv-delete", methods=["DELETE"])
-@limiter.limit("5 per minute")
-def delete_csv_data():
-    """Delete all data from CSV file (admin only)"""
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    try:
-        # Re-create the CSV file with just the headers
-        with CSV_PATH.open("w", newline="", encoding="utf-8") as file:
-            writer = csv.writer(file)
-            writer.writerow(CSV_HEADERS)
-        
-        return jsonify({
-            "status": "success",
-            "message": "All CSV data has been deleted successfully"
-        })
-    except Exception as e:
-        return jsonify({"error": f"Failed to delete CSV data: {str(e)}"}), 500
-
-
-@app.route("/api/security/info")
-def security_info():
-    """Get security information"""
-    return jsonify({
-        "security": {
-            "rate_limits": {
-                "default": "200 per day, 50 per hour",
-                "admin_endpoints": "10 per minute"
-            },
-            "cors_allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
-            "security_headers": [
-                "X-Content-Type-Options: nosniff",
-                "X-Frame-Options: SAMEORIGIN",
-                "X-XSS-Protection: 1; mode=block",
-                "Content-Security-Policy: default-src 'self'",
-                "Strict-Transport-Security: max-age=31536000",
-                "Referrer-Policy: strict-origin-when-cross-origin"
-            ],
-            "data_protection": {
-                "ip_hashing": "SHA-256 with salt",
-                "anonymous_data": True,
-                "storage": "CSV with restricted access"
-            }
-        }
-    })
-
-
-@app.route("/admin/security/audit")
-@limiter.limit("5 per minute")
-def security_audit():
-    """Admin security audit endpoint"""
-    user = require_auth()
-    if not user:
-        return jsonify({"error": "Unauthorized"}), 401
-    
-    # In a real app, this would check various security aspects
-    return jsonify({
-        "security_audit": {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "status": "ok",
-            "checks": {
-                "password_validation": "enabled",
-                "rate_limiting": "enabled",
-                "cors_restrictions": "enabled",
-                "security_headers": "enabled",
-                "data_encryption": "enabled (IP hashing)",
-                "csrf_protection": "available"
-            },
-            "recommendations": [
-                "Change password regularly",
-                "Monitor failed login attempts",
-                "Review CORS origins in production",
-                "Enable HTTPS in production"
-            ]
-        }
-    })
-
-@app.route("/api/admin/login", methods=["POST"])
-@limiter.limit("10 per minute")
-def admin_login():
-    """Admin login endpoint - accepts username/password"""
-    data = request.get_json(silent=True) or {}
-    username = data.get("username", "").strip()
-    password = data.get("password", "").strip()
-    
-    if not username:
-        return jsonify({"error": "Username is required"}), 400
-    
-    if not password:
-        return jsonify({"error": "Password is required"}), 400
-    
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        # Check if user exists and is verified
-        cursor.execute(
-            "SELECT id, password_hash, email_verified, role, is_active FROM admin_users WHERE username = ?",
-            (username,)
-        )
-        user = cursor.fetchone()
-        
-        if not user:
-            return jsonify({"error": "Invalid credentials"}), 401
-        
-        user_id, stored_password_hash, email_verified, role, is_active = user
-        
-        if not is_active:
-            return jsonify({"error": "Account is deactivated"}), 401
-        
-        # Verify password
-        input_hash = hash_password(password)
-        if input_hash != stored_password_hash:
-            # Log failed attempt
-            ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-            cursor.execute(
-                "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-                (user_id, 'login_failed', 'Invalid password', ip_address)
-            )
-            conn.commit()
-            return jsonify({"error": "Invalid credentials"}), 401
-        
-        # Generate session token
-        session_token = secrets.token_hex(32)
-        
-        # Store session
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        user_agent = request.headers.get("User-Agent", "")
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-        
-        cursor.execute(
-            "INSERT INTO admin_sessions (user_id, session_token, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
-            (user_id, session_token, expires_at.isoformat(), ip_address, user_agent)
-        )
-        
-        # Update last login time
-        cursor.execute(
-            "UPDATE admin_users SET last_login = ? WHERE id = ?",
-            (datetime.now(timezone.utc).isoformat(), user_id)
-        )
-        
-        # Log successful login
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (user_id, 'login_success', 'User logged in', ip_address)
-        )
+        cursor.execute('''
+            INSERT INTO submissions 
+            (participant_id, session_id, image_id, image_url, description, word_count, rating, 
+             feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, user_agent, ip_hash)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            participant_id,
+            payload.get("session_id", ""),
+            image_id,
+            payload.get("image_url", f"/api/images/{image_id}"),
+            description,
+            word_count,
+            rating,
+            feedback,
+            time_spent_seconds,
+            is_survey,
+            is_attention,
+            attention_passed,
+            too_fast_flag,
+            request.headers.get("User-Agent", ""),
+            get_ip_hash()
+        ))
         
         conn.commit()
         
         return jsonify({
-            "status": "success",
-            "session_token": session_token,
-            "user": {
-                "username": username,
-                "role": role
-            }
+            "status": "ok", 
+            "word_count": word_count, 
+            "attention_passed": attention_passed
         })
         
-    finally:
-        conn.close()
+    except Exception as e:
+        return jsonify({"error": "Failed to save submission", "details": str(e)}), 500
+
+
+@app.route("/api/submissions/<participant_id>")
+def get_participant_submissions(participant_id):
+    """Get all submissions for a participant"""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT id, image_id, description, word_count, rating, feedback, 
+               time_spent_seconds, is_survey, is_attention, attention_passed, created_at
+        FROM submissions 
+        WHERE participant_id = ?
+        ORDER BY created_at DESC
+    ''', (participant_id,))
+    
+    rows = cursor.fetchall()
+    submissions = []
+    
+    for row in rows:
+        submissions.append({
+            "id": row[0],
+            "image_id": row[1],
+            "description": row[2],
+            "word_count": row[3],
+            "rating": row[4],
+            "feedback": row[5],
+            "time_spent_seconds": row[6],
+            "is_survey": bool(row[7]),
+            "is_attention": bool(row[8]),
+            "attention_passed": row[9],
+            "created_at": row[10]
+        })
+    
+    return jsonify(submissions)
+
+
+# ============== ADMIN ENDPOINTS ==============
+
+@app.route("/api/admin/login", methods=["POST"])
+@limiter.limit("10 per minute")
+def admin_login():
+    """Admin login endpoint"""
+    data = request.get_json(silent=True) or {}
+    username = data.get("username", "").strip()
+    password = data.get("password", "").strip()
+    
+    if not username or not password:
+        return jsonify({"error": "Username and password are required"}), 400
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT id, password_hash, email_verified, role, is_active FROM admin_users WHERE username = ?",
+        (username,)
+    )
+    user = cursor.fetchone()
+    
+    if not user:
+        return jsonify({"error": "Invalid credentials"}), 401
+    
+    user_id, stored_password_hash, email_verified, role, is_active = user
+    
+    if not is_active:
+        return jsonify({"error": "Account is deactivated"}), 401
+    
+    if hash_password(password) != stored_password_hash:
+        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+        cursor.execute(
+            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+            (user_id, 'login_failed', 'Invalid password', ip_address)
+        )
+        conn.commit()
+        return jsonify({"error": "Invalid credentials"}), 401
+    
+    # Generate session token
+    session_token = secrets.token_hex(32)
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+    user_agent = request.headers.get("User-Agent", "")
+    
+    cursor.execute(
+        "INSERT INTO admin_sessions (user_id, session_token, expires_at, ip_address, user_agent) VALUES (?, ?, ?, ?, ?)",
+        (user_id, session_token, expires_at.isoformat(), ip_address, user_agent)
+    )
+    
+    cursor.execute(
+        "UPDATE admin_users SET last_login = ? WHERE id = ?",
+        (datetime.now(timezone.utc).isoformat(), user_id)
+    )
+    
+    cursor.execute(
+        "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+        (user_id, 'login_success', 'User logged in', ip_address)
+    )
+    
+    conn.commit()
+    
+    return jsonify({
+        "status": "success",
+        "session_token": session_token,
+        "user": {
+            "username": username,
+            "role": role
+        }
+    })
 
 
 @app.route("/api/admin/logout", methods=["POST"])
@@ -1121,14 +760,10 @@ def admin_logout():
     session_token = request.headers.get("X-SESSION-TOKEN")
     
     if session_token:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         cursor = conn.cursor()
-        
-        try:
-            cursor.execute("DELETE FROM admin_sessions WHERE session_token = ?", (session_token,))
-            conn.commit()
-        finally:
-            conn.close()
+        cursor.execute("DELETE FROM admin_sessions WHERE session_token = ?", (session_token,))
+        conn.commit()
     
     return jsonify({"status": "success", "message": "Logged out successfully"})
 
@@ -1141,15 +776,25 @@ def admin_me():
     if not session_token:
         return jsonify({"error": "Unauthorized"}), 401
     
-    # Try session token
-    user = get_user_from_session(session_token)
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        """SELECT u.username, u.role, u.email, u.created_at, u.last_login 
+           FROM admin_users u 
+           JOIN admin_sessions s ON u.id = s.user_id 
+           WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
+        (session_token, datetime.now(timezone.utc).isoformat())
+    )
+    
+    user = cursor.fetchone()
     if user:
         return jsonify({
-            "username": user["username"],
-            "role": user["role"],
-            "email": user["email"],
-            "created_at": user["created_at"],
-            "last_login": user["last_login"],
+            "username": user[0],
+            "role": user[1],
+            "email": user[2],
+            "created_at": user[3],
+            "last_login": user[4],
             "auth_method": "session"
         })
     
@@ -1179,53 +824,421 @@ def change_password():
     if len(new_password) < 6:
         return jsonify({"error": "New password must be at least 6 characters long"}), 400
     
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     cursor = conn.cursor()
     
-    try:
-        # Get current password hash
-        cursor.execute(
-            "SELECT password_hash FROM admin_users WHERE id = ?",
-            (user["id"],)
-        )
-        result = cursor.fetchone()
-        
-        if not result:
-            return jsonify({"error": "User not found"}), 404
-        
-        stored_hash = result[0]
-        
-        # Verify current password
-        if hash_password(current_password) != stored_hash:
-            return jsonify({"error": "Current password is incorrect"}), 401
-        
-        # Update password
-        new_hash = hash_password(new_password)
-        cursor.execute(
-            "UPDATE admin_users SET password_hash = ? WHERE id = ?",
-            (new_hash, user["id"])
-        )
-        
-        # Log password change
-        ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
-        cursor.execute(
-            "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
-            (user["id"], 'password_change', 'Password changed successfully', ip_address)
-        )
-        
-        conn.commit()
-        
-        return jsonify({
-            "status": "success",
-            "message": "Password changed successfully"
-        })
-        
-    finally:
-        conn.close()
+    cursor.execute(
+        "SELECT password_hash FROM admin_users WHERE id = ?",
+        (user["id"],)
+    )
+    result = cursor.fetchone()
+    
+    if not result:
+        return jsonify({"error": "User not found"}), 404
+    
+    if hash_password(current_password) != result[0]:
+        return jsonify({"error": "Current password is incorrect"}), 401
+    
+    new_hash = hash_password(new_password)
+    cursor.execute(
+        "UPDATE admin_users SET password_hash = ? WHERE id = ?",
+        (new_hash, user["id"])
+    )
+    
+    ip_address = request.headers.get("X-Forwarded-For", request.remote_addr) or "unknown"
+    cursor.execute(
+        "INSERT INTO admin_audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)",
+        (user["id"], 'password_change', 'Password changed successfully', ip_address)
+    )
+    
+    conn.commit()
+    
+    return jsonify({
+        "status": "success",
+        "message": "Password changed successfully"
+    })
+
+
+# ============== STATS & DATA ENDPOINTS ==============
+
+@app.route("/api/stats")
+def stats():
+    """Get statistics about submissions"""
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Total submissions
+    cursor.execute("SELECT COUNT(*) FROM submissions")
+    total = cursor.fetchone()[0]
+    
+    # Average word count
+    cursor.execute("SELECT AVG(word_count) FROM submissions")
+    avg_word_count = cursor.fetchone()[0] or 0
+    
+    # Attention check statistics
+    cursor.execute("SELECT COUNT(*) FROM submissions WHERE is_attention = 1")
+    attention_total = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM submissions WHERE is_attention = 1 AND attention_passed = 0")
+    attention_failed = cursor.fetchone()[0]
+    
+    attention_fail_rate = (attention_failed / attention_total) if attention_total > 0 else 0
+    
+    return jsonify({
+        "total_submissions": total,
+        "avg_word_count": avg_word_count,
+        "attention_fail_rate": attention_fail_rate,
+    })
+
+
+@app.route("/admin/csv-data")
+@limiter.limit("10 per minute")
+def get_csv_data():
+    """Get submission data as JSON for admin panel"""
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT s.*, p.username, p.gender, p.age, p.place, p.native_language, p.prior_experience
+        FROM submissions s
+        LEFT JOIN participants p ON s.participant_id = p.participant_id
+        ORDER BY s.created_at DESC
+    ''')
+    
+    rows = cursor.fetchall()
+    columns = [description[0] for description in cursor.description]
+    
+    data = []
+    for row in rows:
+        row_dict = {}
+        for col, val in zip(columns, row):
+            # Convert boolean values
+            if col in ['is_survey', 'is_attention', 'attention_passed', 'too_fast_flag']:
+                row_dict[col] = bool(val) if val is not None else None
+            else:
+                row_dict[col] = val
+        data.append(row_dict)
+    
+    return jsonify(data)
+
+
+@app.route("/admin/download")
+def download_csv():
+    """Download submissions as CSV file"""
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        SELECT s.*, p.username, p.gender, p.age, p.place, p.native_language, p.prior_experience
+        FROM submissions s
+        LEFT JOIN participants p ON s.participant_id = p.participant_id
+        ORDER BY s.created_at DESC
+    ''')
+    
+    rows = cursor.fetchall()
+    columns = [description[0] for description in cursor.description]
+    
+    # Ensure data directory exists
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Write to CSV
+    import csv
+    with open(CSV_PATH, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(columns)
+        for row in rows:
+            writer.writerow(row)
+    
+    return send_from_directory(DATA_DIR, CSV_PATH.name, as_attachment=True)
+
+
+@app.route("/admin/settings/csv-delete", methods=["DELETE"])
+@limiter.limit("5 per minute")
+def delete_csv_data():
+    """Delete all data from submissions table (admin only)"""
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Delete all submissions
+    cursor.execute("DELETE FROM submissions")
+    
+    # Also delete participants and consent records
+    cursor.execute("DELETE FROM consent_records")
+    cursor.execute("DELETE FROM participants")
+    
+    conn.commit()
+    
+    return jsonify({
+        "status": "success",
+        "message": "All data has been deleted successfully"
+    })
+
+
+# ============== SECURITY ENDPOINTS ==============
+
+@app.route("/api/security/info")
+def security_info():
+    """Get security information"""
+    return jsonify({
+        "security": {
+            "rate_limits": {
+                "default": "200 per day, 50 per hour",
+                "admin_endpoints": "10 per minute"
+            },
+            "cors_allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
+            "security_headers": [
+                "X-Content-Type-Options: nosniff",
+                "X-Frame-Options: SAMEORIGIN",
+                "X-XSS-Protection: 1; mode=block",
+                "Content-Security-Policy: default-src 'self'",
+                "Strict-Transport-Security: max-age=31536000",
+                "Referrer-Policy: strict-origin-when-cross-origin"
+            ],
+            "data_protection": {
+                "ip_hashing": "SHA-256 with salt",
+                "anonymous_data": True,
+                "storage": "SQLite with indexed columns"
+            }
+        }
+    })
+
+
+@app.route("/admin/security/audit")
+@limiter.limit("5 per minute")
+def security_audit():
+    """Admin security audit endpoint"""
+    user = require_auth()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # Get counts for audit
+    cursor.execute("SELECT COUNT(*) FROM admin_users")
+    admin_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM admin_sessions WHERE expires_at > ?", 
+                   (datetime.now(timezone.utc).isoformat(),))
+    active_sessions = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM participants")
+    participant_count = cursor.fetchone()[0]
+    
+    cursor.execute("SELECT COUNT(*) FROM submissions")
+    submission_count = cursor.fetchone()[0]
+    
+    return jsonify({
+        "security_audit": {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "status": "ok",
+            "counts": {
+                "admin_users": admin_count,
+                "active_sessions": active_sessions,
+                "participants": participant_count,
+                "submissions": submission_count
+            },
+            "checks": {
+                "password_validation": "enabled",
+                "rate_limiting": "enabled",
+                "cors_restrictions": "enabled",
+                "security_headers": "enabled",
+                "data_encryption": "enabled (IP hashing)",
+                "database_indexes": "enabled"
+            },
+            "recommendations": [
+                "Change password regularly",
+                "Monitor failed login attempts",
+                "Review CORS origins in production",
+                "Enable HTTPS in production",
+                "Regular database backups recommended"
+            ]
+        }
+    })
+
+
+# ============== API DOCUMENTATION ==============
+
+@app.route("/api/docs")
+@limiter.limit("30 per minute")
+def api_docs():
+    """Comprehensive API documentation"""
+    return jsonify({
+        "title": "C.O.G.N.I.T. API Documentation",
+        "version": "3.0.0",
+        "description": "Complete API documentation for the C.O.G.N.I.T. research platform with database integration",
+        "base_url": "/api",
+        "authentication": {
+            "type": "Session Token",
+            "description": "Admin endpoints require a session token. Login with username/password to obtain a token.",
+            "methods": ["X-SESSION-TOKEN header"],
+            "login_endpoint": "/api/admin/login",
+            "token_ttl_hours": 24
+        },
+        "endpoints": {
+            "system": {
+                "routes": [
+                    {
+                        "path": "/api/health",
+                        "method": "GET",
+                        "description": "Health check endpoint to verify system connectivity",
+                        "auth": False
+                    },
+                    {
+                        "path": "/api/security/info",
+                        "method": "GET",
+                        "description": "Get security configuration information",
+                        "auth": False
+                    }
+                ]
+            },
+            "participants": {
+                "routes": [
+                    {
+                        "path": "/api/participants",
+                        "method": "POST",
+                        "description": "Create a new participant record",
+                        "auth": False,
+                        "body": ["participant_id", "session_id", "username", "gender", "age", "place", "native_language", "prior_experience", "email", "phone"]
+                    },
+                    {
+                        "path": "/api/participants/<id>",
+                        "method": "GET",
+                        "description": "Get participant details",
+                        "auth": False
+                    }
+                ]
+            },
+            "consent": {
+                "routes": [
+                    {
+                        "path": "/api/consent",
+                        "method": "POST",
+                        "description": "Record participant consent",
+                        "auth": False,
+                        "body": ["participant_id", "consent_given"]
+                    },
+                    {
+                        "path": "/api/consent/<participant_id>",
+                        "method": "GET",
+                        "description": "Get consent status for a participant",
+                        "auth": False
+                    }
+                ]
+            },
+            "images": {
+                "routes": [
+                    {
+                        "path": "/api/images/random",
+                        "method": "GET",
+                        "description": "Get a random image",
+                        "auth": False,
+                        "params": ["type: normal|survey|attention"]
+                    },
+                    {
+                        "path": "/api/images/<image_id>",
+                        "method": "GET",
+                        "description": "Get a specific image file",
+                        "auth": False
+                    }
+                ]
+            },
+            "submissions": {
+                "routes": [
+                    {
+                        "path": "/api/submit",
+                        "method": "POST",
+                        "description": "Submit a description/rating",
+                        "auth": False,
+                        "body": ["participant_id", "session_id", "image_id", "description", "rating", "feedback", "time_spent_seconds"]
+                    },
+                    {
+                        "path": "/api/submissions/<participant_id>",
+                        "method": "GET",
+                        "description": "Get all submissions for a participant",
+                        "auth": False
+                    }
+                ]
+            },
+            "admin": {
+                "routes": [
+                    {
+                        "path": "/api/admin/login",
+                        "method": "POST",
+                        "description": "Admin login",
+                        "auth": False
+                    },
+                    {
+                        "path": "/api/admin/logout",
+                        "method": "POST",
+                        "description": "Admin logout",
+                        "auth": True
+                    },
+                    {
+                        "path": "/api/admin/me",
+                        "method": "GET",
+                        "description": "Get current admin info",
+                        "auth": True
+                    },
+                    {
+                        "path": "/api/admin/change-password",
+                        "method": "POST",
+                        "description": "Change admin password",
+                        "auth": True
+                    },
+                    {
+                        "path": "/api/stats",
+                        "method": "GET",
+                        "description": "Get submission statistics",
+                        "auth": True
+                    },
+                    {
+                        "path": "/admin/csv-data",
+                        "method": "GET",
+                        "description": "Get all submission data as JSON",
+                        "auth": True
+                    },
+                    {
+                        "path": "/admin/download",
+                        "method": "GET",
+                        "description": "Download submissions as CSV",
+                        "auth": True
+                    },
+                    {
+                        "path": "/admin/settings/csv-delete",
+                        "method": "DELETE",
+                        "description": "Delete all data",
+                        "auth": True
+                    },
+                    {
+                        "path": "/admin/security/audit",
+                        "method": "GET",
+                        "description": "Run security audit",
+                        "auth": True
+                    }
+                ]
+            }
+        }
+    })
 
 
 if __name__ == "__main__":
-    ensure_csv()
     init_db()
     print("Starting C.O.G.N.I.T. backend server...")
     print("API Documentation available at: http://localhost:5000/api/docs")

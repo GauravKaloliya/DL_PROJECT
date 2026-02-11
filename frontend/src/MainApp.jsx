@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import App from "./App.jsx";
 import AdminPanel from "./admin/AdminPanel.jsx";
 import NotFound from "./components/NotFound.jsx";
@@ -9,7 +9,6 @@ import ApiDocs from "./components/ApiDocs.jsx";
 function MainApp() {
   const [error, setError] = React.useState(null);
 
-  // Error boundary for the entire app
   React.useEffect(() => {
     const handleError = (event) => {
       console.error('Application error:', event.error);

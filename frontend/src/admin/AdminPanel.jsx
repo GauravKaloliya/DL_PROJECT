@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+
 // Settings Tab Component
 function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -8,7 +10,7 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
   const [deleteError, setDeleteError] = useState(null);
   const [deleteSuccess, setDeleteSuccess] = useState(false);
   
-  const handleDeleteCSV = async () => {
+  const handleDeleteData = async () => {
     setIsDeleting(true);
     setDeleteError(null);
     setDeleteSuccess(false);
@@ -25,10 +27,10 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
         setDeleteSuccess(true);
         setShowConfirmDelete(false);
         onDataDeleted();
-        onToast("All CSV data has been deleted successfully", "success");
+        onToast("All data has been deleted successfully", "success");
       } else {
-        setDeleteError(data.error || "Failed to delete CSV data");
-        onToast(data.error || "Failed to delete CSV data", "error");
+        setDeleteError(data.error || "Failed to delete data");
+        onToast(data.error || "Failed to delete data", "error");
       }
     } catch (err) {
       setDeleteError("Network error. Please try again.");
@@ -42,7 +44,6 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
     <div className="settings">
       <h2>Settings</h2>
       
-      {/* Data Management Section */}
       <div className="settings-section">
         <h3>Data Management</h3>
         <p style={{ color: 'var(--muted)', marginBottom: '20px' }}>
@@ -68,11 +69,10 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
           </div>
         </div>
 
-        {/* Delete Data Section */}
         <div className="danger-zone">
           <h4 style={{ marginTop: 0, color: '#c9444a' }}>⚠️ Danger Zone</h4>
           <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>
-            Deleting data is permanent and cannot be undone. All submissions will be removed from the CSV file.
+            Deleting data is permanent and cannot be undone. All submissions, participants, and consent records will be removed.
           </p>
           
           {!showConfirmDelete ? (
@@ -81,7 +81,7 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
               onClick={() => setShowConfirmDelete(true)}
               disabled={csvData.length === 0}
             >
-              Delete All CSV Data
+              Delete All Data
             </button>
           ) : (
             <div className="reset-confirm">
@@ -91,7 +91,7 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
               <div style={{ display: 'flex', gap: '12px' }}>
                 <button 
                   className="danger-button"
-                  onClick={handleDeleteCSV}
+                  onClick={handleDeleteData}
                   disabled={isDeleting}
                 >
                   {isDeleting ? "Deleting..." : "Yes, Delete All Data"}
@@ -113,27 +113,24 @@ function SettingsTab({ sessionToken, csvData = [], onDataDeleted, onToast }) {
         </div>
       </div>
       
-      {/* System Information Section */}
       <div className="settings-section">
         <h3>System Information</h3>
         <div className="system-info">
-          <p><strong>API Version:</strong> 2.0.0</p>
-          <p><strong>Database:</strong> SQLite + CSV</p>
+          <p><strong>API Version:</strong> 3.0.0</p>
+          <p><strong>Database:</strong> SQLite with full database integration</p>
           <p><strong>Status:</strong> <span className="status-online">Online</span></p>
         </div>
       </div>
       
       {deleteSuccess && (
         <div className="toast success" style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 1000 }}>
-          <span>All CSV data has been deleted successfully</span>
+          <span>All data has been deleted successfully</span>
           <button onClick={() => setDeleteSuccess(false)} aria-label="Dismiss">×</button>
         </div>
       )}
     </div>
   );
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 // Allow copy/paste only in input fields
 const preventCopyPaste = (e) => {
