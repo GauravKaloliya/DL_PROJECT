@@ -97,21 +97,52 @@ export default function TrialPage({
   if (isSurvey && surveyFeedbackReady) {
     return (
       <div className="panel">
-        <div className="guidance">
-          <h2>Survey Complete!</h2>
-          <p>
+        <div className="guidance" style={{ textAlign: 'center' }}>
+          <div style={{ 
+            background: 'linear-gradient(135deg, var(--success), var(--primary))',
+            width: '100px',
+            height: '100px',
+            borderRadius: '50%',
+            margin: '0 auto 24px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontSize: '48px',
+            boxShadow: '0 4px 20px rgba(24, 119, 242, 0.3)'
+          }}>
+            ✓
+          </div>
+          <h2 style={{ color: 'var(--success)', marginBottom: '16px' }}>Survey Complete!</h2>
+          <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>
             Great job on your survey trial! You can now choose to continue with more survey 
             images or finish the session.
           </p>
-          <p style={{ color: 'var(--muted)', margin: '16px 0' }}>
-            <em>Tip: Aim to describe colors, textures, relationships, and any notable objects. 
-            Remember to write at least {MIN_WORDS} words per description.</em>
-          </p>
+          <div style={{ 
+            backgroundColor: 'var(--accent-bg)', 
+            padding: '16px', 
+            borderRadius: '12px',
+            marginBottom: '24px',
+            borderLeft: '4px solid var(--primary)'
+          }}>
+            <p style={{ margin: '0', color: 'var(--muted)' }}>
+              <em>Tip: Aim to describe colors, textures, relationships, and any notable objects. 
+              Remember to write at least {MIN_WORDS} words per description.</em>
+            </p>
+          </div>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button className="ghost" onClick={onSurveyContinue}>
+            <button 
+              className="primary"
+              onClick={onSurveyContinue}
+              style={{ padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white' }}
+            >
               Continue Survey
             </button>
-            <button className="ghost" onClick={onSurveyFinish}>
+            <button 
+              className="ghost"
+              onClick={onSurveyFinish}
+              style={{ padding: '12px 24px', border: '2px solid var(--primary)', color: 'var(--primary)' }}
+            >
               Finish Survey
             </button>
           </div>

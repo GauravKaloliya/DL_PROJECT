@@ -44,53 +44,90 @@ export default function PaymentPage({
       </p>
       
       <div className="welcome-info">
-        <h3>Payment Information</h3>
-        <div style={{ 
-          backgroundColor: 'var(--accent-bg)', 
-          padding: '20px', 
-          borderRadius: '8px',
-          marginBottom: '20px',
+        <div style={{  
+          background: 'linear-gradient(135deg, var(--accent), var(--secondary))',
+          padding: '30px',  
+          borderRadius: '16px',
+          marginBottom: '24px',
           textAlign: 'center',
-          border: '2px solid var(--accent)',
+          boxShadow: '0 4px 20px rgba(24, 119, 242, 0.2)',
+          border: 'none'
         }}>
-          <p style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', color: 'var(--accent)' }}>
-            ₹1.00
+          <div style={{  
+            backgroundColor: 'white',  
+            borderRadius: '50%',  
+            width: '80px',  
+            height: '80px',
+            margin: '0 auto 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+          }}>
+            <span style={{ fontSize: '36px', fontWeight: 'bold', color: 'var(--primary)' }}>₹</span>
+          </div>
+          <p style={{ fontSize: '36px', fontWeight: 'bold', margin: '0', color: 'white' }}>
+            1.00
           </p>
-          <p style={{ margin: '8px 0 0', color: 'var(--muted)' }}>
+          <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.9)', fontSize: '14px' }}>
             One-time participation fee
           </p>
         </div>
 
-        <h3>Why is there a fee?</h3>
-        <p>
-          A nominal fee of ₹1 (one rupee) is required to participate in this research study. 
-          This small fee serves several important purposes:
-        </p>
-        <ul>
-          <li><strong>Ensures Serious Participation:</strong> The minimal fee helps ensure that participants are genuinely interested in contributing to the research.</li>
-          <li><strong>Reduces Spam/Bot Activity:</strong> The payment requirement helps prevent automated bots from flooding the study with invalid responses.</li>
-          <li><strong>Quality Assurance:</strong> Participants who have made a small commitment are more likely to provide thoughtful and detailed responses.</li>
-          <li><strong>Resource Allocation:</strong> The fee helps offset the costs of maintaining the research platform and storing your valuable data.</li>
-        </ul>
+        <div style={{ 
+          backgroundColor: 'var(--panel)', 
+          padding: '20px', 
+          borderRadius: '12px',
+          marginBottom: '20px',
+          borderLeft: '4px solid var(--primary)'
+        }}>
+          <h3 style={{ marginTop: '0', color: 'var(--primary)' }}>Why is there a fee?</h3>
+          <p style={{ marginBottom: '12px' }}>
+            A nominal fee of ₹1 (one rupee) is required to participate in this research study.
+            This small fee serves several important purposes:
+          </p>
+          <ul style={{ paddingLeft: '20px' }}>
+            <li><strong>Ensures Serious Participation:</strong> The minimal fee helps ensure that participants are genuinely interested in contributing to the research.</li>
+            <li><strong>Reduces Spam/Bot Activity:</strong> The payment requirement helps prevent automated bots from flooding the study with invalid responses.</li>
+            <li><strong>Quality Assurance:</strong> Participants who have made a small commitment are more likely to provide thoughtful and detailed responses.</li>
+            <li><strong>Resource Allocation:</strong> The fee helps offset the costs of maintaining the research platform and storing your valuable data.</li>
+          </ul>
+        </div>
 
-        <h3>Payment Terms</h3>
-        <ul>
-          <li>This is a one-time, non-refundable fee of ₹1</li>
-          <li>Your payment will be processed securely</li>
-          <li>Payment information is not linked to your research responses</li>
-          <li>All research data remains anonymous and confidential</li>
-          <li>The fee is strictly for participation verification purposes</li>
-        </ul>
+        <div style={{ 
+          backgroundColor: 'var(--panel)', 
+          padding: '20px', 
+          borderRadius: '12px',
+          marginBottom: '20px',
+          borderLeft: '4px solid var(--success)'
+        }}>
+          <h3 style={{ marginTop: '0', color: 'var(--success)' }}>Payment Terms</h3>
+          <ul style={{ paddingLeft: '20px' }}>
+            <li>This is a one-time, non-refundable fee of ₹1</li>
+            <li>Your payment will be processed securely</li>
+            <li>Payment information is not linked to your research responses</li>
+            <li>All research data remains anonymous and confidential</li>
+            <li>The fee is strictly for participation verification purposes</li>
+          </ul>
+        </div>
 
-        <h3>What happens after payment?</h3>
-        <p>
-          Once you complete the payment, you will immediately proceed to the survey portion of the research study. 
-          Your payment confirmation will be recorded, but your responses and payment details will be kept completely separate 
-          to maintain your privacy and anonymity in the research data.
-        </p>
+        <div style={{ 
+          backgroundColor: 'var(--panel)', 
+          padding: '20px', 
+          borderRadius: '12px',
+          marginBottom: '20px',
+          borderLeft: '4px solid var(--warning)'
+        }}>
+          <h3 style={{ marginTop: '0', color: 'var(--warning)' }}>What happens after payment?</h3>
+          <p>
+            Once you complete the payment, you will immediately proceed to the survey portion of the research study.
+            Your payment confirmation will be recorded, but your responses and payment details will be kept completely separate
+            to maintain your privacy and anonymity in the research data.
+          </p>
+        </div>
 
         <div className="banner info" style={{ marginTop: '20px' }}>
-          <strong>Note:</strong> This is a simulated payment interface for research purposes. 
+          <strong>Note:</strong> This is a simulated payment interface for research purposes.
           In a production environment, you would be redirected to a secure payment gateway.
         </div>
       </div>
@@ -101,7 +138,13 @@ export default function PaymentPage({
         </div>
       )}
       
-      <div className={`consent-checkbox ${error && !paymentChecked ? 'error' : ''}`}>
+      <div className={`consent-checkbox ${error && !paymentChecked ? 'error' : ''}`} style={{ 
+        backgroundColor: 'var(--panel)', 
+        padding: '20px', 
+        borderRadius: '12px',
+        border: error && !paymentChecked ? '2px solid var(--error)' : '2px solid var(--border)',
+        marginTop: '20px'
+      }}>
         <input
           type="checkbox"
           checked={paymentChecked}
@@ -110,11 +153,12 @@ export default function PaymentPage({
             if (error) setError(null);
           }}
           id="payment-check"
+          style={{ transform: 'scale(1.2)', marginRight: '12px' }}
         />
-        <label htmlFor="payment-check">
+        <label htmlFor="payment-check" style={{ fontSize: '16px' }}>
           <strong>I agree to pay ₹1.00 to participate in this research study</strong>
-          <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
-            I understand that this is a one-time, non-refundable fee and agree to the payment terms. 
+          <p style={{ margin: '8px 0 0', fontSize: '14px', color: 'var(--muted)', fontWeight: '400' }}>
+            I understand that this is a one-time, non-refundable fee and agree to the payment terms.
             I acknowledge that my payment details will be kept separate from my research responses.
           </p>
         </label>
@@ -125,6 +169,7 @@ export default function PaymentPage({
           className="ghost"
           onClick={onBack}
           disabled={submitting}
+          style={{ padding: '12px 24px' }}
         >
           Back
         </button>
@@ -132,6 +177,7 @@ export default function PaymentPage({
           className="primary"
           onClick={handleSubmit}
           disabled={!systemReady || submitting}
+          style={{ padding: '12px 24px', fontSize: '16px' }}
         >
           {submitting ? "Processing..." : "Pay ₹1 & Continue"}
         </button>
