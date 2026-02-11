@@ -1230,4 +1230,4 @@ if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
     print("API Documentation available at: http://localhost:5000/api/docs")
     print("API available at: http://localhost:5000/api/")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5001)
