@@ -1,7 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import App from "./App.jsx";
-import AdminPanel from "./admin/AdminPanel.jsx";
 import NotFound from "./components/NotFound.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
 import ApiDocs from "./components/ApiDocs.jsx";
@@ -35,8 +34,6 @@ function MainApp() {
     <Router>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/admin/*" element={<AdminPanel />} />
         <Route path="/api/docs" element={<ApiDocs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

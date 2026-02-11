@@ -45,9 +45,6 @@ export default function ErrorPage({ error, resetError }) {
             <button className="ghost" onClick={() => navigate('/')}>
               Go Home
             </button>
-            <button className="ghost" onClick={() => navigate('/admin')}>
-              Admin Panel
-            </button>
           </div>
           <div style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
             Created by Gaurav Kaloliya

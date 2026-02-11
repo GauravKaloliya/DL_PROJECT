@@ -5,12 +5,8 @@ Test script to verify the specific features implemented in the ticket.
 This script tests:
 1. Image loading validation functionality
 2. Survey completion buttons (Continue Survey and Finish Survey)
-3. Admin authentication with updated credentials
 """
 
-import hashlib
-import sqlite3
-import os
 from pathlib import Path
 
 def test_image_loading_functionality():
@@ -63,8 +59,8 @@ def test_survey_completion_buttons():
         checks = [
             ('Continue Survey button', 'Continue Survey'),
             ('Finish Survey button', 'Finish Survey'),
-            ('Button container', 'display: \'flex\''),
-            ('Gap between buttons', 'gap: \'16px\''),
+            ('Button container', "display: 'flex'"),
+            ('Gap between buttons', "gap: '16px'"),
             ('Finish Survey handler', 'onClick={handleFinishEarly}'),
             ('Continue Survey handler', 'onClick={handleNext}'),
         ]
@@ -82,47 +78,6 @@ def test_survey_completion_buttons():
     except Exception as e:
         print(f"   ❌ Error reading frontend file: {e}")
         return False
-
-def test_admin_authentication():
-    """Test admin authentication with updated credentials"""
-    print("\n🔐 Testing admin authentication...")
-    
-    db_path = Path(__file__).parent / "backend" / "COGNIT.db"
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Get the stored password hash
-        cursor.execute("SELECT password_hash FROM admin_users WHERE username = ?", ("Gaurav",))
-        result = cursor.fetchone()
-        
-        if not result:
-            print("   ❌ Admin user 'Gaurav' not found")
-            return False
-        
-        stored_hash = result[0]
-        
-        # Test authentication with correct password
-        test_password = "Gaurav@0809"
-        test_hash = hashlib.sha256(test_password.encode()).hexdigest()
-        
-        if stored_hash == test_hash:
-            print("   ✅ Admin password is correctly set to 'Gaurav@0809'")
-            print("   ✅ Password hash verification successful")
-            return True
-        else:
-            print("   ❌ Password hash does not match expected value")
-            print(f"   Expected: {test_hash}")
-            print(f"   Got: {stored_hash}")
-            return False
-            
-    except Exception as e:
-        print(f"   ❌ Error testing admin authentication: {e}")
-        return False
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 def test_css_styling():
     """Test that CSS styling is properly implemented"""
@@ -170,9 +125,6 @@ def test_backend_security():
         
         # Check for security features
         checks = [
-            ('Password hashing function', 'def hash_password(password):'),
-            ('Admin authentication', 'def authenticate_admin(username, password):'),
-            ('Session validation', 'def validate_session(session_token):'),
             ('Rate limiting', 'flask_limiter'),
             ('CORS configuration', 'CORS(app'),
             ('Security headers', 'add_security_headers'),
@@ -199,7 +151,6 @@ def main():
     tests = [
         test_image_loading_functionality,
         test_survey_completion_buttons,
-        test_admin_authentication,
         test_css_styling,
         test_backend_security,
     ]
@@ -221,9 +172,8 @@ def main():
         print("\n📋 Summary of implemented features:")
         print("   1. ✅ Image loading validation with loading/error states")
         print("   2. ✅ Survey completion buttons (Continue Survey + Finish Survey)")
-        print("   3. ✅ Admin credentials updated (Gaurav/Gaurav@0809)")
-        print("   4. ✅ CSS styling for new UI elements")
-        print("   5. ✅ Backend security features maintained")
+        print("   3. ✅ CSS styling for new UI elements")
+        print("   4. ✅ Backend security features maintained")
         return 0
     else:
         print("\n⚠️  Some feature tests failed. Please review the implementation.")
