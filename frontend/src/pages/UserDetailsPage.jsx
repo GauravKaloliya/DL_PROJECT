@@ -214,7 +214,7 @@ export default function UserDetailsPage({
           onClick={handleSubmit}
           disabled={!systemReady || submitting}
         >
-          {submitting ? "Saving..." : "Continue to Consent"}
+          {submitting ? "Saving..." : "Continue to Payment"}
         </button>
       </div>
     </div>
