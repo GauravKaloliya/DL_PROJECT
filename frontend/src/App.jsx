@@ -365,6 +365,10 @@ export default function App() {
   };
 
   const handleConsentStart = () => {
+    if (!systemReady) {
+      addToast("System is not ready. Please wait for the connection to be established.", "error");
+      return;
+    }
     if (!validateForm()) {
       addToast("Please fill in all required fields correctly 💕", "error");
       return;
@@ -772,14 +776,18 @@ export default function App() {
             </div>
             
             <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
-              <button className="primary" onClick={handleConsentStart}>
-                Start Survey
+              <button
+                className="primary"
+                onClick={handleConsentStart}
+                disabled={!systemReady}
+              >
+                {systemReady ? "Start Survey" : "Connecting..."}
               </button>
             </div>
           </div>
         )}
 
-        {stage === "survey" && trial && (
+        {stage === "survey" && trial && systemReady && (
           <div className="panel">
             <div className="progress">
               <span>Survey Session</span>
@@ -831,7 +839,7 @@ export default function App() {
           </div>
         )}
 
-        {stage === "trial" && trial && (
+        {stage === "trial" && trial && systemReady && (
           <div className="panel">
             <div className="progress">
               <button className="ghost" onClick={handleFinishEarly}>
