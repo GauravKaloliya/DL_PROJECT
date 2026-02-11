@@ -30,12 +30,6 @@ export default function ApiDocs() {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      // Could add a toast notification here
-    });
-  };
-
   if (loading) {
     return (
       <div className="app">
@@ -79,7 +73,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 3.0.0 • Full Database Integration
+              Version 3.0.0
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -97,7 +91,7 @@ export default function ApiDocs() {
           borderBottom: '2px solid var(--border)',
           flexWrap: 'wrap'
         }}>
-          {['overview', 'authentication', 'endpoints', 'examples', 'errors'].map((section) => (
+          {['overview', 'endpoints', 'examples', 'errors'].map((section) => (
             <button
               key={section}
               onClick={() => setActiveSection(section)}
@@ -125,8 +119,7 @@ export default function ApiDocs() {
             <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
               The C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) API 
               provides programmatic access to the research platform. This RESTful API allows you to 
-              integrate image description tasks into your applications, manage submissions, and 
-              retrieve research data.
+              integrate image description tasks into your applications and manage submissions.
             </p>
             
             <h3 style={{ marginTop: '32px' }}>Base URL</h3>
@@ -146,75 +139,15 @@ export default function ApiDocs() {
               <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
               <li><strong>Health Monitoring:</strong> Check system connectivity and service status</li>
-              <li><strong>Admin Operations:</strong> Login, review stats, export CSV data, and manage submissions</li>
-              <li><strong>Security:</strong> Session-token authentication with rate limiting and hardened headers</li>
+              <li><strong>Security:</strong> Rate limiting and hardened security headers</li>
             </ul>
 
             <h3 style={{ marginTop: '32px' }}>Quick Start</h3>
             <ol style={{ lineHeight: '1.8' }}>
-              <li>Login to the admin panel with your username and password</li>
               <li>Make your first request to <code>/api/images/random</code></li>
               <li>Submit participant data via <code>/api/submit</code></li>
-              <li>Download results from the admin panel</li>
+              <li>Retrieve submissions via <code>/api/submissions/&lt;participant_id&gt;</code></li>
             </ol>
-          </div>
-        )}
-
-        {/* Authentication Section */}
-        {activeSection === 'authentication' && (
-          <div>
-            <h2 style={{ color: 'var(--primary)' }}>Authentication</h2>
-            <p>
-              The API uses session-based authentication for admin endpoints. Login with your 
-              username and password to obtain a session token. Public endpoints for image 
-              retrieval and data submission do not require authentication.
-            </p>
-
-            <h3 style={{ marginTop: '24px' }}>Session Token Method</h3>
-            <div style={{ marginTop: '16px' }}>
-              <h4>Step 1: Login to get a session token</h4>
-              <div style={{ 
-                background: 'var(--bg)', 
-                padding: '16px', 
-                borderRadius: '12px',
-                border: '2px solid var(--border)',
-                marginTop: '12px'
-              }}>
-                <code style={{ fontSize: '14px' }}>
-                  POST /api/admin/login<br />
-                  Body: {`{ "username": "your-username", "password": "your-password" }`}
-                </code>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '24px' }}>
-              <h4>Step 2: Use the session token in headers</h4>
-              <div style={{ 
-                background: 'var(--bg)', 
-                padding: '16px', 
-                borderRadius: '12px',
-                border: '2px solid var(--border)',
-                marginTop: '12px'
-              }}>
-                <code style={{ fontSize: '14px' }}>
-                  X-SESSION-TOKEN: your-session-token-here
-                </code>
-              </div>
-            </div>
-
-            <div style={{ 
-              marginTop: '32px',
-              padding: '20px',
-              background: '#fff5e6',
-              borderRadius: '12px',
-              border: '2px solid #ffe0b3'
-            }}>
-              <h4 style={{ marginTop: 0, color: '#d97706' }}>⚠️ Security Notice</h4>
-              <p style={{ marginBottom: 0 }}>
-                Keep your session token secure and never expose it in client-side code. 
-                Session tokens expire after 24 hours for security.
-              </p>
-            </div>
           </div>
         )}
 
@@ -236,7 +169,6 @@ export default function ApiDocs() {
                 "timestamp": "2024-01-01T00:00:00Z",
                 "services": {
                   "database": "connected",
-                  "data_storage": "accessible",
                   "images": "accessible"
                 }
               }}
@@ -390,115 +322,6 @@ export default function ApiDocs() {
               description="Retrieve the API documentation"
               response="Documentation payload"
             />
-
-            {/* Admin Endpoints */}
-            <h3 style={{ marginTop: '40px' }}>Admin Endpoints (Authentication Required)</h3>
-
-            <EndpointCard
-              method="POST"
-              path="/api/admin/login"
-              description="Authenticate and receive a session token"
-              requestBody={{
-                "username": "string (required)",
-                "password": "string (required)"
-              }}
-              response={{
-                "status": "success",
-                "session_token": "string",
-                "user": { "username": "admin", "role": "admin" }
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/admin/me"
-              description="Get the current admin profile"
-              auth={true}
-              response={{
-                "username": "admin",
-                "role": "admin",
-                "email": "admin@example.com",
-                "auth_method": "session"
-              }}
-            />
-
-            <EndpointCard
-              method="POST"
-              path="/api/admin/change-password"
-              description="Update the current admin password"
-              auth={true}
-              requestBody={{
-                "current_password": "string (required)",
-                "new_password": "string (required, min 6 characters)"
-              }}
-              response={{
-                "status": "success",
-                "message": "Password changed successfully"
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/api/stats"
-              description="Get platform statistics"
-              auth={true}
-              response={{
-                "total_submissions": 150,
-                "avg_word_count": 42.5,
-                "attention_fail_rate": 0.05
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/admin/download"
-              description="Download all submissions as CSV file"
-              auth={true}
-              response="CSV file attachment"
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/admin/csv-data"
-              description="Get CSV data as JSON for admin panel"
-              auth={true}
-              response="[{...submission objects...}]"
-            />
-
-            <EndpointCard
-              method="DELETE"
-              path="/admin/settings/csv-delete"
-              description="Delete all data from CSV file"
-              auth={true}
-              response={{
-                "status": "success",
-                "message": "All CSV data has been deleted successfully"
-              }}
-            />
-
-            <EndpointCard
-              method="GET"
-              path="/admin/security/audit"
-              description="Run the security audit checklist"
-              auth={true}
-              response={{
-                "security_audit": {
-                  "status": "ok",
-                  "recommendations": "array"
-                }
-              }}
-            />
-
-            <EndpointCard
-              method="POST"
-              path="/api/admin/logout"
-              description="Invalidate the current admin session"
-              auth={true}
-              response={{
-                "status": "success",
-                "message": "Logged out successfully"
-              }}
-            />
           </div>
         )}
 
@@ -509,56 +332,36 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '24px' }}>JavaScript / Fetch</h3>
             <CodeBlock code={`// Check system health
-            const healthResponse = await fetch('/api/health');
-            const health = await healthResponse.json();
-            console.log(health.status); // 'healthy' or 'degraded'
+const healthResponse = await fetch('/api/health');
+const health = await healthResponse.json();
+console.log(health.status); // 'healthy' or 'degraded'
 
-            // Get a random image
-            const response = await fetch('/api/images/random?type=normal');
-            const image = await response.json();
-            console.log(image.image_url);
+// Get a random image
+const response = await fetch('/api/images/random?type=normal');
+const image = await response.json();
+console.log(image.image_url);
 
-            // Submit participant data
-            const submission = {
-            participant_id: 'user-123',
-            session_id: 'session-456',
-            image_id: 'normal/aurora-lake.svg',
-            description: 'The image shows a beautiful sunset over mountains...',
-            rating: 8,
-            feedback: 'Interesting image',
-            time_spent_seconds: 45,
-            is_survey: false,
-            is_attention: false,
-            username: 'john_doe',
-            gender: 'male',
-            age: '25',
-            place: 'New York',
-            native_language: 'English',
-            prior_experience: 'Photography'
-            };
+// Submit participant data
+const submission = {
+  participant_id: 'user-123',
+  session_id: 'session-456',
+  image_id: 'normal/aurora-lake.svg',
+  description: 'The image shows a beautiful sunset over mountains...',
+  rating: 8,
+  feedback: 'Interesting image',
+  time_spent_seconds: 45,
+  is_survey: false,
+  is_attention: false
+};
 
-            const submitResponse = await fetch('/api/submit', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(submission)
-            });
+const submitResponse = await fetch('/api/submit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(submission)
+});
 
-            const result = await submitResponse.json();
-            console.log(result.status); // 'ok'
-
-            // Admin login + stats
-            const loginResponse = await fetch('/api/admin/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: 'admin', password: 'password' })
-            });
-            const loginData = await loginResponse.json();
-
-            const statsResponse = await fetch('/api/stats', {
-            headers: { 'X-SESSION-TOKEN': loginData.session_token }
-            });
-            const stats = await statsResponse.json();
-            console.log(stats.total_submissions);`} />
+const result = await submitResponse.json();
+console.log(result.status); // 'ok'`} />
 
             <h3 style={{ marginTop: '32px' }}>Python / Requests</h3>
             <CodeBlock code={`import requests
@@ -583,13 +386,7 @@ submission = {
     'feedback': 'Interesting image',
     'time_spent_seconds': 45,
     'is_survey': False,
-    'is_attention': False,
-    'username': 'john_doe',
-    'gender': 'male',
-    'age': '25',
-    'place': 'New York',
-    'native_language': 'English',
-    'prior_experience': 'Photography'
+    'is_attention': False
 }
 
 response = requests.post(
@@ -597,20 +394,7 @@ response = requests.post(
     json=submission
 )
 result = response.json()
-print(result['status'])  # 'ok'
-
-# Admin login + stats
-login_response = requests.post(
-    'http://localhost:5000/api/admin/login',
-    json={'username': 'admin', 'password': 'password'}
-)
-login_data = login_response.json()
-
-stats_response = requests.get(
-    'http://localhost:5000/api/stats',
-    headers={'X-SESSION-TOKEN': login_data['session_token']}
-)
-print(stats_response.json())`} />
+print(result['status'])  # 'ok'`} />
 
             <h3 style={{ marginTop: '32px' }}>cURL</h3>
             <CodeBlock code={`# Check system health
@@ -631,18 +415,8 @@ curl -X POST "http://localhost:5000/api/submit" \\
     "feedback": "Great image",
     "time_spent_seconds": 45,
     "is_survey": false,
-    "is_attention": false,
-    "username": "john_doe"
-  }'
-
-# Admin login to retrieve session token
-curl -X POST "http://localhost:5000/api/admin/login" \\
-  -H "Content-Type: application/json" \\
-  -d '{"username": "admin", "password": "password"}'
-
-# Get admin stats (requires session token)
-curl -X GET "http://localhost:5000/api/stats" \\
-  -H "X-SESSION-TOKEN: YOUR_SESSION_TOKEN"`} />
+    "is_attention": false
+  }'`} />
           </div>
         )}
 
@@ -681,7 +455,7 @@ curl -X GET "http://localhost:5000/api/stats" \\
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px' }}><code>401</code></td>
                   <td style={{ padding: '12px' }}>Unauthorized</td>
-                  <td style={{ padding: '12px' }}>Invalid or missing session token</td>
+                  <td style={{ padding: '12px' }}>Authentication required</td>
                 </tr>
                 <tr style={{ borderBottom: '1px solid var(--border)' }}>
                   <td style={{ padding: '12px' }}><code>404</code></td>
@@ -730,9 +504,6 @@ curl -X GET "http://localhost:5000/api/stats" \\
           color: 'var(--muted)'
         }}>
           <p>C.O.G.N.I.T. API Documentation • Created by Gaurav Kaloliya</p>
-          <p style={{ fontSize: '14px' }}>
-            For support, contact <strong>research@cognit.org</strong>
-          </p>
         </div>
       </div>
     </div>
@@ -740,7 +511,7 @@ curl -X GET "http://localhost:5000/api/stats" \\
 }
 
 // Helper Components
-function EndpointCard({ method, path, description, parameters, requestBody, response, auth }) {
+function EndpointCard({ method, path, description, parameters, requestBody, response }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const methodColors = {
@@ -781,18 +552,6 @@ function EndpointCard({ method, path, description, parameters, requestBody, resp
           {method}
         </span>
         <code style={{ fontSize: '14px', color: 'var(--text)' }}>{path}</code>
-        {auth && (
-          <span style={{
-            background: '#fff5e6',
-            color: '#d97706',
-            padding: '2px 8px',
-            borderRadius: '4px',
-            fontSize: '11px',
-            fontWeight: '600'
-          }}>
-            🔒 Auth Required
-          </span>
-        )}
         <span style={{ marginLeft: 'auto', fontSize: '20px' }}>
           {isExpanded ? '▼' : '▶'}
         </span>

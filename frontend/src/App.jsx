@@ -467,9 +467,6 @@ export default function App() {
             <button className="ghost" onClick={() => navigate("/api/docs")}>
               API Docs
             </button>
-            <button className="ghost" onClick={() => navigate("/admin")}>
-              Admin
-            </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
               {online ? "Online" : "Offline"}
             </div>

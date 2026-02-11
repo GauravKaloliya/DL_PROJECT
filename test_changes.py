@@ -3,61 +3,15 @@
 Test script to verify the changes made to the C.O.G.N.I.T. application.
 
 This script tests:
-1. Admin credentials update (username: Gaurav, password: Gaurav@0809)
-2. Image loading validation
-3. Survey completion buttons functionality
+1. Image loading validation
+2. Survey completion buttons functionality
 """
 
-import hashlib
-import sqlite3
-import os
 from pathlib import Path
-
-def test_admin_credentials():
-    """Test that admin credentials are correctly updated"""
-    print("🔐 Testing admin credentials...")
-    
-    # Path to the database
-    db_path = Path(__file__).parent / "backend" / "COGNIT.db"
-    
-    # Expected password hash for "Gaurav@0809"
-    expected_password = "Gaurav@0809"
-    expected_hash = hashlib.sha256(expected_password.encode()).hexdigest()
-    
-    try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
-        # Check if admin user exists
-        cursor.execute("SELECT username, password_hash FROM admin_users WHERE username = ?", ("Gaurav",))
-        result = cursor.fetchone()
-        
-        if result:
-            username, stored_hash = result
-            if username == "Gaurav" and stored_hash == expected_hash:
-                print("✅ Admin credentials are correct!")
-                print(f"   Username: {username}")
-                print(f"   Password hash matches: {stored_hash == expected_hash}")
-                return True
-            else:
-                print("❌ Admin credentials are incorrect!")
-                print(f"   Expected username: Gaurav, got: {username}")
-                print(f"   Password hash matches: {stored_hash == expected_hash}")
-                return False
-        else:
-            print("❌ Admin user 'Gaurav' not found!")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Error testing admin credentials: {e}")
-        return False
-    finally:
-        if 'conn' in locals():
-            conn.close()
 
 def test_image_directories():
     """Test that image directories exist and contain images"""
-    print("\n🖼️  Testing image directories...")
+    print("🖼️  Testing image directories...")
     
     images_dir = Path(__file__).parent / "backend" / "images"
     
@@ -75,28 +29,6 @@ def test_image_directories():
             all_ok = False
     
     return all_ok
-
-def test_backend_file_changes():
-    """Test that backend file contains the expected changes"""
-    print("\n📁 Testing backend file changes...")
-    
-    backend_file = Path(__file__).parent / "backend" / "app.py"
-    
-    try:
-        with open(backend_file, 'r') as f:
-            content = f.read()
-        
-        # Check for the updated password hash
-        if 'hash_password("Gaurav@0809")' in content:
-            print("✅ Backend file contains updated admin password")
-            return True
-        else:
-            print("❌ Backend file does not contain updated admin password")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Error reading backend file: {e}")
-        return False
 
 def test_frontend_file_changes():
     """Test that frontend file contains the expected changes"""
@@ -128,15 +60,74 @@ def test_frontend_file_changes():
         print(f"❌ Error reading frontend file: {e}")
         return False
 
+def test_admin_panel_removed():
+    """Test that admin panel has been removed"""
+    print("\n🗑️  Testing admin panel removal...")
+    
+    # Check admin directory is removed
+    admin_dir = Path(__file__).parent / "frontend" / "src" / "admin"
+    if admin_dir.exists():
+        print("❌ Admin directory still exists")
+        return False
+    else:
+        print("✅ Admin directory removed")
+    
+    # Check admin database files are removed
+    sql_file = Path(__file__).parent / "backend" / "COGNIT.sql"
+    db_file = Path(__file__).parent / "backend" / "COGNIT.db"
+    
+    if sql_file.exists():
+        print("❌ COGNIT.sql file still exists")
+        return False
+    else:
+        print("✅ COGNIT.sql file removed")
+    
+    if db_file.exists():
+        print("❌ COGNIT.db file still exists")
+        return False
+    else:
+        print("✅ COGNIT.db file removed")
+    
+    # Check MainApp.jsx doesn't have admin routes
+    main_app = Path(__file__).parent / "frontend" / "src" / "MainApp.jsx"
+    try:
+        with open(main_app, 'r') as f:
+            content = f.read()
+        
+        if 'AdminPanel' in content or '/admin' in content:
+            print("❌ MainApp.jsx still references admin")
+            return False
+        else:
+            print("✅ MainApp.jsx admin references removed")
+    except Exception as e:
+        print(f"❌ Error reading MainApp.jsx: {e}")
+        return False
+    
+    # Check App.jsx doesn't have admin button
+    app_file = Path(__file__).parent / "frontend" / "src" / "App.jsx"
+    try:
+        with open(app_file, 'r') as f:
+            content = f.read()
+        
+        if 'navigate("/admin")' in content:
+            print("❌ App.jsx still has admin button")
+            return False
+        else:
+            print("✅ App.jsx admin button removed")
+    except Exception as e:
+        print(f"❌ Error reading App.jsx: {e}")
+        return False
+    
+    return True
+
 def main():
     """Run all tests"""
     print("🧪 Running C.O.G.N.I.T. application tests...\n")
     
     tests = [
-        test_admin_credentials,
         test_image_directories,
-        test_backend_file_changes,
-        test_frontend_file_changes
+        test_frontend_file_changes,
+        test_admin_panel_removed,
     ]
     
     results = []
