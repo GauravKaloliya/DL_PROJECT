@@ -371,8 +371,7 @@ export default function App() {
 
   // Handle survey finish
   const handleSurveyFinish = () => {
-    setStage("trial");
-    fetchImage(getNextType());
+    setStage("finished");
   };
 
   // Render based on stage

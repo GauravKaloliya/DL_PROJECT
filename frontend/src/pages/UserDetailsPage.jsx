@@ -20,6 +20,16 @@ export default function UserDetailsPage({
       newErrors.username = "Username is required (min 2 characters)";
     }
     
+    // Email validation (now required)
+    if (!demographics.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(demographics.email)) {
+      newErrors.email = "Email is required and must be valid";
+    }
+    
+    // Phone validation (now required)
+    if (!demographics.phone || !/^[\d\s\-\+\\(\)]{7,20}$/.test(demographics.phone)) {
+      newErrors.phone = "Phone number is required and must be valid";
+    }
+    
     if (!demographics.gender) {
       newErrors.gender = "Gender is required";
     }
@@ -38,16 +48,6 @@ export default function UserDetailsPage({
     
     if (!demographics.prior_experience) {
       newErrors.prior_experience = "Prior experience is required";
-    }
-    
-    // Email validation (optional but validated if provided)
-    if (demographics.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(demographics.email)) {
-      newErrors.email = "Please enter a valid email address";
-    }
-    
-    // Phone validation (optional but validated if provided)
-    if (demographics.phone && !/^[\d\s\-\+\(\)]{7,20}$/.test(demographics.phone)) {
-      newErrors.phone = "Please enter a valid phone number";
     }
     
     setErrors(newErrors);
@@ -99,7 +99,7 @@ export default function UserDetailsPage({
         </div>
 
         <div className={`form-field ${errors.email ? 'error' : ''}`}>
-          <label>Email (Optional)</label>
+          <label>Email *</label>
           <input
             type="email"
             placeholder="Enter your email"
@@ -110,7 +110,7 @@ export default function UserDetailsPage({
         </div>
 
         <div className={`form-field ${errors.phone ? 'error' : ''}`}>
-          <label>Phone Number (Optional)</label>
+          <label>Phone Number *</label>
           <input
             type="tel"
             placeholder="Enter your phone number"
