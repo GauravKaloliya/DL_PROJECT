@@ -44,13 +44,13 @@ export default function PaymentPage({
       </p>
       
       <div className="welcome-info">
-        <div style={{  
-          background: 'linear-gradient(135deg, var(--accent), var(--secondary))',
-          padding: '30px',  
+        <div style={{
+          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          padding: '30px',
           borderRadius: '16px',
           marginBottom: '24px',
           textAlign: 'center',
-          boxShadow: '0 4px 20px rgba(24, 119, 242, 0.2)',
+          boxShadow: '0 4px 20px rgba(102, 126, 234, 0.3)',
           border: 'none'
         }}>
           <div style={{  

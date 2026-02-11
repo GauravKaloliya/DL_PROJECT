@@ -442,6 +442,7 @@ export default function App() {
             demographics={demographics}
             setDemographics={setDemographics}
             onSubmit={handleUserDetailsSubmit}
+            onBack={() => setStage("consent")}
             systemReady={systemReady}
           />
         );
@@ -490,7 +491,7 @@ export default function App() {
         return <FinishedPage surveyCompleted={surveyCompleted} />;
       
       default:
-        return <UserDetailsPage demographics={demographics} setDemographics={setDemographics} onSubmit={handleUserDetailsSubmit} systemReady={systemReady} />;
+        return <UserDetailsPage demographics={demographics} setDemographics={setDemographics} onSubmit={handleUserDetailsSubmit} onBack={() => setStage("consent")} systemReady={systemReady} />;
     }
   };
 
