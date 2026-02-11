@@ -134,6 +134,7 @@ def init_db():
             session_id TEXT NOT NULL CHECK(LENGTH(session_id) <= 100),
             image_id TEXT NOT NULL CHECK(LENGTH(image_id) <= 200),
             image_url TEXT CHECK(LENGTH(image_url) <= 500),
+            trial_index INTEGER NOT NULL,
             description TEXT NOT NULL CHECK(LENGTH(description) <= 10000),
             word_count INTEGER CHECK(word_count >= 0),
             rating INTEGER CHECK(rating BETWEEN 1 AND 10),
@@ -147,6 +148,7 @@ def init_db():
             ip_hash TEXT CHECK(LENGTH(ip_hash) = 64),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE,
+            FOREIGN KEY (image_id) REFERENCES images (image_id),
             CONSTRAINT valid_word_count CHECK(word_count >= 0 AND word_count <= 10000)
         )
     ''')
@@ -162,6 +164,19 @@ def init_db():
             user_agent TEXT CHECK(LENGTH(user_agent) <= 500),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+        )
+    ''')
+    
+    # Create images table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS images (
+            image_id TEXT PRIMARY KEY,
+            category TEXT,
+            difficulty_score REAL,
+            object_count INTEGER,
+            width INTEGER,
+            height INTEGER,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -218,7 +233,7 @@ def init_db():
     # Insert initial metadata
     cursor.execute('''
         INSERT OR IGNORE INTO database_metadata (key, value) VALUES 
-            ('version', '3.1.0'),
+            ('version', '3.2.0'),
             ('schema_updated', CURRENT_TIMESTAMP),
             ('description', 'C.O.G.N.I.T. Research Platform Database')
     ''')
@@ -250,6 +265,11 @@ def _create_comprehensive_indexes(cursor):
         # Consent records indexes
         ("idx_consent_participant", "consent_records", "participant_id"),
         ("idx_consent_timestamp", "consent_records", "consent_timestamp"),
+        
+        # Images indexes
+        ("idx_images_id", "images", "image_id"),
+        ("idx_images_category", "images", "category"),
+        ("idx_images_created", "images", "created_at"),
         
         # Audit log indexes
         ("idx_audit_timestamp", "audit_log", "timestamp"),
@@ -343,6 +363,89 @@ def _create_views(cursor):
                 AVG(time_spent_seconds) AS avg_time_seconds
             FROM submissions
             GROUP BY participant_id;
+        """),
+        ("vw_image_coverage", """
+            CREATE VIEW IF NOT EXISTS vw_image_coverage AS
+            SELECT 
+                i.image_id,
+                i.category,
+                i.difficulty_score,
+                i.object_count,
+                i.width,
+                i.height,
+                COUNT(s.id) AS submission_count,
+                COUNT(DISTINCT s.participant_id) AS unique_participants,
+                AVG(s.word_count) AS avg_word_count,
+                AVG(s.rating) AS avg_rating,
+                AVG(s.time_spent_seconds) AS avg_time_seconds,
+                SUM(CASE WHEN s.is_survey = 1 THEN 1 ELSE 0 END) AS survey_submissions,
+                SUM(CASE WHEN s.is_attention = 1 THEN 1 ELSE 0 END) AS attention_submissions,
+                SUM(CASE WHEN s.attention_passed = 1 THEN 1 ELSE 0 END) AS attention_passed_submissions,
+                MIN(s.created_at) AS first_submission_time,
+                MAX(s.created_at) AS last_submission_time,
+                CASE 
+                    WHEN COUNT(s.id) = 0 THEN 'unused'
+                    WHEN COUNT(s.id) < 5 THEN 'low_usage'
+                    WHEN COUNT(s.id) < 20 THEN 'medium_usage'
+                    ELSE 'high_usage'
+                END AS usage_category
+            FROM images i
+            LEFT JOIN submissions s ON i.image_id = s.image_id
+            GROUP BY i.image_id, i.category, i.difficulty_score, i.object_count, i.width, i.height;
+        """),
+        ("vw_submission_quality", """
+            CREATE VIEW IF NOT EXISTS vw_submission_quality AS
+            SELECT 
+                s.id,
+                s.participant_id,
+                s.image_id,
+                s.trial_index,
+                s.word_count,
+                s.rating,
+                s.time_spent_seconds,
+                s.is_survey,
+                s.is_attention,
+                s.attention_passed,
+                s.too_fast_flag,
+                s.created_at,
+                CASE
+                    WHEN s.word_count >= 60 THEN 20
+                    WHEN s.word_count >= 40 THEN 15
+                    WHEN s.word_count >= 20 THEN 10
+                    ELSE 5
+                END +
+                CASE
+                    WHEN s.rating >= 8 THEN 20
+                    WHEN s.rating >= 6 THEN 15
+                    WHEN s.rating >= 4 THEN 10
+                    ELSE 5
+                END +
+                CASE
+                    WHEN s.time_spent_seconds IS NULL THEN 0
+                    WHEN s.time_spent_seconds BETWEEN 30 AND 300 THEN 20
+                    WHEN s.time_spent_seconds BETWEEN 15 AND 600 THEN 15
+                    WHEN s.time_spent_seconds BETWEEN 5 AND 900 THEN 10
+                    ELSE 5
+                END +
+                CASE
+                    WHEN s.is_attention = 0 THEN 20
+                    WHEN s.attention_passed = 1 THEN 20
+                    WHEN s.attention_passed = 0 THEN 5
+                    ELSE 10
+                END +
+                CASE
+                    WHEN s.too_fast_flag = 1 THEN 0
+                    ELSE 20
+                END AS data_quality_score,
+                CASE
+                    WHEN s.word_count >= 60 AND s.rating >= 7 AND s.time_spent_seconds BETWEEN 30 AND 300 AND 
+                         (s.is_attention = 0 OR s.attention_passed = 1) AND s.too_fast_flag = 0 THEN 'excellent'
+                    WHEN s.word_count >= 40 AND s.rating >= 5 AND s.time_spent_seconds >= 15 AND 
+                         (s.is_attention = 0 OR s.attention_passed IS NOT NULL) THEN 'good'
+                    WHEN s.word_count >= 20 AND s.rating >= 3 AND s.time_spent_seconds >= 5 THEN 'acceptable'
+                    ELSE 'poor'
+                END AS quality_category
+            FROM submissions s;
         """)
     ]
     
@@ -351,6 +454,79 @@ def _create_views(cursor):
             cursor.execute(view_sql)
         except sqlite3.OperationalError:
             pass  # View might already exist
+
+
+def migrate_database_schema():
+    """Migrate existing database to new schema"""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    try:
+        # Check if images table exists, create if not
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS images (
+                image_id TEXT PRIMARY KEY,
+                category TEXT,
+                difficulty_score REAL,
+                object_count INTEGER,
+                width INTEGER,
+                height INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Check if trial_index column exists in submissions
+        cursor.execute("PRAGMA table_info(submissions)")
+        columns = [row[1] for row in cursor.fetchall()]
+        
+        if 'trial_index' not in columns:
+            # Add trial_index column to existing submissions
+            cursor.execute("ALTER TABLE submissions ADD COLUMN trial_index INTEGER DEFAULT 0")
+            print("Added trial_index column to submissions table")
+        
+        # Create images indexes
+        indexes = [
+            ("idx_images_id", "images", "image_id"),
+            ("idx_images_category", "images", "category"),
+            ("idx_images_created", "images", "created_at")
+        ]
+        
+        for idx_name, table, column in indexes:
+            try:
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
+            except sqlite3.OperationalError:
+                pass
+        
+        # Add foreign key constraint for image_id (only if not exists)
+        try:
+            cursor.execute("PRAGMA foreign_key_list(submissions)")
+            fks = cursor.fetchall()
+            fk_columns = [fk[3] for fk in fks if fk[3] == 'image_id']
+            
+            if not fk_columns:
+                cursor.execute("ALTER TABLE submissions ADD CONSTRAINT fk_submissions_image FOREIGN KEY (image_id) REFERENCES images (image_id)")
+                print("Added foreign key constraint for submissions.image_id")
+        except sqlite3.OperationalError:
+            pass  # Constraint might already exist
+        
+        # Create views
+        _create_views(cursor)
+        
+        # Update database version
+        cursor.execute("""
+            INSERT OR REPLACE INTO database_metadata (key, value, updated_at) 
+            VALUES ('version', '3.2.0', CURRENT_TIMESTAMP)
+        """)
+        
+        conn.commit()
+        print("Database migration completed successfully")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Database migration failed: {str(e)}")
+        raise
+    finally:
+        conn.close()
 
 
 def get_ip_hash():
@@ -851,16 +1027,23 @@ def submit():
 
     # Insert into database
     try:
+        trial_index = payload.get("trial_index", 0)
+        try:
+            trial_index = int(trial_index)
+        except (TypeError, ValueError):
+            trial_index = 0
+        
         cursor.execute('''
             INSERT INTO submissions 
-            (participant_id, session_id, image_id, image_url, description, word_count, rating, 
+            (participant_id, session_id, image_id, image_url, trial_index, description, word_count, rating, 
              feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, user_agent, ip_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             participant_id,
             payload.get("session_id", ""),
             image_id,
             payload.get("image_url", f"/api/images/{image_id}"),
+            trial_index,
             description,
             word_count,
             rating,
@@ -893,7 +1076,7 @@ def get_participant_submissions(participant_id):
     cursor = conn.cursor()
     
     cursor.execute('''
-        SELECT id, image_id, description, word_count, rating, feedback, 
+        SELECT id, image_id, trial_index, description, word_count, rating, feedback, 
                time_spent_seconds, is_survey, is_attention, attention_passed, created_at
         FROM submissions 
         WHERE participant_id = ?
@@ -907,15 +1090,16 @@ def get_participant_submissions(participant_id):
         submissions.append({
             "id": row[0],
             "image_id": row[1],
-            "description": row[2],
-            "word_count": row[3],
-            "rating": row[4],
-            "feedback": row[5],
-            "time_spent_seconds": row[6],
-            "is_survey": bool(row[7]),
-            "is_attention": bool(row[8]),
-            "attention_passed": row[9],
-            "created_at": row[10]
+            "trial_index": row[2],
+            "description": row[3],
+            "word_count": row[4],
+            "rating": row[5],
+            "feedback": row[6],
+            "time_spent_seconds": row[7],
+            "is_survey": bool(row[8]),
+            "is_attention": bool(row[9]),
+            "attention_passed": row[10],
+            "created_at": row[11]
         })
     
     return jsonify(submissions)
@@ -929,7 +1113,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.1.0",
+            "version": "3.2.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1020,7 +1204,7 @@ def api_docs():
     """Comprehensive API documentation - only working routes"""
     return jsonify({
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.1.0",
+        "version": "3.2.0",
         "description": "Complete and verified API documentation for the C.O.G.N.I.T. research platform",
         "base_url": "/api",
         "security": {
@@ -1155,13 +1339,14 @@ def api_docs():
                 "rate_limit": "60 per minute",
                 "request_body": {
                     "required": ["participant_id", "image_id", "description", "rating", "feedback", "time_spent_seconds"],
-                    "optional": ["session_id", "image_url", "is_survey", "is_attention", "attention_expected"]
+                    "optional": ["session_id", "image_url", "trial_index", "is_survey", "is_attention", "attention_expected"]
                 },
                 "validation": {
                     "description": f"Minimum {MIN_WORD_COUNT} words required",
                     "rating": "Integer between 1-10",
                     "feedback": "Minimum 5 characters",
-                    "participant_consent": "Participant must have given consent"
+                    "participant_consent": "Participant must have given consent",
+                    "trial_index": "Optional trial sequence number (integer, defaults to 0)"
                 },
                 "response": {
                     "status": "ok|error",
@@ -1193,6 +1378,7 @@ def api_docs():
             }
         },
         "changelog": {
+            "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
         }
     })
@@ -1254,6 +1440,9 @@ if __name__ == "__main__":
         else:
             print("Database regeneration failed")
         sys.exit(0)
+    
+    # Run database migration for schema updates
+    migrate_database_schema()
     
     init_db()
     print("Starting C.O.G.N.I.T. backend server...")
