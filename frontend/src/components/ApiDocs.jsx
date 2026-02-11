@@ -279,7 +279,7 @@ export default function ApiDocs() {
                 "participant_id": "string (required)",
                 "session_id": "string (required)",
                 "image_id": "string (required)",
-                "description": "string (required, min 30 words)",
+                "description": "string (required, min 60 words)",
                 "rating": "integer (required, 1-10)",
                 "feedback": "string (required, min 5 chars)",
                 "time_spent_seconds": "number (required)",
@@ -486,7 +486,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
 
             <h3 style={{ marginTop: '32px' }}>Common Errors</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><code>Minimum 30 words required</code> - Description is too short</li>
+              <li><code>Minimum 60 words required</code> - Description is too short</li>
               <li><code>rating must be an integer between 1-10</code> - Invalid rating value</li>
               <li><code>comments must be at least 5 characters</code> - Feedback is too short</li>
               <li><code>image_id is required</code> - Missing required field</li>
