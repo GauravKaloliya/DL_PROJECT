@@ -4,7 +4,8 @@ export default function UserDetailsPage({
   demographics, 
   setDemographics, 
   onSubmit, 
-  systemReady 
+  systemReady,
+  onBack
 }) {
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -81,6 +82,17 @@ export default function UserDetailsPage({
 
   return (
     <div className="panel">
+      <div style={{ marginBottom: '16px' }}>
+        {onBack && (
+          <button
+            className="ghost"
+            onClick={onBack}
+            style={{ padding: '10px 20px' }}
+          >
+            ← Back
+          </button>
+        )}
+      </div>
       <h2>Participant Information</h2>
       <p style={{ color: 'var(--muted)', marginBottom: '24px' }}>
         Please provide your details to participate in the C.O.G.N.I.T. research study.

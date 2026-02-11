@@ -111,13 +111,13 @@ export default function TrialPage({
   if (isSurvey && surveyFeedbackReady) {
     return (
       <div className="panel">
-        <div className="guidance" style={{ textAlign: 'center' }}>
+        <div className="guidance" style={{ textAlign: 'center', padding: '20px' }}>
           <div style={{
             background: 'linear-gradient(135deg, var(--success), var(--primary))',
             width: '100px',
             height: '100px',
             borderRadius: '50%',
-            margin: '0 auto 24px',
+            margin: '0 auto 32px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -127,42 +127,37 @@ export default function TrialPage({
           }}>
             ✓
           </div>
-          <h2 style={{ color: 'var(--success)', marginBottom: '16px' }}>Survey Complete!</h2>
-          <p style={{ fontSize: '16px', lineHeight: '1.6', marginBottom: '24px' }}>
+          <h2 style={{ color: 'var(--success)', marginBottom: '20px', marginTop: '0' }}>Survey Complete!</h2>
+          <p style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
             Great job on your survey trial! You can now choose to continue with more survey 
-            images or start the main study.
+            images or finish the study.
           </p>
           <div style={{
             backgroundColor: 'var(--accent-bg)',
-            padding: '16px',
+            padding: '20px',
             borderRadius: '12px',
-            marginBottom: '24px',
-            borderLeft: '4px solid var(--primary)'
+            marginBottom: '32px',
+            borderLeft: '4px solid var(--primary)',
+            maxWidth: '600px',
+            margin: '0 auto 32px'
           }}>
-            <p style={{ margin: '0', color: 'var(--muted)' }}>
+            <p style={{ margin: '0', color: 'var(--muted)', lineHeight: '1.6' }}>
               <em>Tip: Aim to describe colors, textures, relationships, and any notable objects.
               Remember to write at least {MIN_WORDS} words per description.</em>
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
             <button
               className="primary"
               onClick={onSurveyContinue}
-              style={{ padding: '12px 24px', backgroundColor: 'var(--primary)', color: 'white' }}
+              style={{ padding: '14px 32px', backgroundColor: 'var(--primary)', color: 'white', fontSize: '16px' }}
             >
               Continue Survey
             </button>
             <button
-              className="primary"
-              onClick={onNext}
-              style={{ padding: '12px 24px', backgroundColor: 'var(--success)', color: 'white' }}
-            >
-              Start Main Trials
-            </button>
-            <button
               className="ghost"
               onClick={onSurveyFinish}
-              style={{ padding: '12px 24px', border: '2px solid var(--error)', color: 'var(--error)' }}
+              style={{ padding: '14px 32px', border: '2px solid var(--error)', color: 'var(--error)', fontSize: '16px' }}
             >
               Finish
             </button>
