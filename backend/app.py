@@ -302,36 +302,6 @@ def get_user_by_id(user_id):
         conn.close()
 
 
-def validate_session(session_token):
-    """Validate session token and return user info"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        # Check if session exists and is not expired
-        cursor.execute(
-            """SELECT u.id, u.username, u.role, u.is_active 
-               FROM admin_users u 
-               JOIN admin_sessions s ON u.id = s.user_id 
-               WHERE s.session_token = ? AND s.expires_at > ? AND u.is_active = 1""",
-            (session_token, datetime.now(timezone.utc).isoformat())
-        )
-        user = cursor.fetchone()
-        
-        if user:
-            user_id, username, role, is_active = user
-            return {
-                "id": user_id,
-                "username": username,
-                "role": role,
-                "is_active": is_active
-            }
-        return None
-        
-    finally:
-        conn.close()
-
-
 def list_images(image_type: str):
     folder = IMAGES_DIR / image_type
     if not folder.exists():
@@ -465,6 +435,51 @@ def validate_session(session_token):
         
     finally:
         conn.close()
+
+
+@app.route("/api/health")
+def health_check():
+    """Health check endpoint to verify all system connectivity"""
+    status = {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "services": {}
+    }
+    
+    # Check database connectivity
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        cursor.execute("SELECT 1")
+        conn.close()
+        status["services"]["database"] = "connected"
+    except Exception as e:
+        status["services"]["database"] = f"error: {str(e)}"
+        status["status"] = "degraded"
+    
+    # Check CSV/data directory
+    try:
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
+        test_file = DATA_DIR / ".health_check"
+        test_file.write_text("test")
+        test_file.unlink()
+        status["services"]["data_storage"] = "accessible"
+    except Exception as e:
+        status["services"]["data_storage"] = f"error: {str(e)}"
+        status["status"] = "degraded"
+    
+    # Check images directory
+    try:
+        if IMAGES_DIR.exists():
+            status["services"]["images"] = "accessible"
+        else:
+            status["services"]["images"] = "not found"
+            status["status"] = "degraded"
+    except Exception as e:
+        status["services"]["images"] = f"error: {str(e)}"
+        status["status"] = "degraded"
+    
+    return jsonify(status)
 
 
 @app.route("/api/images/random")
@@ -614,70 +629,6 @@ def download_csv():
     return send_from_directory(DATA_DIR, CSV_PATH.name, as_attachment=True)
 
 
-@app.route("/api/pages/home")
-def home_page():
-    """Home page endpoint"""
-    return jsonify({
-        "title": "C.O.G.N.I.T. - Cognitive Observation & Generalized Narrative Inquiry Tool",
-        "description": "A research tool for studying how people describe visual scenes",
-        "version": "2.0.0",
-        "features": ["Image description tasks", "Demographic data collection", "Attention checks", "Data export"]
-    })
-
-
-@app.route("/api/pages/about")
-def about_page():
-    """About page endpoint"""
-    return jsonify({
-        "title": "About C.O.G.N.I.T.",
-        "content": "C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a research platform designed to study how individuals describe and interpret visual stimuli. This tool helps researchers understand cognitive processes involved in language production and visual perception.",
-        "purpose": "To collect anonymous descriptions of images for improving language understanding models and cognitive research",
-        "team": ["Researchers", "Developers", "Data Scientists"]
-    })
-
-
-@app.route("/api/pages/contact")
-def contact_page():
-    """Contact page endpoint"""
-    return jsonify({
-        "title": "Contact Us",
-        "email": "contact@cognit-research.org",
-        "support": "support@cognit-research.org",
-        "address": "Research Department, University of Cognitive Sciences, 123 Research Ave, Science City, ST 12345",
-        "social": {
-            "twitter": "@cognit_research",
-            "facebook": "/cognit.study",
-            "linkedin": "/company/cognit-research"
-        }
-    })
-
-
-@app.route("/api/pages/faq")
-def faq_page():
-    """FAQ page endpoint"""
-    return jsonify({
-        "title": "Frequently Asked Questions",
-        "faqs": [
-            {
-                "question": "What is C.O.G.N.I.T.?",
-                "answer": "C.O.G.N.I.T. is a research tool for studying how people describe visual scenes and assess their cognitive workload."
-            },
-            {
-                "question": "How long does a session take?",
-                "answer": "A typical session takes about 15-20 minutes to complete, depending on your description speed."
-            },
-            {
-                "question": "Is my data anonymous?",
-                "answer": "Yes, all data is collected anonymously. We only store a hashed version of your IP address for research purposes."
-            },
-            {
-                "question": "Can I stop at any time?",
-                "answer": "Absolutely! You can stop participating at any time without any consequences."
-            }
-        ]
-    })
-
-
 @app.route("/api/docs")
 @limiter.limit("30 per minute")
 def api_docs():
@@ -700,6 +651,20 @@ def api_docs():
             "public": {
                 "description": "Endpoints accessible without authentication",
                 "routes": [
+                    {
+                        "path": "/api/health",
+                        "method": "GET",
+                        "description": "Health check endpoint to verify system connectivity",
+                        "response": {
+                            "status": "string (healthy/degraded)",
+                            "timestamp": "ISO format timestamp",
+                            "services": {
+                                "database": "string",
+                                "data_storage": "string",
+                                "images": "string"
+                            }
+                        }
+                    },
                     {
                         "path": "/api/images/random",
                         "method": "GET",
@@ -746,49 +711,6 @@ def api_docs():
                             "status": "string",
                             "word_count": "integer",
                             "attention_passed": "boolean"
-                        }
-                    },
-                    {
-                        "path": "/api/pages/home",
-                        "method": "GET",
-                        "description": "Get home page information",
-                        "response": {
-                            "title": "string",
-                            "description": "string",
-                            "version": "string",
-                            "features": "array"
-                        }
-                    },
-                    {
-                        "path": "/api/pages/about",
-                        "method": "GET",
-                        "description": "Get about page information",
-                        "response": {
-                            "title": "string",
-                            "content": "string",
-                            "purpose": "string",
-                            "team": "array"
-                        }
-                    },
-                    {
-                        "path": "/api/pages/contact",
-                        "method": "GET",
-                        "description": "Get contact page information",
-                        "response": {
-                            "title": "string",
-                            "email": "string",
-                            "support": "string",
-                            "address": "string",
-                            "social": "object"
-                        }
-                    },
-                    {
-                        "path": "/api/pages/faq",
-                        "method": "GET",
-                        "description": "Get FAQ information",
-                        "response": {
-                            "title": "string",
-                            "faqs": "array of {question, answer}"
                         }
                     },
                     {

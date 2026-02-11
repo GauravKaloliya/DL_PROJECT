@@ -122,6 +122,8 @@ const preventCopyPaste = (e) => {
 export default function App() {
   const [darkMode, setDarkMode] = useState(getStoredValue("darkMode", false));
   const [online, setOnline] = useState(navigator.onLine);
+  const [systemReady, setSystemReady] = useState(false);
+  const [systemError, setSystemError] = useState(null);
   const [stage, setStage] = useState(getStoredValue("stage", "consent"));
   const [consentChecked, setConsentChecked] = useState(getStoredValue("consentChecked", false));
   const [demographics, setDemographics] = useState(
@@ -243,6 +245,40 @@ export default function App() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
+  }, []);
+
+  // Health check on mount
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/api/health`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status === 'healthy') {
+            setSystemReady(true);
+            setSystemError(null);
+          } else {
+            setSystemReady(false);
+            setSystemError('System is degraded. Some features may not work properly.');
+          }
+        } else {
+          setSystemReady(false);
+          setSystemError('Unable to connect to the server. Please try again later.');
+        }
+      } catch (err) {
+        setSystemReady(false);
+        setSystemError('Unable to connect to the server. Please check your connection.');
+      }
+    };
+
+    checkHealth();
+    // Re-check health every 30 seconds
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const addToast = useCallback((message, type = "info", action) => {
@@ -482,7 +518,39 @@ export default function App() {
           </div>
         </header>
 
-        {!online && (
+        {!systemReady && !systemError && (
+          <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+            <h2>Loading C.O.G.N.I.T.</h2>
+            <p style={{ color: 'var(--muted)', marginTop: '16px' }}>
+              Checking system connectivity...
+            </p>
+            <div style={{ 
+              marginTop: '24px', 
+              width: '40px', 
+              height: '40px', 
+              border: '4px solid var(--border)', 
+              borderTop: '4px solid var(--primary)', 
+              borderRadius: '50%', 
+              animation: 'spin 1s linear infinite',
+              margin: '24px auto 0'
+            }} />
+          </div>
+        )}
+
+        {systemError && (
+          <div className="banner warning" style={{ textAlign: 'center' }}>
+            <strong>System Error:</strong> {systemError}
+            <button 
+              className="ghost" 
+              onClick={() => window.location.reload()} 
+              style={{ marginLeft: '16px' }}
+            >
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!online && systemReady && (
           <div className="banner warning">
             Oh no! 💕 You appear to be offline. Submissions will fail until connectivity is restored.
           </div>
