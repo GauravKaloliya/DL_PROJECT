@@ -139,7 +139,7 @@ export default function ConsentPage({
           onClick={handleSubmit}
           disabled={!systemReady || submitting}
         >
-          {submitting ? "Processing..." : "Start Survey"}
+          {submitting ? "Processing..." : "I Agree - Continue"}
         </button>
       </div>
     </div>

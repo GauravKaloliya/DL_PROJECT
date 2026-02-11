@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import UserDetailsPage from "./pages/UserDetailsPage.jsx";
 import ConsentPage from "./pages/ConsentPage.jsx";
+import PaymentPage from "./pages/PaymentPage.jsx";
 import TrialPage from "./pages/TrialPage.jsx";
 import FinishedPage from "./pages/FinishedPage.jsx";
 
@@ -97,7 +98,7 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(getStoredValue("darkMode", false));
   
   // Flow state
-  const [stage, setStage] = useState(getStoredValue("stage", "user-details"));
+  const [stage, setStage] = useState(getStoredValue("stage", "consent"));
   const [participantId] = useState(() => getStoredValue("participantId", createId()));
   const [sessionId] = useState(() => getStoredValue("sessionId", createId()));
   
@@ -236,7 +237,7 @@ export default function App() {
   const handleUserDetailsSubmit = async () => {
     try {
       await createParticipant();
-      setStage("consent");
+      setStage("payment");
       addToast("Details saved successfully", "success");
     } catch (err) {
       addToast(err.message, "error");
@@ -247,8 +248,15 @@ export default function App() {
   // Handle consent given
   const handleConsentGiven = async () => {
     await recordConsent();
+    setStage("user-details");
+    addToast("Consent recorded successfully", "success");
+  };
+
+  // Handle payment completion
+  const handlePaymentComplete = async () => {
     setStage("survey");
     await fetchImage("survey");
+    addToast("Payment completed successfully", "success");
   };
 
   // Fetch image
@@ -390,6 +398,15 @@ export default function App() {
     }
 
     switch (stage) {
+      case "consent":
+        return (
+          <ConsentPage
+            onConsentGiven={handleConsentGiven}
+            onBack={() => window.location.reload()}
+            systemReady={systemReady}
+          />
+        );
+
       case "user-details":
         return (
           <UserDetailsPage
@@ -400,10 +417,10 @@ export default function App() {
           />
         );
       
-      case "consent":
+      case "payment":
         return (
-          <ConsentPage
-            onConsentGiven={handleConsentGiven}
+          <PaymentPage
+            onPaymentComplete={handlePaymentComplete}
             onBack={() => setStage("user-details")}
             systemReady={systemReady}
           />
