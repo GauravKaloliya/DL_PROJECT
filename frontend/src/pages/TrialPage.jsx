@@ -109,6 +109,14 @@ export default function TrialPage({
     setImageLoaded(false);
   };
 
+  const getSubmitTooltip = () => {
+    if (submitting) return "Submitting...";
+    if (wordCount < MIN_WORDS) return `Need at least ${MIN_WORDS} words (currently ${wordCount})`;
+    if (rating === 0) return "Please select a rating";
+    if (!commentsValid) return "Comments must be at least 5 characters";
+    return "Submit your response";
+  };
+
   const imageSrc = trial ? `${API_BASE}${trial.image_url}` : "";
 
   if (isSurvey && surveyFeedbackReady) {
@@ -292,6 +300,7 @@ export default function TrialPage({
           className={`primary ${submitting ? "wiggle" : ""}`}
           onClick={handleSubmit}
           disabled={submitting || wordCount < MIN_WORDS || rating === 0 || !commentsValid}
+          title={getSubmitTooltip()}
         >
           {submitting ? "Submitting..." : "Submit"}
         </button>
