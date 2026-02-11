@@ -24,7 +24,7 @@ export default function FinishedPage({ surveyCompleted }) {
           examines how people describe visual scenes. Your responses
           will help improve language understanding models.
         </p>
-        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px' }}>
+        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '10px 24px' }}>
           Finish
         </button>
       </div>

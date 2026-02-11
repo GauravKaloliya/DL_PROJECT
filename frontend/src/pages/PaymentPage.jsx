@@ -38,6 +38,17 @@ export default function PaymentPage({
 
   return (
     <div className="panel">
+      <div style={{ marginBottom: '16px' }}>
+        {onBack && (
+          <button
+            className="ghost"
+            onClick={onBack}
+            style={{ padding: '10px 20px' }}
+          >
+            ← Back
+          </button>
+        )}
+      </div>
       <h2>Payment Required</h2>
       <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
         <strong>C.O.G.N.I.T. Research Study Participation Fee</strong>
@@ -164,15 +175,7 @@ export default function PaymentPage({
         </label>
       </div>
       
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
-        <button
-          className="ghost"
-          onClick={onBack}
-          disabled={submitting}
-          style={{ padding: '12px 24px' }}
-        >
-          Back
-        </button>
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
         <button
           className="primary"
           onClick={handleSubmit}
