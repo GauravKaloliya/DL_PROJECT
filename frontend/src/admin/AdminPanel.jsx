@@ -239,9 +239,8 @@ export default function AdminPanel() {
   }, [stats]);
 
   useEffect(() => {
-    if (csvData && csvData.length > 0) {
-      sessionStorage.setItem("adminCsvData", JSON.stringify(csvData));
-    }
+    // Always save csvData to sessionStorage, even if empty
+    sessionStorage.setItem("adminCsvData", JSON.stringify(csvData));
   }, [csvData]);
 
   useEffect(() => {
@@ -737,8 +736,9 @@ export default function AdminPanel() {
             csvData={csvData}
             onDataDeleted={() => {
               setCsvData([]);
-              fetchStats();
-              fetchCsvData();
+              fetchStats().then(() => {
+                fetchCsvData();
+              });
             }}
             onToast={addToast}
           />
