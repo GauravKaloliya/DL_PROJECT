@@ -185,7 +185,7 @@ export default function TrialPage({
         {isSurvey ? (
           <span>Survey Session</span>
         ) : (
-          <button className="ghost" onClick={onFinish}>
+          <button className="ghost" onClick={onFinish} style={{ padding: '8px 16px', fontSize: '13px' }}>
             Finish
           </button>
         )}
@@ -236,7 +236,6 @@ export default function TrialPage({
       <div className="meta">
         <span className="timer">Time: {elapsed}s</span>
         {trial.is_attention && <span className="tag attention">Attention check</span>}
-        {trial.is_survey && <span className="tag survey">Survey</span>}
       </div>
 
       <div className="field">
