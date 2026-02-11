@@ -162,9 +162,9 @@ body.dark .banner.info {
 /* Form Grid */
 .form-grid {
   display: grid;
-  gap: 20px;
+  gap: 24px;
   grid-template-columns: repeat(2, 1fr);
-  margin: 20px 0;
+  margin: 24px 0;
 }
 
 @media (max-width: 768px) {
@@ -177,7 +177,8 @@ body.dark .banner.info {
 .form-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .form-field label {
@@ -237,12 +238,13 @@ select,
 textarea {
   border-radius: 12px;
   border: 2px solid var(--border);
-  padding: 12px 16px;
+  padding: 14px 16px;
   background: var(--panel);
   color: inherit;
   font-size: 14px;
   font-family: inherit;
   transition: all 0.2s ease;
+  margin-bottom: 8px;
 }
 
 select {
@@ -388,7 +390,7 @@ textarea {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
   color: var(--muted);
   font-weight: 600;
   font-size: 15px;
@@ -397,7 +399,7 @@ textarea {
 .trial {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 24px;
 }
 
 .image-container {
@@ -513,7 +515,8 @@ body.dark .tag.attention {
 .field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
 .field label {
@@ -524,11 +527,19 @@ body.dark .tag.attention {
 /* Counts */
 .counts {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   font-size: 13px;
   color: var(--muted);
   font-weight: 500;
   flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding: 12px;
+  background: var(--accent);
+  border-radius: 12px;
+}
+
+body.dark .counts {
+  background: #2d4778;
 }
 
 .counts .ok {
@@ -601,10 +612,11 @@ body.dark .tag.attention {
 /* Actions */
 .actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
   align-items: center;
   justify-content: center;
+  margin-top: 24px;
 }
 
 .hint {
