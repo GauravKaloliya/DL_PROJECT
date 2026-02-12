@@ -21,7 +21,7 @@ C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a full-stack resea
 
 - `frontend/`: React application
 - `backend/`: Flask API and SQLite database
-- `backend/images/`: Image library (`normal/`, `survey/`, `attention/`)
+- `backend/images/`: Unified image library (`survey/` holds normal, survey, and attention images)
 - `backend/data/`: Local data directory
 
 ## Getting Started
@@ -65,7 +65,7 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 - `GET /` - API documentation (root endpoint)
 - `GET /api/health` - Health check endpoint
 - `GET /api/images/random` (type: `normal`, `survey`, `attention`)
-- `GET /api/images/<image_id>`
+- `GET /api/images/<image_id>` (image IDs use the `survey/<filename>` format)
 - `POST /api/participants` - Create participant
 - `GET /api/participants/<participant_id>`
 - `POST /api/consent` - Record consent
@@ -78,11 +78,11 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 
 ## Images
 
-Add or replace images in:
+Add or replace images in the unified library:
 
-- `backend/images/normal/`
 - `backend/images/survey/`
-- `backend/images/attention/`
+
+Normal, survey, and attention-check images live together in the same folder. Attention-check images use the `attention-` filename prefix, while survey practice images should match the survey names configured in the backend.
 
 ## Data Storage
 

@@ -4,15 +4,15 @@ import { getApiUrl } from "../utils/apiBase";
 const MIN_WORDS = 60;
 
 const attentionInstruction = {
-  "attention/attention-red.svg": {
+  "survey/attention-red.svg": {
     text: "Special task: Include the word \"red\" in your description!",
     expected: "red"
   },
-  "attention/attention-circle.svg": {
+  "survey/attention-circle.svg": {
     text: "Special task: Include the word \"circle\" in your description!",
     expected: "circle"
   },
-  "attention/attention-ocean.svg": {
+  "survey/attention-ocean.svg": {
     text: "Special task: Include the word \"ocean\" in your description!",
     expected: "ocean"
   }
