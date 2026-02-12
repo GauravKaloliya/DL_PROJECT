@@ -46,7 +46,7 @@ export default function ConsentPage({
   return (
     <div className="panel">
       <h2>Research Consent Form</h2>
-      <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
+      <p className="page-subtitle">
         <strong>C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling</strong>
       </p>
       
@@ -128,7 +128,7 @@ export default function ConsentPage({
         </label>
       </div>
       
-      <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
+      <div className="page-actions">
         <button
           className="primary"
           onClick={handleSubmit}

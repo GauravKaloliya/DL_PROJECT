@@ -15,13 +15,13 @@ export default function ErrorPage({ error, resetError }) {
   return (
     <div className="app">
       <div className="panel">
-        <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <div className="page-hero">
           <h1 style={{ color: 'var(--warning)', fontSize: '48px', marginBottom: '16px' }}>Oops!</h1>
           <h2 style={{ marginBottom: '16px' }}>Something went wrong</h2>
           <p style={{ color: 'var(--muted)', marginBottom: '32px', fontSize: '18px' }}>
             {error?.message || "An unexpected error occurred. Please try again."}
           </p>
-          
+
           {error?.stack && process.env.NODE_ENV === 'development' && (
             <details style={{ marginBottom: '32px', textAlign: 'left' }}>
               <summary style={{ cursor: 'pointer', marginBottom: '16px' }}>Error Details (Development)</summary>
@@ -37,8 +37,8 @@ export default function ErrorPage({ error, resetError }) {
               </pre>
             </details>
           )}
-          
-          <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
+
+          <div className="page-actions">
             <button className="primary" onClick={handleReset}>
               Try Again
             </button>
