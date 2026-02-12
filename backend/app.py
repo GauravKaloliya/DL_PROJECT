@@ -8,7 +8,7 @@ import functools
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, abort, g, render_template
+from flask import Flask, jsonify, request, send_from_directory, abort, g
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -46,20 +46,6 @@ CORS(app, resources={
     r"/api/*": {
         "origins": _get_cors_origins(),
         "methods": ["GET", "POST", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-        "supports_credentials": False,
-        "max_age": 86400
-    },
-    r"/": {
-        "origins": _get_cors_origins(),
-        "methods": ["GET", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-        "supports_credentials": False,
-        "max_age": 86400
-    },
-    r"/api/docs/ui": {
-        "origins": _get_cors_origins(),
-        "methods": ["GET", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": False,
         "max_age": 86400
@@ -1691,37 +1677,6 @@ def _get_api_documentation():
     }
 
 
-@app.route("/")
-@limiter.limit("30 per minute")
-def api_docs_ui():
-    """API documentation UI at root endpoint"""
-    docs = _get_api_documentation()
-    return render_template(
-        "api_docs.html",
-        version=docs.get("version", "3.5.0"),
-        base_url=docs.get("base_url", "/api")
-    )
-
-
-@app.route("/api/docs")
-@limiter.limit("30 per minute")
-def api_docs_json():
-    """API documentation as JSON"""
-    return jsonify(_get_api_documentation())
-
-
-@app.route("/api/docs/ui")
-@limiter.limit("30 per minute")
-def api_docs_ui_alt():
-    """API documentation UI at /api/docs/ui endpoint"""
-    docs = _get_api_documentation()
-    return render_template(
-        "api_docs.html",
-        version=docs.get("version", "3.5.0"),
-        base_url=docs.get("base_url", "/api")
-    )
-
-
 def regenerate_database_from_schema():
     """Regenerate the database from the schema.sql file"""
     schema_path = BASE_DIR / "schema.sql"
@@ -1790,9 +1745,6 @@ initialize_app()
 
 if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
-    print("API Documentation (HTML UI) available at: http://localhost:5000/")
-    print("API Documentation (HTML UI) also at: http://localhost:5000/api/docs/ui")
-    print("API Documentation (JSON) available at: http://localhost:5000/api/docs")
     print("API endpoints available at: http://localhost:5000/api/")
     print("Security Info available at: http://localhost:5000/api/security/info")
     port = int(os.getenv("PORT", "5000"))

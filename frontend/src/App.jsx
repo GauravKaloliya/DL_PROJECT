@@ -512,7 +512,7 @@ export default function App() {
             >
               {darkMode ? "☀️" : "🌙"}
             </button>
-            <button className="ghost" onClick={() => navigate("/api/docs")}>
+            <button className="ghost" onClick={() => navigate("/")}>
               API Docs
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
