@@ -183,7 +183,7 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
+              <li><strong>Image Management:</strong> Fetch random images from the survey collection with session-based tracking</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
               <li><strong>Health Monitoring:</strong> Check system connectivity and service status</li>
               <li><strong>Security:</strong> Rate limiting and hardened security headers</li>
@@ -303,14 +303,14 @@ export default function ApiDocs() {
                 <EndpointCard
                   method="GET"
                   path="/api/images/random"
-                  description="Retrieve a random image for the study"
+                  description="Retrieve a random image from the survey collection. Each session receives unique images until all have been shown."
                   parameters={[
-                    { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
+                    { name: 'session_id', type: 'string', required: false, description: 'Used to track shown images and ensure variety per session' }
                   ]}
                   response={{
-                    "image_id": "normal/aurora-lake.svg",
-                    "image_url": "/api/images/normal/aurora-lake.svg",
-                    "is_survey": false,
+                    "image_id": "survey/aurora-lake.svg",
+                    "image_url": "/api/images/survey/aurora-lake.svg",
+                    "is_survey": true,
                     "is_attention": false
                   }}
                 />
@@ -394,7 +394,7 @@ const health = await healthResponse.json();
 console.log(health.status); // 'healthy' or 'degraded'
 
 // Get a random image
-const response = await fetch('/api/images/random?type=normal');
+const response = await fetch('/api/images/random?session_id=abc123');
 const image = await response.json();
 console.log(image.image_url);
 
@@ -402,7 +402,7 @@ console.log(image.image_url);
 const submission = {
   participant_id: 'user-123',
   session_id: 'session-456',
-  image_id: 'normal/aurora-lake.svg',
+  image_id: 'survey/aurora-lake.svg',
   description: 'The image shows a beautiful sunset over mountains...',
   rating: 8,
   feedback: 'Interesting image',
@@ -429,7 +429,7 @@ health = health_response.json()
 print(health['status'])  # 'healthy' or 'degraded'
 
 # Get a random image
-response = requests.get('http://localhost:5000/api/images/random?type=normal')
+response = requests.get('http://localhost:5000/api/images/random?session_id=abc123')
 image = response.json()
 print(image['image_url'])
 
@@ -437,7 +437,7 @@ print(image['image_url'])
 submission = {
     'participant_id': 'user-123',
     'session_id': 'session-456',
-    'image_id': 'normal/aurora-lake.svg',
+    'image_id': 'survey/aurora-lake.svg',
     'description': 'The image shows a beautiful sunset...',
     'rating': 8,
     'feedback': 'Interesting image',
@@ -458,7 +458,7 @@ print(result['status'])  # 'ok'`} />
 curl -X GET "http://localhost:5000/api/health"
 
 # Get a random image
-curl -X GET "http://localhost:5000/api/images/random?type=normal"
+curl -X GET "http://localhost:5000/api/images/random?session_id=abc123"
 
 # Submit participant data
 curl -X POST "http://localhost:5000/api/submit" \\
@@ -466,12 +466,12 @@ curl -X POST "http://localhost:5000/api/submit" \\
   -d '{
     "participant_id": "user-123",
     "session_id": "session-456",
-    "image_id": "normal/aurora-lake.svg",
+    "image_id": "survey/aurora-lake.svg",
     "description": "The image shows...",
     "rating": 8,
     "feedback": "Great image",
     "time_spent_seconds": 45,
-    "is_survey": false,
+    "is_survey": true,
     "is_attention": false
   }'`} />
           </div>

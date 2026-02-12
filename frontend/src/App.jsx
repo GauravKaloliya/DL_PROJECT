@@ -307,15 +307,9 @@ export default function App() {
     }
   };
 
-  // Get next image type
+  // All images are now from survey folder
   const getNextType = () => {
-    if (mainCompleted >= 14) {
-      return "attention";
-    }
-    if (Math.random() < 0.25) {
-      return "attention";
-    }
-    return "normal";
+    return "survey";
   };
 
   // Handle submission

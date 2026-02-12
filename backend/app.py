@@ -1070,8 +1070,13 @@ def get_consent(participant_id):
 
 # ============== IMAGE ENDPOINTS ==============
 
+# Session-based image tracking to ensure unique images per session
+session_used_images = {}
+
+
 def list_images(image_type: str):
-    folder = IMAGES_DIR / image_type
+    # All images are now in the survey folder
+    folder = IMAGES_DIR / "survey"
     if not folder.exists():
         return []
     return [
@@ -1082,28 +1087,51 @@ def list_images(image_type: str):
 
 
 def build_image_payload(image_path: Path, image_type: str):
-    image_id = f"{image_type}/{image_path.name}"
+    # All images are served from survey folder
+    image_id = f"survey/{image_path.name}"
     image_url = f"/api/images/{image_id}"
+    # Determine if attention check based on filename
+    is_attention = image_path.name.startswith("attention-")
     return {
         "image_id": image_id,
         "image_url": image_url,
-        "is_survey": image_type == "survey",
-        "is_attention": image_type == "attention",
+        "is_survey": True,
+        "is_attention": is_attention,
     }
 
 
 @app.route("/api/images/random")
 def random_image():
-    requested_type = request.args.get("type", "normal")
-    if requested_type not in {"normal", "survey", "attention"}:
-        return jsonify({"error": "Invalid type"}), 400
-
-    images = list_images(requested_type)
+    # Get session_id for tracking used images
+    session_id = request.args.get("session_id", "")
+    
+    # All images are now from survey folder
+    images = list_images("survey")
     if not images:
-        return jsonify({"error": f"No images available for {requested_type}"}), 404
+        return jsonify({"error": "No images available"}), 404
 
-    image_path = random.choice(images)
-    payload = build_image_payload(image_path, requested_type)
+    # Initialize session tracking if needed
+    if session_id and session_id not in session_used_images:
+        session_used_images[session_id] = set()
+    
+    # Get available images (not yet used in this session)
+    if session_id:
+        available_images = [img for img in images if img.name not in session_used_images[session_id]]
+        # If all images used, reset the session
+        if not available_images:
+            session_used_images[session_id] = set()
+            available_images = images
+    else:
+        available_images = images
+
+    # Select random image from available
+    image_path = random.choice(available_images)
+    
+    # Mark image as used for this session
+    if session_id:
+        session_used_images[session_id].add(image_path.name)
+    
+    payload = build_image_payload(image_path, "survey")
     return jsonify(payload)
 
 
@@ -1306,7 +1334,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.4.0",
+            "version": "3.5.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1395,7 +1423,7 @@ def _get_api_documentation():
     """Get API documentation object - available at /"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.4.0",
+        "version": "3.5.0",
         "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform",
         "base_url": "/api",
         "security": {
@@ -1501,17 +1529,17 @@ def _get_api_documentation():
             "random_image": {
                 "path": "/api/images/random",
                 "method": "GET",
-                "description": "Get a random image from specified category",
+                "description": "Get a random image from the survey collection. Each session receives unique images until all have been shown.",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "query_params": {
-                    "type": "normal|survey|attention (default: normal)"
+                    "session_id": "string (optional) - Used to track shown images and ensure variety"
                 },
                 "response": {
                     "image_id": "string",
                     "image_url": "string",
-                    "is_survey": "boolean",
-                    "is_attention": "boolean"
+                    "is_survey": "boolean (always true)",
+                    "is_attention": "boolean (true for attention-check images)"
                 }
             },
             "serve_image": {
@@ -1597,6 +1625,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "3.5.0": "Merged all image types (normal, survey, attention) into unified survey folder, added session-based image tracking for unique images per session, updated API documentation UI to match frontend design",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
@@ -1612,7 +1641,7 @@ def api_docs_ui():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 
@@ -1631,7 +1660,7 @@ def api_docs_ui_alt():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 
