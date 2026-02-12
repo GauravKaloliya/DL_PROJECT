@@ -5,7 +5,7 @@ import ConsentPage from "./pages/ConsentPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
 import TrialPage from "./pages/TrialPage.jsx";
 import FinishedPage from "./pages/FinishedPage.jsx";
-import { API_BASE } from "./utils/apiBase";
+import { API_BASE, getApiUrl } from "./utils/apiBase";
 
 function createId() {
   if (crypto?.randomUUID) {
@@ -155,7 +155,7 @@ export default function App() {
   useEffect(() => {
     const checkHealth = async () => {
       try {
-        const response = await fetch(`${API_BASE}/api/health`);
+        const response = await fetch(getApiUrl('/api/health'));
         if (response.ok) {
           const data = await response.json();
           if (data.status === 'healthy' && data.services.database === 'connected') {
@@ -190,7 +190,7 @@ export default function App() {
 
   // Create participant in database
   const createParticipant = async () => {
-    const response = await fetch(`${API_BASE}/api/participants`, {
+    const response = await fetch(getApiUrl('/api/participants'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -218,7 +218,7 @@ export default function App() {
 
   // Record consent in database
   const recordConsent = async () => {
-    const response = await fetch(`${API_BASE}/api/consent`, {
+    const response = await fetch(getApiUrl('/api/consent'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -291,7 +291,7 @@ export default function App() {
     setSurveyFeedbackReady(false);
 
     try {
-      const response = await fetch(`${API_BASE}/api/images/random?type=${type}&session_id=${sessionId}`);
+      const response = await fetch(getApiUrl(`/api/images/random?type=${type}&session_id=${sessionId}`));
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Unable to fetch image");
@@ -334,7 +334,7 @@ export default function App() {
       attention_expected: formData.attentionExpected
     };
 
-    const response = await fetch(`${API_BASE}/api/submit`, {
+    const response = await fetch(getApiUrl('/api/submit'), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -346,13 +346,13 @@ export default function App() {
     }
 
     const result = await response.json();
-    
+
     if (trial.is_attention && !result.attention_passed) {
       addToast("Please follow the special instructions next time!", "warning");
     } else {
       addToast("Your response was saved!", "success");
     }
-    
+
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 1200);
 

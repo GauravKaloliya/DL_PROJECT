@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { API_BASE } from "../utils/apiBase";
+import { getApiUrl } from "../utils/apiBase";
 
 export default function PaymentPage({ 
   onPaymentComplete, 
@@ -24,7 +24,7 @@ export default function PaymentPage({
       return;
     }
     try {
-      const response = await fetch(`${API_BASE}/api/reward/${participantId}`);
+      const response = await fetch(getApiUrl(`/api/reward/${participantId}`));
       if (response.ok) {
         const data = await response.json();
         setRewardStatus(data);
