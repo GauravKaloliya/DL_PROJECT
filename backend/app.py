@@ -24,8 +24,8 @@ MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 
-# PostgreSQL Database URL from environment
-DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql://postgres:postgres@localhost:5432/cognit")
+# PostgreSQL Database URL - production Neon database
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_XGug6dnRMl9j@ep-super-cloud-aif6l6hr-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require")
 
 # Fix for SQLAlchemy (Render uses postgres:// sometimes)
 if DATABASE_URL.startswith("postgres://"):
