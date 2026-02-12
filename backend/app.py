@@ -57,7 +57,11 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
-    return ["http://localhost:5173"]
+    # Default origins include localhost for development and production frontend
+    return [
+        "http://localhost:5173",
+        "https://cognit-weld.vercel.app"
+    ]
 
 
 # CORS Configuration with enhanced security
@@ -1232,7 +1236,7 @@ def security_info():
                 "api_docs": "30 per minute"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
+                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
@@ -1328,7 +1332,7 @@ def _get_api_documentation():
                 "implementation": "Per-IP based rate limiting using flask-limiter"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
+                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
