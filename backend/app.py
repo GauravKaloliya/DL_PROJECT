@@ -1,26 +1,31 @@
 import hashlib
 import os
 import random
-import sqlite3
 import re
 import time
 import functools
 from datetime import datetime, timezone
 from pathlib import Path
+from contextlib import contextmanager
 
 from flask import Flask, jsonify, request, send_from_directory, abort, g, render_template
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from sqlalchemy import create_engine, text, event, Column, Integer, String, Boolean, Float, TIMESTAMP, CheckConstraint, ForeignKey
+from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
+from sqlalchemy.pool import QueuePool
 
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
-DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
+
+# PostgreSQL Database URL from environment
+DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql://postgres:postgres@localhost:5432/cognit")
 
 app = Flask(__name__)
 
@@ -30,6 +35,16 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+
+# SQLAlchemy configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_size': 10,
+    'pool_recycle': 3600,
+    'pool_pre_ping': True,
+    'max_overflow': 20
+}
 
 def _get_cors_origins():
     env_origins = os.getenv("CORS_ORIGINS", "").strip()
@@ -79,268 +94,99 @@ def add_security_headers(response):
     return response
 
 
+# Database connection setup using SQLAlchemy
+engine = create_engine(
+    DATABASE_URL,
+    poolclass=QueuePool,
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    echo=False
+)
+
+SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
+
+Base = declarative_base()
+
+
 def get_db():
-    """Get database connection for current request context"""
+    """Get database session for current request context"""
     if 'db' not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = SessionLocal()
     return g.db
 
 
 @app.teardown_appcontext
 def close_db(exception):
-    """Close database connection at end of request"""
+    """Close database session at end of request"""
     db = g.pop('db', None)
     if db is not None:
         db.close()
+        SessionLocal.remove()
 
 
 def init_db():
-    """Initialize the SQLite database with enhanced security and comprehensive schema"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
+    """Initialize the PostgreSQL database with schema"""
+    # Create tables using SQLAlchemy
+    from sqlalchemy import create_engine
     
-    # Enable security and performance pragmas
-    cursor.execute("PRAGMA foreign_keys = ON;")
-    cursor.execute("PRAGMA journal_mode = WAL;")
-    cursor.execute("PRAGMA synchronous = NORMAL;")
-    cursor.execute("PRAGMA temp_store = MEMORY;")
-    cursor.execute("PRAGMA encoding = 'UTF-8';")
+    # Create all tables
+    Base.metadata.create_all(bind=engine)
     
-    # Create participants table with enhanced constraints
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS participants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
-            session_id TEXT NOT NULL CHECK(LENGTH(session_id) <= 100),
-            username TEXT NOT NULL CHECK(LENGTH(username) <= 100),
-            email TEXT CHECK(LENGTH(email) <= 255),
-            phone TEXT CHECK(LENGTH(phone) <= 30),
-            gender TEXT CHECK(LENGTH(gender) <= 50),
-            age INTEGER CHECK(age BETWEEN 1 AND 120),
-            place TEXT CHECK(LENGTH(place) <= 100),
-            native_language TEXT CHECK(LENGTH(native_language) <= 50),
-            prior_experience TEXT CHECK(LENGTH(prior_experience) <= 100),
-            consent_given BOOLEAN DEFAULT 0,
-            consent_timestamp TIMESTAMP,
-            ip_hash TEXT CHECK(LENGTH(ip_hash) = 64),
-            user_agent TEXT CHECK(LENGTH(user_agent) <= 500),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            CONSTRAINT valid_email CHECK (
-                email IS NULL OR 
-                email GLOB '*@*' AND 
-                LENGTH(email) - LENGTH(REPLACE(email, '@', '')) = 1
-            )
-        )
-    ''')
-    
-    # Create submissions table with foreign key constraints
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS submissions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            participant_id TEXT NOT NULL CHECK(LENGTH(participant_id) <= 100),
-            session_id TEXT NOT NULL CHECK(LENGTH(session_id) <= 100),
-            image_id TEXT NOT NULL CHECK(LENGTH(image_id) <= 200),
-            image_url TEXT CHECK(LENGTH(image_url) <= 500),
-            trial_index INTEGER NOT NULL,
-            description TEXT NOT NULL CHECK(LENGTH(description) <= 10000),
-            word_count INTEGER CHECK(word_count >= 0),
-            rating INTEGER CHECK(rating BETWEEN 1 AND 10),
-            feedback TEXT CHECK(LENGTH(feedback) <= 2000),
-            time_spent_seconds REAL CHECK(time_spent_seconds >= 0),
-            is_survey BOOLEAN DEFAULT 0,
-            is_attention BOOLEAN DEFAULT 0,
-            attention_passed BOOLEAN,
-            too_fast_flag BOOLEAN DEFAULT 0,
-            user_agent TEXT CHECK(LENGTH(user_agent) <= 500),
-            ip_hash TEXT CHECK(LENGTH(ip_hash) = 64),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE,
-            FOREIGN KEY (image_id) REFERENCES images (image_id),
-            CONSTRAINT valid_word_count CHECK(word_count >= 0 AND word_count <= 10000)
-        )
-    ''')
-    
-    # Create consent records table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS consent_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
-            consent_given BOOLEAN DEFAULT 0,
-            consent_timestamp TIMESTAMP,
-            ip_hash TEXT CHECK(LENGTH(ip_hash) = 64),
-            user_agent TEXT CHECK(LENGTH(user_agent) <= 500),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-        )
-    ''')
-    
-    # Create images table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS images (
-            image_id TEXT PRIMARY KEY,
-            category TEXT,
-            difficulty_score REAL,
-            object_count INTEGER,
-            width INTEGER,
-            height INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Create audit log table for security tracking
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            event_type TEXT NOT NULL CHECK(LENGTH(event_type) <= 50),
-            user_id TEXT CHECK(LENGTH(user_id) <= 100),
-            participant_id TEXT CHECK(LENGTH(participant_id) <= 100),
-            endpoint TEXT CHECK(LENGTH(endpoint) <= 100),
-            method TEXT CHECK(LENGTH(method) <= 10),
-            status_code INTEGER,
-            ip_hash TEXT CHECK(LENGTH(ip_hash) = 64),
-            user_agent TEXT CHECK(LENGTH(user_agent) <= 500),
-            details TEXT CHECK(LENGTH(details) <= 2000)
-        )
-    ''')
-    
-    # Create performance metrics table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS performance_metrics (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            endpoint TEXT NOT NULL CHECK(LENGTH(endpoint) <= 100),
-            response_time_ms INTEGER CHECK(response_time_ms >= 0),
-            status_code INTEGER,
-            request_size_bytes INTEGER CHECK(request_size_bytes >= 0),
-            response_size_bytes INTEGER CHECK(response_size_bytes >= 0)
-        )
-    ''')
-    
-    # Create database metadata table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS database_metadata (
-            key TEXT PRIMARY KEY,
-            value TEXT,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    
-    # Create comprehensive indexes for performance optimization
-    _create_comprehensive_indexes(cursor)
-    
-    # Create triggers for automatic audit logging
-    _create_audit_triggers(cursor)
-    
-    # Create views for common queries
-    _create_views(cursor)
-    
-    # Insert initial metadata
-    cursor.execute('''
-        INSERT OR IGNORE INTO database_metadata (key, value) VALUES 
-            ('version', '3.2.0'),
-            ('schema_updated', CURRENT_TIMESTAMP),
-            ('description', 'C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) Research Platform Database')
-    ''')
-    
-    conn.commit()
-    conn.close()
+    # Create indexes, views, and other PostgreSQL-specific objects
+    _create_indexes()
+    _create_views()
+    _create_triggers()
+    _insert_metadata()
 
 
-def _create_comprehensive_indexes(cursor):
+def _create_indexes():
     """Create comprehensive database indexes for performance optimization"""
     indexes = [
-        # Participants indexes
-        ("idx_participants_id", "participants", "participant_id"),
-        ("idx_participants_session", "participants", "session_id"),
-        ("idx_participants_created", "participants", "created_at"),
-        ("idx_participants_consent", "participants", "consent_given"),
-        ("idx_participants_email", "participants", "email"),
+        ("idx_participants_id", "CREATE INDEX IF NOT EXISTS idx_participants_id ON participants(participant_id)"),
+        ("idx_participants_session", "CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id)"),
+        ("idx_participants_created", "CREATE INDEX IF NOT EXISTS idx_participants_created ON participants(created_at)"),
+        ("idx_participants_consent", "CREATE INDEX IF NOT EXISTS idx_participants_consent ON participants(consent_given)"),
+        ("idx_participants_email", "CREATE INDEX IF NOT EXISTS idx_participants_email ON participants(email)"),
         
-        # Submissions indexes
-        ("idx_submissions_participant", "submissions", "participant_id"),
-        ("idx_submissions_session", "submissions", "session_id"),
-        ("idx_submissions_created", "submissions", "created_at"),
-        ("idx_submissions_image", "submissions", "image_id"),
-        ("idx_submissions_survey", "submissions", "is_survey"),
-        ("idx_submissions_attention", "submissions", "is_attention"),
-        ("idx_submissions_rating", "submissions", "rating"),
-        ("idx_submissions_word_count", "submissions", "word_count"),
+        ("idx_submissions_participant", "CREATE INDEX IF NOT EXISTS idx_submissions_participant ON submissions(participant_id)"),
+        ("idx_submissions_session", "CREATE INDEX IF NOT EXISTS idx_submissions_session ON submissions(session_id)"),
+        ("idx_submissions_created", "CREATE INDEX IF NOT EXISTS idx_submissions_created ON submissions(created_at)"),
+        ("idx_submissions_image", "CREATE INDEX IF NOT EXISTS idx_submissions_image ON submissions(image_id)"),
+        ("idx_submissions_survey", "CREATE INDEX IF NOT EXISTS idx_submissions_survey ON submissions(is_survey)"),
+        ("idx_submissions_attention", "CREATE INDEX IF NOT EXISTS idx_submissions_attention ON submissions(is_attention)"),
+        ("idx_submissions_rating", "CREATE INDEX IF NOT EXISTS idx_submissions_rating ON submissions(rating)"),
+        ("idx_submissions_word_count", "CREATE INDEX IF NOT EXISTS idx_submissions_word_count ON submissions(word_count)"),
         
-        # Consent records indexes
-        ("idx_consent_participant", "consent_records", "participant_id"),
-        ("idx_consent_timestamp", "consent_records", "consent_timestamp"),
+        ("idx_consent_participant", "CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id)"),
+        ("idx_consent_timestamp", "CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp)"),
         
-        # Images indexes
-        ("idx_images_id", "images", "image_id"),
-        ("idx_images_category", "images", "category"),
-        ("idx_images_created", "images", "created_at"),
+        ("idx_images_category", "CREATE INDEX IF NOT EXISTS idx_images_category ON images(category)"),
+        ("idx_images_created", "CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at)"),
         
-        # Audit log indexes
-        ("idx_audit_timestamp", "audit_log", "timestamp"),
-        ("idx_audit_user", "audit_log", "user_id"),
-        ("idx_audit_participant", "audit_log", "participant_id"),
-        ("idx_audit_endpoint", "audit_log", "endpoint"),
+        ("idx_audit_timestamp", "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)"),
+        ("idx_audit_user", "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id)"),
+        ("idx_audit_participant", "CREATE INDEX IF NOT EXISTS idx_audit_participant ON audit_log(participant_id)"),
+        ("idx_audit_endpoint", "CREATE INDEX IF NOT EXISTS idx_audit_endpoint ON audit_log(endpoint)"),
         
-        # Performance metrics indexes
-        ("idx_performance_timestamp", "performance_metrics", "timestamp"),
-        ("idx_performance_endpoint", "performance_metrics", "endpoint")
+        ("idx_performance_timestamp", "CREATE INDEX IF NOT EXISTS idx_performance_timestamp ON performance_metrics(timestamp)"),
+        ("idx_performance_endpoint", "CREATE INDEX IF NOT EXISTS idx_performance_endpoint ON performance_metrics(endpoint)")
     ]
     
-    for idx_name, table, column in indexes:
-        try:
-            cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
-        except sqlite3.OperationalError:
-            pass  # Index might already exist
+    with engine.connect() as conn:
+        for idx_name, idx_sql in indexes:
+            try:
+                conn.execute(text(idx_sql))
+            except Exception:
+                pass  # Index might already exist
+        conn.commit()
 
 
-def _create_audit_triggers(cursor):
-    """Create triggers for automatic audit logging"""
-    triggers = [
-        ("trg_participant_insert_audit", """
-            CREATE TRIGGER IF NOT EXISTS trg_participant_insert_audit
-            AFTER INSERT ON participants
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO audit_log (timestamp, event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES (CURRENT_TIMESTAMP, 'participant_created', NEW.participant_id, '/api/participants', 'POST', 201, NEW.ip_hash, NEW.user_agent, 'New participant created');
-            END;
-        """),
-        ("trg_consent_insert_audit", """
-            CREATE TRIGGER IF NOT EXISTS trg_consent_insert_audit
-            AFTER INSERT ON consent_records
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO audit_log (timestamp, event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES (CURRENT_TIMESTAMP, 'consent_recorded', NEW.participant_id, '/api/consent', 'POST', 200, NEW.ip_hash, NEW.user_agent, 'Consent recorded for participant');
-            END;
-        """),
-        ("trg_submission_insert_audit", """
-            CREATE TRIGGER IF NOT EXISTS trg_submission_insert_audit
-            AFTER INSERT ON submissions
-            FOR EACH ROW
-            BEGIN
-                INSERT INTO audit_log (timestamp, event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES (CURRENT_TIMESTAMP, 'submission_created', NEW.participant_id, '/api/submit', 'POST', 200, NEW.ip_hash, NEW.user_agent, 'New submission created for image: ' || NEW.image_id);
-            END;
-        """)
-    ]
-    
-    for trigger_name, trigger_sql in triggers:
-        try:
-            cursor.execute(trigger_sql)
-        except sqlite3.OperationalError:
-            pass  # Trigger might already exist
-
-
-def _create_views(cursor):
+def _create_views():
     """Create views for common queries"""
     views = [
         ("vw_participant_summary", """
-            CREATE VIEW IF NOT EXISTS vw_participant_summary AS
+            CREATE OR REPLACE VIEW vw_participant_summary AS
             SELECT 
                 p.participant_id,
                 p.username,
@@ -359,13 +205,13 @@ def _create_views(cursor):
             GROUP BY p.participant_id;
         """),
         ("vw_submission_stats", """
-            CREATE VIEW IF NOT EXISTS vw_submission_stats AS
+            CREATE OR REPLACE VIEW vw_submission_stats AS
             SELECT 
                 participant_id,
                 COUNT(*) AS total_submissions,
-                SUM(CASE WHEN is_survey = 1 THEN 1 ELSE 0 END) AS survey_count,
-                SUM(CASE WHEN is_attention = 1 THEN 1 ELSE 0 END) AS attention_count,
-                SUM(CASE WHEN attention_passed = 1 THEN 1 ELSE 0 END) AS attention_passed_count,
+                SUM(CASE WHEN is_survey = TRUE THEN 1 ELSE 0 END) AS survey_count,
+                SUM(CASE WHEN is_attention = TRUE THEN 1 ELSE 0 END) AS attention_count,
+                SUM(CASE WHEN attention_passed = TRUE THEN 1 ELSE 0 END) AS attention_passed_count,
                 AVG(word_count) AS avg_word_count,
                 AVG(rating) AS avg_rating,
                 AVG(time_spent_seconds) AS avg_time_seconds
@@ -373,7 +219,7 @@ def _create_views(cursor):
             GROUP BY participant_id;
         """),
         ("vw_image_coverage", """
-            CREATE VIEW IF NOT EXISTS vw_image_coverage AS
+            CREATE OR REPLACE VIEW vw_image_coverage AS
             SELECT 
                 i.image_id,
                 i.category,
@@ -386,9 +232,9 @@ def _create_views(cursor):
                 AVG(s.word_count) AS avg_word_count,
                 AVG(s.rating) AS avg_rating,
                 AVG(s.time_spent_seconds) AS avg_time_seconds,
-                SUM(CASE WHEN s.is_survey = 1 THEN 1 ELSE 0 END) AS survey_submissions,
-                SUM(CASE WHEN s.is_attention = 1 THEN 1 ELSE 0 END) AS attention_submissions,
-                SUM(CASE WHEN s.attention_passed = 1 THEN 1 ELSE 0 END) AS attention_passed_submissions,
+                SUM(CASE WHEN s.is_survey = TRUE THEN 1 ELSE 0 END) AS survey_submissions,
+                SUM(CASE WHEN s.is_attention = TRUE THEN 1 ELSE 0 END) AS attention_submissions,
+                SUM(CASE WHEN s.attention_passed = TRUE THEN 1 ELSE 0 END) AS attention_passed_submissions,
                 MIN(s.created_at) AS first_submission_time,
                 MAX(s.created_at) AS last_submission_time,
                 CASE 
@@ -402,7 +248,7 @@ def _create_views(cursor):
             GROUP BY i.image_id, i.category, i.difficulty_score, i.object_count, i.width, i.height;
         """),
         ("vw_submission_quality", """
-            CREATE VIEW IF NOT EXISTS vw_submission_quality AS
+            CREATE OR REPLACE VIEW vw_submission_quality AS
             SELECT 
                 s.id,
                 s.participant_id,
@@ -436,20 +282,20 @@ def _create_views(cursor):
                     ELSE 5
                 END +
                 CASE
-                    WHEN s.is_attention = 0 THEN 20
-                    WHEN s.attention_passed = 1 THEN 20
-                    WHEN s.attention_passed = 0 THEN 5
+                    WHEN s.is_attention = FALSE THEN 20
+                    WHEN s.attention_passed = TRUE THEN 20
+                    WHEN s.attention_passed = FALSE THEN 5
                     ELSE 10
                 END +
                 CASE
-                    WHEN s.too_fast_flag = 1 THEN 0
+                    WHEN s.too_fast_flag = TRUE THEN 0
                     ELSE 20
                 END AS data_quality_score,
                 CASE
                     WHEN s.word_count >= 60 AND s.rating >= 7 AND s.time_spent_seconds BETWEEN 30 AND 300 AND 
-                         (s.is_attention = 0 OR s.attention_passed = 1) AND s.too_fast_flag = 0 THEN 'excellent'
+                         (s.is_attention = FALSE OR s.attention_passed = TRUE) AND s.too_fast_flag = FALSE THEN 'excellent'
                     WHEN s.word_count >= 40 AND s.rating >= 5 AND s.time_spent_seconds >= 15 AND 
-                         (s.is_attention = 0 OR s.attention_passed IS NOT NULL) THEN 'good'
+                         (s.is_attention = FALSE OR s.attention_passed IS NOT NULL) THEN 'good'
                     WHEN s.word_count >= 20 AND s.rating >= 3 AND s.time_spent_seconds >= 5 THEN 'acceptable'
                     ELSE 'poor'
                 END AS quality_category
@@ -457,84 +303,135 @@ def _create_views(cursor):
         """)
     ]
     
-    for view_name, view_sql in views:
+    with engine.connect() as conn:
+        for view_name, view_sql in views:
+            try:
+                conn.execute(text(view_sql))
+            except Exception:
+                pass  # View might already exist
+        conn.commit()
+
+
+def _create_triggers():
+    """Create triggers for automatic audit logging"""
+    triggers = [
+        ("fn_participant_insert_audit", """
+            CREATE OR REPLACE FUNCTION fn_participant_insert_audit()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                INSERT INTO audit_log
+                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
+                VALUES
+                ('participant_created', NEW.participant_id,
+                 '/api/participants', 'POST', 201,
+                 NEW.ip_hash, NEW.user_agent,
+                 'New participant created');
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """),
+        ("trg_participant_insert_audit", """
+            DROP TRIGGER IF EXISTS trg_participant_insert_audit ON participants;
+            CREATE TRIGGER trg_participant_insert_audit
+            AFTER INSERT ON participants
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_participant_insert_audit();
+        """),
+        ("fn_consent_insert_audit", """
+            CREATE OR REPLACE FUNCTION fn_consent_insert_audit()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                INSERT INTO audit_log
+                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
+                VALUES
+                ('consent_recorded', NEW.participant_id,
+                 '/api/consent', 'POST', 200,
+                 NEW.ip_hash, NEW.user_agent,
+                 'Consent recorded for participant');
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """),
+        ("trg_consent_insert_audit", """
+            DROP TRIGGER IF EXISTS trg_consent_insert_audit ON consent_records;
+            CREATE TRIGGER trg_consent_insert_audit
+            AFTER INSERT ON consent_records
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_consent_insert_audit();
+        """),
+        ("fn_submission_insert_audit", """
+            CREATE OR REPLACE FUNCTION fn_submission_insert_audit()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                INSERT INTO audit_log
+                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
+                VALUES
+                ('submission_created', NEW.participant_id,
+                 '/api/submit', 'POST', 200,
+                 NEW.ip_hash, NEW.user_agent,
+                 'New submission created for image: ' || NEW.image_id);
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+        """),
+        ("trg_submission_insert_audit", """
+            DROP TRIGGER IF EXISTS trg_submission_insert_audit ON submissions;
+            CREATE TRIGGER trg_submission_insert_audit
+            AFTER INSERT ON submissions
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_submission_insert_audit();
+        """)
+    ]
+    
+    with engine.connect() as conn:
+        for trigger_name, trigger_sql in triggers:
+            try:
+                conn.execute(text(trigger_sql))
+            except Exception:
+                pass  # Trigger might already exist
+        conn.commit()
+
+
+def _insert_metadata():
+    """Insert initial database metadata"""
+    with engine.connect() as conn:
         try:
-            cursor.execute(view_sql)
-        except sqlite3.OperationalError:
-            pass  # View might already exist
+            conn.execute(text("""
+                INSERT INTO database_metadata (key, value)
+                VALUES 
+                    ('version', '3.2.0'),
+                    ('schema_updated', CURRENT_TIMESTAMP::text),
+                    ('description', 'C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) Research Platform Database')
+                ON CONFLICT (key) DO NOTHING
+            """))
+            conn.commit()
+        except Exception:
+            pass
 
 
 def migrate_database_schema():
     """Migrate existing database to new schema"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    try:
-        # Check if images table exists, create if not
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS images (
-                image_id TEXT PRIMARY KEY,
-                category TEXT,
-                difficulty_score REAL,
-                object_count INTEGER,
-                width INTEGER,
-                height INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
-        # Check if trial_index column exists in submissions
-        cursor.execute("PRAGMA table_info(submissions)")
-        columns = [row[1] for row in cursor.fetchall()]
-        
-        if 'trial_index' not in columns:
-            # Add trial_index column to existing submissions
-            cursor.execute("ALTER TABLE submissions ADD COLUMN trial_index INTEGER DEFAULT 0")
-            print("Added trial_index column to submissions table")
-        
-        # Create images indexes
-        indexes = [
-            ("idx_images_id", "images", "image_id"),
-            ("idx_images_category", "images", "category"),
-            ("idx_images_created", "images", "created_at")
-        ]
-        
-        for idx_name, table, column in indexes:
-            try:
-                cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
-            except sqlite3.OperationalError:
-                pass
-        
-        # Add foreign key constraint for image_id (only if not exists)
+    with engine.connect() as conn:
         try:
-            cursor.execute("PRAGMA foreign_key_list(submissions)")
-            fks = cursor.fetchall()
-            fk_columns = [fk[3] for fk in fks if fk[3] == 'image_id']
+            # Check if images table exists, create if not
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS images (
+                    image_id VARCHAR(200) PRIMARY KEY,
+                    category VARCHAR(100),
+                    difficulty_score DOUBLE PRECISION,
+                    object_count INTEGER,
+                    width INTEGER,
+                    height INTEGER,
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """))
             
-            if not fk_columns:
-                cursor.execute("ALTER TABLE submissions ADD CONSTRAINT fk_submissions_image FOREIGN KEY (image_id) REFERENCES images (image_id)")
-                print("Added foreign key constraint for submissions.image_id")
-        except sqlite3.OperationalError:
-            pass  # Constraint might already exist
-        
-        # Create views
-        _create_views(cursor)
-        
-        # Update database version
-        cursor.execute("""
-            INSERT OR REPLACE INTO database_metadata (key, value, updated_at) 
-            VALUES ('version', '3.2.0', CURRENT_TIMESTAMP)
-        """)
-        
-        conn.commit()
-        print("Database migration completed successfully")
-        
-    except Exception as e:
-        conn.rollback()
-        print(f"Database migration failed: {str(e)}")
-        raise
-    finally:
-        conn.close()
+            conn.commit()
+            print("Database migration completed successfully")
+        except Exception as e:
+            conn.rollback()
+            print(f"Database migration failed: {str(e)}")
+            raise
 
 
 def get_ip_hash():
@@ -547,28 +444,27 @@ def get_ip_hash():
 def update_participant_stats(participant_id, word_count, is_survey):
     """Update participant engagement stats for reward eligibility"""
     try:
-        conn = get_db()
-        cursor = conn.cursor()
+        db = get_db()
         
         # Check if participant_stats table exists, create if not
-        cursor.execute('''
+        db.execute(text("""
             CREATE TABLE IF NOT EXISTS participant_stats (
                 participant_id TEXT PRIMARY KEY,
                 total_words INTEGER DEFAULT 0,
                 total_submissions INTEGER DEFAULT 0,
                 survey_rounds INTEGER DEFAULT 0,
-                priority_eligible BOOLEAN DEFAULT 0,
+                priority_eligible BOOLEAN DEFAULT FALSE,
                 FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
             )
-        ''')
+        """))
         
         # Get current stats
-        cursor.execute('''
+        result = db.execute(text('''
             SELECT total_words, total_submissions, survey_rounds 
             FROM participant_stats 
-            WHERE participant_id = ?
-        ''', (participant_id,))
-        row = cursor.fetchone()
+            WHERE participant_id = :participant_id
+        '''), {"participant_id": participant_id})
+        row = result.fetchone()
         
         if row:
             new_words = row[0] + word_count
@@ -580,21 +476,26 @@ def update_participant_stats(participant_id, word_count, is_survey):
             new_survey_rounds = 1 if is_survey else 0
         
         # Priority eligibility: more words or more survey rounds increases chance
-        # Threshold: 500+ words total OR 3+ survey rounds makes you priority eligible
         priority_eligible = new_words >= 500 or new_survey_rounds >= 3
         
-        cursor.execute('''
+        db.execute(text('''
             INSERT INTO participant_stats 
             (participant_id, total_words, total_submissions, survey_rounds, priority_eligible)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES (:participant_id, :total_words, :total_submissions, :survey_rounds, :priority_eligible)
             ON CONFLICT(participant_id) DO UPDATE SET
-            total_words = excluded.total_words,
-            total_submissions = excluded.total_submissions,
-            survey_rounds = excluded.survey_rounds,
-            priority_eligible = excluded.priority_eligible
-        ''', (participant_id, new_words, new_submissions, new_survey_rounds, priority_eligible))
+            total_words = EXCLUDED.total_words,
+            total_submissions = EXCLUDED.total_submissions,
+            survey_rounds = EXCLUDED.survey_rounds,
+            priority_eligible = EXCLUDED.priority_eligible
+        '''), {
+            "participant_id": participant_id,
+            "total_words": new_words,
+            "total_submissions": new_submissions,
+            "survey_rounds": new_survey_rounds,
+            "priority_eligible": priority_eligible
+        })
         
-        conn.commit()
+        db.commit()
     except Exception as e:
         # Don't let stats update failures break the main functionality
         pass
@@ -603,25 +504,24 @@ def update_participant_stats(participant_id, word_count, is_survey):
 def get_reward_eligibility(participant_id):
     """Check if participant is eligible for reward and return details"""
     try:
-        conn = get_db()
-        cursor = conn.cursor()
+        db = get_db()
         
         # Ensure table exists
-        cursor.execute('''
+        db.execute(text('''
             CREATE TABLE IF NOT EXISTS reward_winners (
                 participant_id TEXT PRIMARY KEY,
                 reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 status TEXT DEFAULT 'pending',
                 FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
             )
-        ''')
+        '''))
         
         # Check if already a winner
-        cursor.execute('''
-            SELECT reward_amount, status FROM reward_winners WHERE participant_id = ?
-        ''', (participant_id,))
-        winner_row = cursor.fetchone()
+        result = db.execute(text('''
+            SELECT reward_amount, status FROM reward_winners WHERE participant_id = :participant_id
+        '''), {"participant_id": participant_id})
+        winner_row = result.fetchone()
         
         if winner_row:
             return {
@@ -631,12 +531,12 @@ def get_reward_eligibility(participant_id):
             }
         
         # Get participant stats
-        cursor.execute('''
+        result = db.execute(text('''
             SELECT total_words, survey_rounds, priority_eligible 
             FROM participant_stats 
-            WHERE participant_id = ?
-        ''', (participant_id,))
-        stats_row = cursor.fetchone()
+            WHERE participant_id = :participant_id
+        '''), {"participant_id": participant_id})
+        stats_row = result.fetchone()
         
         if stats_row:
             return {
@@ -665,45 +565,42 @@ def get_reward_eligibility(participant_id):
 def select_reward_winner(participant_id):
     """Select participant as a reward winner with 5% probability, prioritizing engaged users"""
     try:
-        conn = get_db()
-        cursor = conn.cursor()
+        db = get_db()
         
         # Ensure table exists
-        cursor.execute('''
+        db.execute(text('''
             CREATE TABLE IF NOT EXISTS reward_winners (
                 participant_id TEXT PRIMARY KEY,
                 reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
                 status TEXT DEFAULT 'pending',
                 FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
             )
-        ''')
+        '''))
         
         # Check if already selected
-        cursor.execute('SELECT participant_id FROM reward_winners WHERE participant_id = ?', (participant_id,))
-        if cursor.fetchone():
+        result = db.execute(text('SELECT participant_id FROM reward_winners WHERE participant_id = :participant_id'), {"participant_id": participant_id})
+        if result.fetchone():
             return {"selected": False, "already_winner": True}
         
         # Get participant's priority status
-        cursor.execute('''
-            SELECT priority_eligible FROM participant_stats WHERE participant_id = ?
-        ''', (participant_id,))
-        stats_row = cursor.fetchone()
+        result = db.execute(text('''
+            SELECT priority_eligible FROM participant_stats WHERE participant_id = :participant_id
+        '''), {"participant_id": participant_id})
+        stats_row = result.fetchone()
         priority_eligible = bool(stats_row[0]) if stats_row else False
         
-        # Weighted random selection:
-        # - Priority eligible participants have higher chance (15% instead of 5%)
-        # - But all participants have a chance
+        # Weighted random selection
         base_probability = 0.05  # 5%
-        priority_boost = 0.10 if priority_eligible else 0.0  # Additional 10% for priority
+        priority_boost = 0.10 if priority_eligible else 0.0
         selection_probability = base_probability + priority_boost
         
         if random.random() < selection_probability:
-            cursor.execute('''
+            db.execute(text('''
                 INSERT INTO reward_winners (participant_id, reward_amount, status)
-                VALUES (?, 10, 'pending')
-            ''', (participant_id,))
-            conn.commit()
+                VALUES (:participant_id, 10, 'pending')
+            '''), {"participant_id": participant_id})
+            db.commit()
             return {"selected": True, "reward_amount": 10}
         
         return {"selected": False, "priority_eligible": priority_eligible}
@@ -716,26 +613,26 @@ def count_words(text: str):
     return len([word for word in text.strip().split() if word])
 
 
-def _log_audit_event(cursor, event_type, participant_id=None, user_id=None, endpoint=None, 
+def _log_audit_event(db, event_type, participant_id=None, user_id=None, endpoint=None, 
                     method=None, status_code=None, details=None):
     """Log an audit event to the audit_log table"""
     try:
-        cursor.execute('''
+        db.execute(text('''
             INSERT INTO audit_log 
-            (timestamp, event_type, user_id, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            datetime.now(timezone.utc).isoformat(),
-            event_type,
-            user_id,
-            participant_id,
-            endpoint,
-            method,
-            status_code,
-            get_ip_hash(),
-            request.headers.get('User-Agent', ''),
-            details
-        ))
+            (event_type, user_id, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
+            VALUES (:event_type, :user_id, :participant_id, :endpoint, :method, :status_code, :ip_hash, :user_agent, :details)
+        '''), {
+            "event_type": event_type,
+            "user_id": user_id,
+            "participant_id": participant_id,
+            "endpoint": endpoint,
+            "method": method,
+            "status_code": status_code,
+            "ip_hash": get_ip_hash(),
+            "user_agent": request.headers.get('User-Agent', ''),
+            "details": details
+        })
+        db.commit()
     except Exception as e:
         # Don't let audit logging failures break the main functionality
         pass
@@ -744,21 +641,19 @@ def _log_audit_event(cursor, event_type, participant_id=None, user_id=None, endp
 def _log_performance_metric(endpoint, response_time_ms, status_code, request_size=0, response_size=0):
     """Log performance metrics"""
     try:
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute('''
+        db = get_db()
+        db.execute(text('''
             INSERT INTO performance_metrics 
-            (timestamp, endpoint, response_time_ms, status_code, request_size_bytes, response_size_bytes)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            datetime.now(timezone.utc).isoformat(),
-            endpoint,
-            response_time_ms,
-            status_code,
-            request_size,
-            response_size
-        ))
-        conn.commit()
+            (endpoint, response_time_ms, status_code, request_size_bytes, response_size_bytes)
+            VALUES (:endpoint, :response_time_ms, :status_code, :request_size_bytes, :response_size_bytes)
+        '''), {
+            "endpoint": endpoint,
+            "response_time_ms": response_time_ms,
+            "status_code": status_code,
+            "request_size_bytes": request_size,
+            "response_size_bytes": response_size
+        })
+        db.commit()
     except Exception as e:
         # Don't let performance logging failures break the main functionality
         pass
@@ -816,10 +711,8 @@ def health_check():
     
     # Check database connectivity
     try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute("SELECT 1")
-        conn.close()
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
         status["services"]["database"] = "connected"
     except Exception as e:
         status["services"]["database"] = f"error: {str(e)}"
@@ -870,11 +763,10 @@ def create_participant():
         return jsonify({"error": "Invalid phone number format"}), 400
     
     try:
-        conn = get_db()
-        cursor = conn.cursor()
+        db = get_db()
         
         # Log the participant creation attempt
-        _log_audit_event(cursor, 
+        _log_audit_event(db, 
                         event_type='participant_creation_attempt',
                         participant_id=data['participant_id'],
                         endpoint='/api/participants',
@@ -882,42 +774,44 @@ def create_participant():
                         status_code=201,
                         details='Participant creation attempt')
         
-        cursor.execute('''
+        db.execute(text('''
             INSERT INTO participants 
             (participant_id, session_id, username, email, phone, gender, age, place, native_language, prior_experience, ip_hash, user_agent)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data['participant_id'],
-            data['session_id'],
-            data['username'],
-            email or None,
-            phone or None,
-            data['gender'],
-            int(data['age']),
-            data['place'],
-            data['native_language'],
-            data['prior_experience'],
-            get_ip_hash(),
-            request.headers.get('User-Agent', '')
-        ))
+            VALUES (:participant_id, :session_id, :username, :email, :phone, :gender, :age, :place, :native_language, :prior_experience, :ip_hash, :user_agent)
+        '''), {
+            "participant_id": data['participant_id'],
+            "session_id": data['session_id'],
+            "username": data['username'],
+            "email": email or None,
+            "phone": phone or None,
+            "gender": data['gender'],
+            "age": int(data['age']),
+            "place": data['place'],
+            "native_language": data['native_language'],
+            "prior_experience": data['prior_experience'],
+            "ip_hash": get_ip_hash(),
+            "user_agent": request.headers.get('User-Agent', '')
+        })
         
-        cursor.execute('''
+        # Check for existing consent
+        result = db.execute(text('''
             SELECT consent_given, consent_timestamp
             FROM consent_records
-            WHERE participant_id = ? AND consent_given = 1
-        ''', (data['participant_id'],))
-        consent_row = cursor.fetchone()
+            WHERE participant_id = :participant_id AND consent_given = TRUE
+        '''), {"participant_id": data['participant_id']})
+        consent_row = result.fetchone()
+        
         if consent_row:
-            cursor.execute('''
+            db.execute(text('''
                 UPDATE participants
-                SET consent_given = 1, consent_timestamp = ?
-                WHERE participant_id = ?
-            ''', (consent_row[1], data['participant_id']))
+                SET consent_given = TRUE, consent_timestamp = :consent_timestamp
+                WHERE participant_id = :participant_id
+            '''), {"consent_timestamp": consent_row[1], "participant_id": data['participant_id']})
 
-        conn.commit()
+        db.commit()
 
         # Log successful creation
-        _log_audit_event(cursor, 
+        _log_audit_event(db, 
                         event_type='participant_created',
                         participant_id=data['participant_id'],
                         endpoint='/api/participants',
@@ -931,47 +825,38 @@ def create_participant():
             "message": "Participant created successfully"
         }), 201
         
-    except sqlite3.IntegrityError as e:
-        if "participant_id" in str(e).lower():
-            _log_audit_event(cursor, 
+    except Exception as e:
+        error_msg = str(e)
+        if "duplicate" in error_msg.lower() or "unique" in error_msg.lower():
+            _log_audit_event(db, 
                            event_type='participant_creation_failed',
                            participant_id=data['participant_id'],
                            endpoint='/api/participants',
                            method='POST',
                            status_code=409,
-                           details=f'Duplicate participant ID: {str(e)}')
+                           details=f'Duplicate participant ID: {error_msg}')
             return jsonify({"error": "Participant ID already exists"}), 409
-        _log_audit_event(cursor, 
+        _log_audit_event(db, 
                        event_type='participant_creation_failed',
                        participant_id=data['participant_id'],
                        endpoint='/api/participants',
                        method='POST',
                        status_code=500,
-                       details=f'Database error: {str(e)}')
-        return jsonify({"error": "Database error", "details": str(e)}), 500
-    except Exception as e:
-        _log_audit_event(cursor, 
-                       event_type='participant_creation_failed',
-                       participant_id=data.get('participant_id', 'unknown'),
-                       endpoint='/api/participants',
-                       method='POST',
-                       status_code=500,
-                       details=f'Creation failed: {str(e)}')
-        return jsonify({"error": "Failed to create participant", "details": str(e)}), 500
+                       details=f'Database error: {error_msg}')
+        return jsonify({"error": "Database error", "details": error_msg}), 500
 
 
 @app.route("/api/participants/<participant_id>")
 def get_participant(participant_id):
     """Get participant details"""
-    conn = get_db()
-    cursor = conn.cursor()
+    db = get_db()
     
-    cursor.execute('''
+    result = db.execute(text('''
         SELECT participant_id, username, email, phone, gender, age, place, native_language, prior_experience, consent_given, created_at
-        FROM participants WHERE participant_id = ?
-    ''', (participant_id,))
+        FROM participants WHERE participant_id = :participant_id
+    '''), {"participant_id": participant_id})
     
-    row = cursor.fetchone()
+    row = result.fetchone()
     if not row:
         return jsonify({"error": "Participant not found"}), 404
     
@@ -986,7 +871,7 @@ def get_participant(participant_id):
         "native_language": row[7],
         "prior_experience": row[8],
         "consent_given": bool(row[9]),
-        "created_at": row[10]
+        "created_at": str(row[10])
     })
 
 
@@ -1008,32 +893,36 @@ def record_consent():
     if not consent_given:
         return jsonify({"error": "Consent must be given to proceed"}), 400
     
-    conn = get_db()
-    cursor = conn.cursor()
+    db = get_db()
     
-    cursor.execute("SELECT id FROM participants WHERE participant_id = ?", (participant_id,))
-    participant_row = cursor.fetchone()
+    result = db.execute(text("SELECT id FROM participants WHERE participant_id = :participant_id"), {"participant_id": participant_id})
+    participant_row = result.fetchone()
 
     timestamp = datetime.now(timezone.utc).isoformat()
 
     if participant_row:
-        cursor.execute('''
+        db.execute(text('''
             UPDATE participants 
-            SET consent_given = 1, consent_timestamp = ?
-            WHERE participant_id = ?
-        ''', (timestamp, participant_id))
+            SET consent_given = TRUE, consent_timestamp = :consent_timestamp
+            WHERE participant_id = :participant_id
+        '''), {"consent_timestamp": timestamp, "participant_id": participant_id})
 
-    cursor.execute('''
+    db.execute(text('''
         INSERT INTO consent_records (participant_id, consent_given, consent_timestamp, ip_hash, user_agent)
-        VALUES (?, 1, ?, ?, ?)
+        VALUES (:participant_id, TRUE, :consent_timestamp, :ip_hash, :user_agent)
         ON CONFLICT(participant_id) DO UPDATE SET
-        consent_given = 1,
-        consent_timestamp = excluded.consent_timestamp,
-        ip_hash = excluded.ip_hash,
-        user_agent = excluded.user_agent
-    ''', (participant_id, timestamp, get_ip_hash(), request.headers.get('User-Agent', '')))
+        consent_given = TRUE,
+        consent_timestamp = EXCLUDED.consent_timestamp,
+        ip_hash = EXCLUDED.ip_hash,
+        user_agent = EXCLUDED.user_agent
+    '''), {
+        "participant_id": participant_id,
+        "consent_timestamp": timestamp,
+        "ip_hash": get_ip_hash(),
+        "user_agent": request.headers.get('User-Agent', '')
+    })
 
-    conn.commit()
+    db.commit()
 
     return jsonify({
         "status": "success",
@@ -1045,15 +934,14 @@ def record_consent():
 @app.route("/api/consent/<participant_id>")
 def get_consent(participant_id):
     """Get consent status for a participant"""
-    conn = get_db()
-    cursor = conn.cursor()
+    db = get_db()
     
-    cursor.execute('''
+    result = db.execute(text('''
         SELECT consent_given, consent_timestamp FROM consent_records 
-        WHERE participant_id = ?
-    ''', (participant_id,))
+        WHERE participant_id = :participant_id
+    '''), {"participant_id": participant_id})
     
-    row = cursor.fetchone()
+    row = result.fetchone()
     if not row:
         return jsonify({
             "participant_id": participant_id,
@@ -1064,7 +952,7 @@ def get_consent(participant_id):
     return jsonify({
         "participant_id": participant_id,
         "consent_given": bool(row[0]),
-        "consent_timestamp": row[1]
+        "consent_timestamp": str(row[1]) if row[1] else None
     })
 
 
@@ -1140,15 +1028,14 @@ def submit():
         return jsonify({"error": "participant_id is required"}), 400
     
     # Verify participant exists and has given consent
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("SELECT consent_given FROM participants WHERE participant_id = ?", (participant_id,))
-    result = cursor.fetchone()
+    db = get_db()
+    result = db.execute(text("SELECT consent_given FROM participants WHERE participant_id = :participant_id"), {"participant_id": participant_id})
+    db_result = result.fetchone()
     
-    if not result:
+    if not db_result:
         return jsonify({"error": "Participant not found. Please complete registration first."}), 400
     
-    if not result[0]:
+    if not db_result[0]:
         return jsonify({"error": "Consent required. Please complete the consent process."}), 403
     
     description = (payload.get("description") or "").strip()
@@ -1180,7 +1067,7 @@ def submit():
     
     # Security validation - prevent potential injection
     if any(char in description for char in ['<', '>', '&', ';', '--', '/*', '*/', 'exec', 'union', 'select', 'insert', 'update', 'delete']):
-        _log_audit_event(cursor, 
+        _log_audit_event(db, 
                        event_type='security_violation',
                        participant_id=participant_id,
                        endpoint='/api/submit',
@@ -1190,7 +1077,7 @@ def submit():
         return jsonify({"error": "Description contains invalid characters"}), 403
     
     if any(char in feedback for char in ['<', '>', '&', ';', '--', '/*', '*/', 'exec', 'union', 'select', 'insert', 'update', 'delete']):
-        _log_audit_event(cursor, 
+        _log_audit_event(db, 
                        event_type='security_violation',
                        participant_id=participant_id,
                        endpoint='/api/submit',
@@ -1222,31 +1109,32 @@ def submit():
         except (TypeError, ValueError):
             trial_index = 0
         
-        cursor.execute('''
+        db.execute(text('''
             INSERT INTO submissions 
             (participant_id, session_id, image_id, image_url, trial_index, description, word_count, rating, 
              feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, user_agent, ip_hash)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            participant_id,
-            payload.get("session_id", ""),
-            image_id,
-            payload.get("image_url", f"/api/images/{image_id}"),
-            trial_index,
-            description,
-            word_count,
-            rating,
-            feedback,
-            time_spent_seconds,
-            is_survey,
-            is_attention,
-            attention_passed,
-            too_fast_flag,
-            request.headers.get("User-Agent", ""),
-            get_ip_hash()
-        ))
+            VALUES (:participant_id, :session_id, :image_id, :image_url, :trial_index, :description, :word_count, :rating, 
+             :feedback, :time_spent_seconds, :is_survey, :is_attention, :attention_passed, :too_fast_flag, :user_agent, :ip_hash)
+        '''), {
+            "participant_id": participant_id,
+            "session_id": payload.get("session_id", ""),
+            "image_id": image_id,
+            "image_url": payload.get("image_url", f"/api/images/{image_id}"),
+            "trial_index": trial_index,
+            "description": description,
+            "word_count": word_count,
+            "rating": rating,
+            "feedback": feedback,
+            "time_spent_seconds": time_spent_seconds,
+            "is_survey": is_survey,
+            "is_attention": is_attention,
+            "attention_passed": attention_passed,
+            "too_fast_flag": too_fast_flag,
+            "user_agent": request.headers.get("User-Agent", ""),
+            "ip_hash": get_ip_hash()
+        })
         
-        conn.commit()
+        db.commit()
         
         # Update participant stats for reward eligibility
         update_participant_stats(participant_id, word_count, is_survey)
@@ -1279,18 +1167,17 @@ def check_reward_winner(participant_id):
 @app.route("/api/submissions/<participant_id>")
 def get_participant_submissions(participant_id):
     """Get all submissions for a participant"""
-    conn = get_db()
-    cursor = conn.cursor()
+    db = get_db()
     
-    cursor.execute('''
+    result = db.execute(text('''
         SELECT id, image_id, trial_index, description, word_count, rating, feedback, 
                time_spent_seconds, is_survey, is_attention, attention_passed, created_at
         FROM submissions 
-        WHERE participant_id = ?
+        WHERE participant_id = :participant_id
         ORDER BY created_at DESC
-    ''', (participant_id,))
+    '''), {"participant_id": participant_id})
     
-    rows = cursor.fetchall()
+    rows = result.fetchall()
     submissions = []
     
     for row in rows:
@@ -1306,7 +1193,7 @@ def get_participant_submissions(participant_id):
             "is_survey": bool(row[8]),
             "is_attention": bool(row[9]),
             "attention_passed": row[10],
-            "created_at": row[11]
+            "created_at": str(row[11])
         })
     
     return jsonify(submissions)
@@ -1352,7 +1239,7 @@ def security_info():
             "data_protection": {
                 "ip_hashing": "SHA-256 with configurable salt",
                 "anonymous_data": True,
-                "storage": "SQLite with WAL mode and comprehensive indexing",
+                "storage": "PostgreSQL with comprehensive indexing",
                 "encryption": "At-rest protection via filesystem encryption",
                 "data_validation": "Comprehensive input validation and sanitization"
             },
@@ -1448,7 +1335,7 @@ def _get_api_documentation():
             "data_protection": {
                 "ip_hashing": "SHA-256 with configurable salt (IP_HASH_SALT)",
                 "anonymous_data": True,
-                "storage": "SQLite with WAL mode and comprehensive indexing",
+                "storage": "PostgreSQL with comprehensive indexing",
                 "encryption": "At-rest protection via filesystem encryption",
                 "data_validation": "Comprehensive input validation and sanitization"
             },
@@ -1457,8 +1344,7 @@ def _get_api_documentation():
                 "input_validation": "Length and format constraints on all fields",
                 "audit_logging": "Automatic logging of all participant actions via triggers",
                 "performance_monitoring": "Comprehensive endpoint performance tracking",
-                "data_integrity": "Check constraints and validation rules",
-                "sqlite_pragmas": ["PRAGMA foreign_keys = ON", "PRAGMA journal_mode = WAL", "PRAGMA synchronous = NORMAL", "PRAGMA temp_store = MEMORY"]
+                "data_integrity": "Check constraints and validation rules"
             },
             "api_security": {
                 "input_sanitization": "Protection against injection attacks",
@@ -1668,7 +1554,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
-            "3.5.0": "Enhanced API documentation with comprehensive security details, added red border validation styling for frontend forms, removed sample-practice.svg, fixed API docs loading issue in Vite dev server proxy configuration",
+            "3.5.0": "Migrated from SQLite to PostgreSQL for production deployment compatibility",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
@@ -1685,36 +1571,20 @@ def regenerate_database_from_schema():
         return False
     
     try:
-        # Backup existing database
-        backup_path = BASE_DIR / f"COGNIT_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.db"
-        if DB_PATH.exists():
-            import shutil
-            shutil.copy2(DB_PATH, backup_path)
-            print(f"Backup created at {backup_path}")
-        
-        # Remove existing database
-        if DB_PATH.exists():
-            DB_PATH.unlink()
-        
-        # Create new database from schema
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        
         with open(schema_path, 'r', encoding='utf-8') as f:
             schema_sql = f.read()
         
-        # Execute schema statements
-        for statement in schema_sql.split(';'):
-            statement = statement.strip()
-            if statement:
-                try:
-                    cursor.execute(statement)
-                except sqlite3.OperationalError as e:
-                    # Some statements like PRAGMA might fail, that's okay
-                    pass
-        
-        conn.commit()
-        conn.close()
+        with engine.connect() as conn:
+            # Execute schema statements
+            for statement in schema_sql.split(';'):
+                statement = statement.strip()
+                if statement and not statement.startswith('--'):
+                    try:
+                        conn.execute(text(statement))
+                    except Exception as e:
+                        print(f"Statement error (may be expected): {e}")
+            
+            conn.commit()
         
         print("Database successfully regenerated from schema")
         return True
@@ -1727,6 +1597,13 @@ def regenerate_database_from_schema():
 # Initialize database on module load (for gunicorn)
 def initialize_app():
     """Initialize the application - run migrations and init db"""
+    # Check if DATABASE_URL is set to a non-default value
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url or "localhost:5432" in db_url:
+        print("Warning: DATABASE_URL not set or using default localhost. Database initialization will be skipped.")
+        print("Set a valid DATABASE_URL environment variable to initialize the database.")
+        return
+    
     # Check if we should regenerate the database (only when run directly)
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--regenerate-db":
@@ -1736,9 +1613,14 @@ def initialize_app():
             print("Database regeneration failed")
         sys.exit(0)
     
-    # Run database migration for schema updates
-    migrate_database_schema()
-    init_db()
+    try:
+        # Run database migration for schema updates
+        migrate_database_schema()
+        init_db()
+        print("Database initialized successfully")
+    except Exception as e:
+        print(f"Warning: Database initialization failed: {e}")
+        print("The application will continue, but database functionality will not work.")
 
 # Initialize when module is loaded
 initialize_app()

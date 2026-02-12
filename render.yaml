@@ -1,0 +1,41 @@
+services:
+  # Backend Web Service
+  - type: web
+    name: cognit-backend
+    env: python
+    plan: starter
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && python app.py"
+    envVars:
+      - key: FLASK_DEBUG
+        value: 0
+      - key: MIN_WORD_COUNT
+        value: "60"
+      - key: TOO_FAST_SECONDS
+        value: "5"
+    # Note: Set DATABASE_URL and SECRET_KEY via Render Dashboard
+    # DATABASE_URL will be automatically available when connecting a PostgreSQL database
+    healthCheckPath: /api/health
+    
+  # Frontend Static Site
+  - type: static
+    name: cognit-frontend
+    buildCommand: "cd frontend && npm install && npm run build"
+    staticPublishPath: ./frontend/dist
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: X-XSS-Protection
+        value: 1; mode=block
+
+# PostgreSQL Database (create separately in Render Dashboard)
+# After creating, connect it to the backend service
+databases:
+  - name: cognit-db
+    databaseName: cognit
+    user: cognit
