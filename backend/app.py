@@ -133,6 +133,65 @@ def close_db(exception):
         SessionLocal.remove()
 
 
+def _populate_images():
+    """Populate images table with all images from the images folder"""
+    if not IMAGES_DIR.exists():
+        app.logger.warning(f"Images directory not found at {IMAGES_DIR}")
+        return
+    
+    image_files = []
+    survey_specific_files = ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]
+    
+    # Find all SVG files in the images directory and subdirectories
+    for image_path in IMAGES_DIR.rglob("*.svg"):
+        # Create image_id relative to images directory
+        rel_path = image_path.relative_to(IMAGES_DIR)
+        image_id = str(rel_path)
+        filename = image_path.name
+        
+        # Determine category based on filename
+        if filename.startswith("attention-"):
+            category = "attention"
+        elif filename.startswith("sample-") or filename in survey_specific_files:
+            category = "survey"
+        else:
+            category = "normal"
+        
+        image_files.append({
+            "image_id": image_id,
+            "category": category,
+            "difficulty_score": 5.0,
+            "object_count": 1,
+            "width": 800,
+            "height": 600
+        })
+    
+    if not image_files:
+        app.logger.warning("No image files found in images directory")
+        return
+    
+    app.logger.info(f"Found {len(image_files)} image files")
+    
+    # Insert images into database
+    with engine.connect() as conn:
+        inserted = 0
+        
+        for image_data in image_files:
+            try:
+                conn.execute(text('''
+                    INSERT INTO images 
+                    (image_id, category, difficulty_score, object_count, width, height)
+                    VALUES (:image_id, :category, :difficulty_score, :object_count, :width, :height)
+                    ON CONFLICT (image_id) DO NOTHING
+                '''), image_data)
+                inserted += 1
+            except Exception as e:
+                app.logger.error(f"Failed to insert {image_data['image_id']}: {e}")
+        
+        conn.commit()
+        app.logger.info(f"Inserted {inserted} images into database")
+
+
 def init_db():
     """Initialize the PostgreSQL database with schema"""
     # Create tables using SQLAlchemy
@@ -146,6 +205,9 @@ def init_db():
     _create_views()
     _create_triggers()
     _insert_metadata()
+    
+    # Populate images from the images folder
+    _populate_images()
 
 
 def _create_indexes():
@@ -977,38 +1039,36 @@ def get_consent(participant_id):
 
 # ============== IMAGE ENDPOINTS ==============
 
-def list_images(image_type: str = None):
-    """List images from survey folder, optionally filtered by type"""
-    folder = IMAGES_DIR / "survey"
-    if not folder.exists():
+def get_images_from_db(image_type: str = None):
+    """Query images from database, optionally filtered by type"""
+    db = get_db()
+    
+    try:
+        if image_type:
+            result = db.execute(text('''
+                SELECT image_id, category
+                FROM images
+                WHERE category = :category
+            '''), {"category": image_type})
+        else:
+            result = db.execute(text('''
+                SELECT image_id, category
+                FROM images
+            '''))
+        
+        return [{"image_id": row[0], "category": row[1]} for row in result.fetchall()]
+    except Exception as e:
+        app.logger.error(f"Error querying images from database: {e}")
         return []
-    
-    all_images = [
-        path
-        for path in folder.iterdir()
-        if path.is_file() and not path.name.startswith(".")
-    ]
-    
-    # Filter by type if specified
-    if image_type:
-        if image_type == "attention":
-            return [img for img in all_images if img.name.startswith("attention-")]
-        elif image_type == "survey":
-            return [img for img in all_images if img.name.startswith("sample-") or img.name in ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]]
-        elif image_type == "normal":
-            return [img for img in all_images if not img.name.startswith("attention-") and not img.name.startswith("sample-") and img.name not in ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]]
-    
-    return all_images
 
 
-def build_image_payload(image_path: Path, image_type: str):
-    image_id = f"survey/{image_path.name}"
+def build_image_payload(image_id: str, category: str):
     image_url = f"/api/images/{image_id}"
     return {
         "image_id": image_id,
         "image_url": image_url,
-        "is_survey": image_type == "survey",
-        "is_attention": image_type == "attention",
+        "is_survey": category == "survey",
+        "is_attention": category == "attention",
     }
 
 
@@ -1018,13 +1078,13 @@ def random_image():
     if requested_type not in {"normal", "survey", "attention"}:
         return jsonify({"error": "Invalid type"}), 400
 
-    images = list_images(requested_type)
+    images = get_images_from_db(requested_type)
     if not images:
         return jsonify({"error": f"No images available for {requested_type}"}), 404
 
     # Ensure we get a new random image each time by not using any caching
-    image_path = random.choice(images)
-    payload = build_image_payload(image_path, requested_type)
+    image_data = random.choice(images)
+    payload = build_image_payload(image_data["image_id"], image_data["category"])
     return jsonify(payload)
 
 

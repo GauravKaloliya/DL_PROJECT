@@ -121,6 +121,76 @@ def verify_database(engine):
     print("\n✓ Database verification passed!")
     return True
 
+def populate_images(engine):
+    """Populate images table with all images from the images folder"""
+    print("\nPopulating images table...")
+    
+    script_dir = Path(__file__).resolve().parent
+    images_dir = script_dir / "images"
+    
+    if not images_dir.exists():
+        print(f"⚠ Images directory not found at {images_dir}")
+        return True
+    
+    image_files = []
+    survey_specific_files = ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]
+    
+    # Find all SVG files in the images directory and subdirectories
+    for image_path in images_dir.rglob("*.svg"):
+        # Create image_id relative to images directory
+        rel_path = image_path.relative_to(images_dir)
+        image_id = str(rel_path)
+        filename = image_path.name
+        
+        # Determine category based on filename
+        if filename.startswith("attention-"):
+            category = "attention"
+        elif filename.startswith("sample-") or filename in survey_specific_files:
+            category = "survey"
+        else:
+            category = "normal"
+        
+        image_files.append({
+            "image_id": image_id,
+            "category": category,
+            "difficulty_score": 5.0,
+            "object_count": 1,
+            "width": 800,
+            "height": 600
+        })
+    
+    if not image_files:
+        print("⚠ No image files found in images directory")
+        return True
+    
+    print(f"Found {len(image_files)} image files")
+    
+    # Insert images into database
+    with engine.connect() as conn:
+        inserted = 0
+        skipped = 0
+        
+        for image_data in image_files:
+            try:
+                conn.execute(text('''
+                    INSERT INTO images 
+                    (image_id, category, difficulty_score, object_count, width, height)
+                    VALUES (:image_id, :category, :difficulty_score, :object_count, :width, :height)
+                    ON CONFLICT (image_id) DO NOTHING
+                '''), image_data)
+                inserted += 1
+            except Exception as e:
+                skipped += 1
+                print(f"✗ Failed to insert {image_data['image_id']}: {e}")
+        
+        conn.commit()
+        print(f"✓ Inserted {inserted} images into database")
+        if skipped > 0:
+            print(f"⚠ Skipped {skipped} images (already exist or failed)")
+    
+    return True
+
+
 def main():
     """Main initialization function"""
     print("=" * 60)
@@ -162,6 +232,9 @@ def main():
     if not success:
         print("\n⚠ Some statements failed. This may be normal if the database already exists.")
         print("  Proceeding with verification...")
+    
+    # Populate images from folder
+    populate_images(engine)
     
     # Verify database
     if verify_database(engine):
