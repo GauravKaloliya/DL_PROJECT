@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import UserDetailsPage from "./pages/UserDetailsPage.jsx";
 import ConsentPage from "./pages/ConsentPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
@@ -88,8 +87,6 @@ function Confetti({ show }) {
 }
 
 export default function App() {
-  const navigate = useNavigate();
-  
   // System state
   const [systemReady, setSystemReady] = useState(false);
   const [systemError, setSystemError] = useState(null);
@@ -505,15 +502,12 @@ export default function App() {
             <p className="subtitle">Describe each image with as much detail as possible</p>
           </div>
           <div className="header-actions">
-            <button 
-              className="ghost dark-mode-toggle" 
+            <button
+              className="ghost dark-mode-toggle"
               onClick={() => setDarkMode((prev) => !prev)}
               title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             >
               {darkMode ? "☀️" : "🌙"}
-            </button>
-            <button className="ghost" onClick={() => navigate("/api-docs")}>
-              API Docs
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
               {online ? "Online" : "Offline"}
