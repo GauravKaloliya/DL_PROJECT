@@ -1,12 +1,24 @@
 const normalizeApiBase = (baseValue) => {
   const trimmed = (baseValue || "").trim().replace(/\/+$/, "");
-  if (!trimmed) return "";  // Empty string means use relative URLs (same origin)
+  if (!trimmed) return ""; // Empty string means use relative URLs (same origin)
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith("/")) return trimmed;
   return `${window.location.protocol}//${trimmed}`;
 };
 
-export const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE);
+const resolveDefaultApiBase = () => {
+  if (typeof window === "undefined") {
+    return "";
+  }
+  if (window.location.hostname === "cognit-weld.vercel.app") {
+    return "https://dl-project-six.vercel.app";
+  }
+  return "";
+};
+
+export const API_BASE = normalizeApiBase(
+  import.meta.env.VITE_API_BASE || resolveDefaultApiBase()
+);
 
 // Helper to get full API URL
 export const getApiUrl = (endpoint) => {
