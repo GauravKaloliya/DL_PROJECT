@@ -261,7 +261,7 @@ export default function TrialPage({
       <div className="field">
         <label>Description</label>
         <textarea
-          className={wordCount > 0 && wordCount < MIN_WORDS ? 'error-input' : ''}
+          className={!isSurvey && wordCount > 0 && wordCount < MIN_WORDS ? 'error-input' : ''}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Describe what you see..."
@@ -302,7 +302,7 @@ export default function TrialPage({
       <div className="field">
         <label>Comments</label>
         <textarea
-          className={comments.length > 0 && comments.length < 5 ? 'error-input' : ''}
+          className={!isSurvey && comments.length > 0 && comments.length < 5 ? 'error-input' : ''}
           value={comments}
           onChange={(e) => setComments(e.target.value)}
           placeholder="Share any additional notes..."
