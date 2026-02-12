@@ -10,9 +10,6 @@ const resolveDefaultApiBase = () => {
   if (typeof window === "undefined") {
     return "";
   }
-  if (window.location.hostname === "cognit-weld.vercel.app") {
-    return "https://dl-project-six.vercel.app";
-  }
   return "";
 };
 

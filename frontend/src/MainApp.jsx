@@ -3,7 +3,6 @@ import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import App from "./App.jsx";
 import NotFound from "./components/NotFound.jsx";
 import ErrorPage from "./components/ErrorPage.jsx";
-import ApiDocs from "./pages/ApiDocs.jsx";
 
 function MainApp() {
   const [error, setError] = React.useState(null);
@@ -34,8 +33,6 @@ function MainApp() {
     <Router>
       <Routes>
         <Route path="/" element={<App />} />
-        <Route path="/api-docs" element={<ApiDocs />} />
-        <Route path="/api/docs" element={<ApiDocs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
