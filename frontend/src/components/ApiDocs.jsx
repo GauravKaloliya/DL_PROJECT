@@ -16,7 +16,7 @@ export default function ApiDocs() {
   const fetchApiDocs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/docs`);
+      const response = await fetch(`${API_BASE}/`);
       if (!response.ok) {
         throw new Error('Failed to fetch API documentation');
       }
@@ -118,7 +118,7 @@ export default function ApiDocs() {
           <div>
             <h2 style={{ color: 'var(--primary)' }}>Overview</h2>
             <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
-              The C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) API 
+              The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API 
               provides programmatic access to the research platform. This RESTful API allows you to 
               integrate image description tasks into your applications and manage submissions.
             </p>

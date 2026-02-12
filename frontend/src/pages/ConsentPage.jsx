@@ -47,35 +47,36 @@ export default function ConsentPage({
     <div className="panel">
       <h2>Research Consent Form</h2>
       <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
-        <strong>C.O.G.N.I.T.: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
+        <strong>C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling</strong>
       </p>
       
       <div className="welcome-info">
         <h3>About the Study</h3>
         <p>
-          C.O.G.N.I.T. explores how people describe visual scenes and how language captures what we see. 
-          Your responses help us advance research in cognition, language understanding, and visual computing.
+          C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a research platform that advances our understanding of how humans describe visual content and how AI can better model this cognitive process. Your contributions help improve image-text understanding and generation systems.
         </p>
 
         <h3>What Participation Involves</h3>
         <ul>
           <li>Review a series of images presented one at a time</li>
-          <li>Write a descriptive response for each image (at least 60 words)</li>
-          <li>Rate each image on a 1-10 scale based on perceived complexity</li>
-          <li>Complete a short survey set before starting the main image set</li>
+          <li>Write detailed descriptive responses for each image (minimum 60 words)</li>
+          <li>Rate each image on a 1-10 complexity scale</li>
+          <li>Provide brief feedback on your experience</li>
+          <li>Complete a short survey set before starting main trials</li>
         </ul>
 
         <h3>Time Commitment</h3>
         <p>
-          The session takes about 15-20 minutes. You may pause between images and you can stop at any time.
+          The session takes approximately 15-20 minutes. You may pause between images and withdraw at any time without penalty.
         </p>
 
         <h3>Privacy &amp; Data Use</h3>
         <ul>
-          <li>Responses are stored without directly identifying information</li>
-          <li>Data is used only for academic research and analysis</li>
-          <li>Results may be summarized in publications or presentations</li>
-          <li>Your data is stored securely and handled with care</li>
+          <li>All responses are stored without directly identifying information</li>
+          <li>Your IP address is cryptographically hashed for security</li>
+          <li>Data is used exclusively for academic research and AI model training</li>
+          <li>Results may be summarized in research publications, presentations, or shared with other researchers</li>
+          <li>Your data is stored securely using industry-standard encryption practices</li>
         </ul>
 
         <h3>Voluntary Participation</h3>
@@ -85,7 +86,7 @@ export default function ConsentPage({
 
         <h3>Questions or Concerns</h3>
         <p>
-          For questions about the study, contact the research team at
+          For questions about the study, data use, or to request data deletion, contact the research team at
           <strong> research@cognit.org</strong>.
         </p>
 

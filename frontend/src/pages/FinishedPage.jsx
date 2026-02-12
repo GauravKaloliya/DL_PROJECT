@@ -57,7 +57,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
     if (darkMode !== null) {
       sessionStorage.setItem("darkMode", darkMode);
     }
-    window.location.href = "/";
+    window.location.href = "/app";
   };
 
   const isWinner = rewardStatus?.is_winner;
@@ -137,9 +137,9 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
         </div>
 
         <p className="debrief">
-          Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
-          examines how people describe visual scenes. Your responses
-          will help improve language understanding models.
+          Debrief: C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) 
+          advances our understanding of how humans describe visual content and how AI can better model this cognitive process. Your responses
+          contribute to improving image-text understanding and generation systems.
         </p>
 
         <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '10px 24px' }}>
