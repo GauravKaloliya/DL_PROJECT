@@ -141,7 +141,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
           contribute to improving image-text understanding and generation systems.
         </p>
 
-        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '8px 24px', fontSize: '14px' }}>
+        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '16px 32px', fontSize: '16px' }}>
           Finish
         </button>
       </div>
