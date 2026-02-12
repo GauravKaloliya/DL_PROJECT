@@ -22,7 +22,7 @@ export default function ErrorPage({ error, resetError }) {
             {error?.message || "An unexpected error occurred. Please try again."}
           </p>
 
-          {error?.stack && process.env.NODE_ENV === 'development' && (
+          {error?.stack && import.meta.env.DEV && (
             <details style={{ marginBottom: '32px', textAlign: 'left' }}>
               <summary style={{ cursor: 'pointer', marginBottom: '16px' }}>Error Details (Development)</summary>
               <pre style={{ 

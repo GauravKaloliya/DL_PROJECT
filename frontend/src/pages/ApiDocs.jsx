@@ -104,7 +104,7 @@ export default function ApiDocs() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="ghost" onClick={() => navigate('/survey')}>
+            <button className="ghost" onClick={() => navigate('/')}>
               ← Back to Survey
             </button>
           </div>

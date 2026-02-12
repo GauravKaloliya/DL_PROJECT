@@ -34,6 +34,7 @@ function MainApp() {
     <Router>
       <Routes>
         <Route path="/" element={<App />} />
+        <Route path="/api-docs" element={<ApiDocs />} />
         <Route path="/api/docs" element={<ApiDocs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
