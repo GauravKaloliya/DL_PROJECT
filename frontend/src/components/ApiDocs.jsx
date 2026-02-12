@@ -16,12 +16,12 @@ export default function ApiDocs() {
   const fetchApiDocs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/docs`);
+      const response = await fetch(`${API_BASE}/`);
       if (!response.ok) {
         throw new Error('Failed to fetch API documentation');
       }
-      const data = await response.json();
-      setDocs(data);
+      // HTML response, we can't parse it as JSON
+      setDocs({ title: 'C.O.G.N.I.T. API', version: '4.0.0' });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -74,7 +74,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 3.0.0
+              Version 4.0.0
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -118,11 +118,11 @@ export default function ApiDocs() {
           <div>
             <h2 style={{ color: 'var(--primary)' }}>Overview</h2>
             <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
-              The C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) API 
-              provides programmatic access to the research platform. This RESTful API allows you to 
+              The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API
+              provides programmatic access to the research platform. This RESTful API allows you to
               integrate image description tasks into your applications and manage submissions.
             </p>
-            
+
             <h3 style={{ marginTop: '32px' }}>Base URL</h3>
             <div style={{ 
               background: 'var(--bg)', 

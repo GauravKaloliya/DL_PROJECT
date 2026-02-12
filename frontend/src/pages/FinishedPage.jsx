@@ -137,7 +137,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
         </div>
 
         <p className="debrief">
-          Debrief: C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) 
+          Debrief: C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling)
           examines how people describe visual scenes. Your responses
           will help improve language understanding models.
         </p>

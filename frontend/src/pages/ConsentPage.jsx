@@ -47,13 +47,13 @@ export default function ConsentPage({
     <div className="panel">
       <h2>Research Consent Form</h2>
       <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
-        <strong>C.O.G.N.I.T.: Cognitive Observation & Generalized Narrative Inquiry Tool</strong>
+        <strong>C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling</strong>
       </p>
-      
+
       <div className="welcome-info">
         <h3>About the Study</h3>
         <p>
-          C.O.G.N.I.T. explores how people describe visual scenes and how language captures what we see. 
+          C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) explores how people describe visual scenes and how language captures what we see.
           Your responses help us advance research in cognition, language understanding, and visual computing.
         </p>
 

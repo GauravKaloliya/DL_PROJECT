@@ -90,12 +90,11 @@ class TestBackendAPI(unittest.TestCase):
         self.assertEqual(data["services"]["images"], "accessible")
 
     def test_api_docs_endpoint(self):
-        """Test API documentation endpoint"""
-        response = get(f"{BASE_URL}/api/docs")
+        """Test API documentation endpoint (now HTML at root)"""
+        response = get(f"{BASE_URL}/")
         self.assertEqual(response.status_code, 200)
-        data = response.json()
-        self.assertIn("endpoints", data)
-        self.assertIn("title", data)
+        # HTML response, not JSON
+        self.assertIn("text/html", response.headers["Content-Type"])
 
     def test_security_info_endpoint(self):
         """Test security info endpoint"""
@@ -309,11 +308,11 @@ class TestFrontendRoutes(unittest.TestCase):
         self.assertIn("text/html", response.headers["Content-Type"])
 
     def test_api_docs_page(self):
-        """Test API docs page loads (returns JSON from backend via proxy)"""
-        response = get(f"{FRONTEND_URL}/api/docs")
+        """Test API docs page loads (HTML from backend at root)"""
+        response = get(f"{BASE_URL}/")
         self.assertEqual(response.status_code, 200)
-        # Via proxy, this returns JSON from the backend
-        self.assertIn("application/json", response.headers["Content-Type"])
+        # HTML response from backend
+        self.assertIn("text/html", response.headers["Content-Type"])
 
     def test_404_page(self):
         """Test 404 page (SPA fallback)"""

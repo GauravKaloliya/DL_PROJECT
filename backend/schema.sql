@@ -1,6 +1,6 @@
 -- C.O.G.N.I.T. Database Schema
--- Version: 3.2.0
--- Description: SQLite database schema for the C.O.G.N.I.T. research platform
+-- Version: 4.0.0
+-- Description: SQLite database schema for C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling)
 -- This schema includes enhanced security features and comprehensive indexing
 
 PRAGMA foreign_keys = ON;
@@ -283,6 +283,43 @@ SELECT
     END AS quality_category
 FROM submissions s;
 
+-- Priority Users table
+CREATE TABLE IF NOT EXISTS priority_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
+    username TEXT NOT NULL CHECK(LENGTH(username) <= 100),
+    email TEXT CHECK(LENGTH(email) <= 255),
+    total_words INTEGER DEFAULT 0,
+    survey_rounds INTEGER DEFAULT 0,
+    total_submissions INTEGER DEFAULT 0,
+    priority_eligible BOOLEAN DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+);
+
+-- Rewards table
+CREATE TABLE IF NOT EXISTS rewards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
+    reward_amount INTEGER DEFAULT 10 CHECK(reward_amount > 0),
+    selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'paid', 'rejected')),
+    notes TEXT CHECK(LENGTH(notes) <= 500),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+);
+
+-- Create indexes for priority users
+CREATE INDEX IF NOT EXISTS idx_priority_participant ON priority_users(participant_id);
+CREATE INDEX IF NOT EXISTS idx_priority_eligible ON priority_users(priority_eligible);
+CREATE INDEX IF NOT EXISTS idx_priority_words ON priority_users(total_words);
+
+-- Create indexes for rewards
+CREATE INDEX IF NOT EXISTS idx_rewards_participant ON rewards(participant_id);
+CREATE INDEX IF NOT EXISTS idx_rewards_status ON rewards(status);
+CREATE INDEX IF NOT EXISTS idx_rewards_selected_at ON rewards(selected_at);
+
 -- Database metadata
 CREATE TABLE IF NOT EXISTS database_metadata (
     key TEXT PRIMARY KEY,
@@ -291,8 +328,8 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 );
 
 -- Insert initial metadata
-INSERT OR IGNORE INTO database_metadata (key, value) VALUES 
-    ('version', '3.1.0'),
+INSERT OR IGNORE INTO database_metadata (key, value) VALUES
+    ('version', '4.0.0'),
     ('schema_updated', CURRENT_TIMESTAMP),
     ('description', 'C.O.G.N.I.T. Research Platform Database');
 

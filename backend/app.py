@@ -1,4 +1,3 @@
-import csv
 import hashlib
 import os
 import random
@@ -17,7 +16,6 @@ from flask_limiter.util import get_remote_address
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
-CSV_PATH = DATA_DIR / "submissions.csv"
 DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
@@ -242,10 +240,10 @@ def init_db():
     
     # Insert initial metadata
     cursor.execute('''
-        INSERT OR IGNORE INTO database_metadata (key, value) VALUES 
-            ('version', '3.2.0'),
+        INSERT OR IGNORE INTO database_metadata (key, value) VALUES
+            ('version', '4.0.0'),
             ('schema_updated', CURRENT_TIMESTAMP),
-            ('description', 'C.O.G.N.I.T. Research Platform Database')
+            ('description', 'C.O.G.N.I.T. Research Platform Database - Cognitive Network for Image & Text Modeling')
     ''')
     
     conn.commit()
@@ -521,13 +519,74 @@ def migrate_database_schema():
         
         # Create views
         _create_views(cursor)
-        
+
+        # Create priority_users table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS priority_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
+                username TEXT NOT NULL CHECK(LENGTH(username) <= 100),
+                email TEXT CHECK(LENGTH(email) <= 255),
+                total_words INTEGER DEFAULT 0,
+                survey_rounds INTEGER DEFAULT 0,
+                total_submissions INTEGER DEFAULT 0,
+                priority_eligible BOOLEAN DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+            )
+        ''')
+        print("Created priority_users table")
+
+        # Create rewards table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rewards (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                participant_id TEXT UNIQUE NOT NULL CHECK(LENGTH(participant_id) <= 100),
+                reward_amount INTEGER DEFAULT 10 CHECK(reward_amount > 0),
+                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'approved', 'paid', 'rejected')),
+                notes TEXT CHECK(LENGTH(notes) <= 500),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+            )
+        ''')
+        print("Created rewards table")
+
+        # Create indexes for priority_users
+        priority_indexes = [
+            ("idx_priority_participant", "priority_users", "participant_id"),
+            ("idx_priority_eligible", "priority_users", "priority_eligible"),
+            ("idx_priority_words", "priority_users", "total_words")
+        ]
+
+        for idx_name, table, column in priority_indexes:
+            try:
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
+            except sqlite3.OperationalError:
+                pass
+
+        # Create indexes for rewards
+        reward_indexes = [
+            ("idx_rewards_participant", "rewards", "participant_id"),
+            ("idx_rewards_status", "rewards", "status"),
+            ("idx_rewards_selected_at", "rewards", "selected_at")
+        ]
+
+        for idx_name, table, column in reward_indexes:
+            try:
+                cursor.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table}({column})")
+            except sqlite3.OperationalError:
+                pass
+
+        print("Created priority_users and rewards indexes")
+
         # Update database version
         cursor.execute("""
-            INSERT OR REPLACE INTO database_metadata (key, value, updated_at) 
-            VALUES ('version', '3.2.0', CURRENT_TIMESTAMP)
+            INSERT OR REPLACE INTO database_metadata (key, value, updated_at)
+            VALUES ('version', '4.0.0', CURRENT_TIMESTAMP)
         """)
-        
+
         conn.commit()
         print("Database migration completed successfully")
         
@@ -547,31 +606,25 @@ def get_ip_hash():
 
 
 def update_participant_stats(participant_id, word_count, is_survey):
-    """Update participant engagement stats for reward eligibility"""
+    """Update participant engagement stats for priority users table"""
     try:
         conn = get_db()
         cursor = conn.cursor()
-        
-        # Check if participant_stats table exists, create if not
+
+        # Get participant details
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS participant_stats (
-                participant_id TEXT PRIMARY KEY,
-                total_words INTEGER DEFAULT 0,
-                total_submissions INTEGER DEFAULT 0,
-                survey_rounds INTEGER DEFAULT 0,
-                priority_eligible BOOLEAN DEFAULT 0,
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        ''')
-        
+            SELECT username, email FROM participants WHERE participant_id = ?
+        ''', (participant_id,))
+        participant = cursor.fetchone()
+
         # Get current stats
         cursor.execute('''
-            SELECT total_words, total_submissions, survey_rounds 
-            FROM participant_stats 
+            SELECT total_words, total_submissions, survey_rounds
+            FROM priority_users
             WHERE participant_id = ?
         ''', (participant_id,))
         row = cursor.fetchone()
-        
+
         if row:
             new_words = row[0] + word_count
             new_submissions = row[1] + 1
@@ -580,22 +633,36 @@ def update_participant_stats(participant_id, word_count, is_survey):
             new_words = word_count
             new_submissions = 1
             new_survey_rounds = 1 if is_survey else 0
-        
+
         # Priority eligibility: more words or more survey rounds increases chance
         # Threshold: 500+ words total OR 3+ survey rounds makes you priority eligible
         priority_eligible = new_words >= 500 or new_survey_rounds >= 3
-        
-        cursor.execute('''
-            INSERT INTO participant_stats 
-            (participant_id, total_words, total_submissions, survey_rounds, priority_eligible)
-            VALUES (?, ?, ?, ?, ?)
-            ON CONFLICT(participant_id) DO UPDATE SET
-            total_words = excluded.total_words,
-            total_submissions = excluded.total_submissions,
-            survey_rounds = excluded.survey_rounds,
-            priority_eligible = excluded.priority_eligible
-        ''', (participant_id, new_words, new_submissions, new_survey_rounds, priority_eligible))
-        
+
+        if participant:
+            cursor.execute('''
+                INSERT INTO priority_users
+                (participant_id, username, email, total_words, total_submissions, survey_rounds, priority_eligible, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(participant_id) DO UPDATE SET
+                total_words = excluded.total_words,
+                total_submissions = excluded.total_submissions,
+                survey_rounds = excluded.survey_rounds,
+                priority_eligible = excluded.priority_eligible,
+                updated_at = CURRENT_TIMESTAMP
+            ''', (participant_id, participant[0], participant[1], new_words, new_submissions, new_survey_rounds, priority_eligible))
+        else:
+            cursor.execute('''
+                INSERT INTO priority_users
+                (participant_id, username, email, total_words, total_submissions, survey_rounds, priority_eligible, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(participant_id) DO UPDATE SET
+                total_words = excluded.total_words,
+                total_submissions = excluded.total_submissions,
+                survey_rounds = excluded.survey_rounds,
+                priority_eligible = excluded.priority_eligible,
+                updated_at = CURRENT_TIMESTAMP
+            ''', (participant_id, 'Unknown', None, new_words, new_submissions, new_survey_rounds, priority_eligible))
+
         conn.commit()
     except Exception as e:
         # Don't let stats update failures break the main functionality
@@ -607,39 +674,28 @@ def get_reward_eligibility(participant_id):
     try:
         conn = get_db()
         cursor = conn.cursor()
-        
-        # Ensure table exists
+
+        # Check if already a winner in rewards table
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS reward_winners (
-                participant_id TEXT PRIMARY KEY,
-                reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'pending',
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        ''')
-        
-        # Check if already a winner
-        cursor.execute('''
-            SELECT reward_amount, status FROM reward_winners WHERE participant_id = ?
+            SELECT reward_amount, status FROM rewards WHERE participant_id = ?
         ''', (participant_id,))
         winner_row = cursor.fetchone()
-        
+
         if winner_row:
             return {
                 "is_winner": True,
                 "reward_amount": winner_row[0],
                 "status": winner_row[1]
             }
-        
-        # Get participant stats
+
+        # Get participant stats from priority_users table
         cursor.execute('''
-            SELECT total_words, survey_rounds, priority_eligible 
-            FROM participant_stats 
+            SELECT total_words, survey_rounds, priority_eligible
+            FROM priority_users
             WHERE participant_id = ?
         ''', (participant_id,))
         stats_row = cursor.fetchone()
-        
+
         if stats_row:
             return {
                 "is_winner": False,
@@ -647,7 +703,7 @@ def get_reward_eligibility(participant_id):
                 "survey_rounds": stats_row[1],
                 "priority_eligible": bool(stats_row[2])
             }
-        
+
         return {
             "is_winner": False,
             "total_words": 0,
@@ -669,45 +725,34 @@ def select_reward_winner(participant_id):
     try:
         conn = get_db()
         cursor = conn.cursor()
-        
-        # Ensure table exists
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS reward_winners (
-                participant_id TEXT PRIMARY KEY,
-                reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'pending',
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        ''')
-        
+
         # Check if already selected
-        cursor.execute('SELECT participant_id FROM reward_winners WHERE participant_id = ?', (participant_id,))
+        cursor.execute('SELECT participant_id FROM rewards WHERE participant_id = ?', (participant_id,))
         if cursor.fetchone():
             return {"selected": False, "already_winner": True}
-        
-        # Get participant's priority status
+
+        # Get participant's priority status from priority_users table
         cursor.execute('''
-            SELECT priority_eligible FROM participant_stats WHERE participant_id = ?
+            SELECT priority_eligible FROM priority_users WHERE participant_id = ?
         ''', (participant_id,))
         stats_row = cursor.fetchone()
         priority_eligible = bool(stats_row[0]) if stats_row else False
-        
+
         # Weighted random selection:
         # - Priority eligible participants have higher chance (15% instead of 5%)
         # - But all participants have a chance
         base_probability = 0.05  # 5%
         priority_boost = 0.10 if priority_eligible else 0.0  # Additional 10% for priority
         selection_probability = base_probability + priority_boost
-        
+
         if random.random() < selection_probability:
             cursor.execute('''
-                INSERT INTO reward_winners (participant_id, reward_amount, status)
+                INSERT INTO rewards (participant_id, reward_amount, status)
                 VALUES (?, 10, 'pending')
             ''', (participant_id,))
             conn.commit()
             return {"selected": True, "reward_amount": 10}
-        
+
         return {"selected": False, "priority_eligible": priority_eligible}
     except Exception as e:
         return {"selected": False, "error": str(e)}
@@ -1308,14 +1353,13 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.3.0",
+            "version": "4.0.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
                 "participant_creation": "30 per minute",
                 "consent_recording": "20 per minute",
-                "submission": "60 per minute",
-                "api_docs": "30 per minute"
+                "submission": "60 per minute"
             },
             "cors_configuration": {
                 "allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
@@ -1393,12 +1437,20 @@ def security_info():
 
 # ============== API DOCUMENTATION ==============
 
+@app.route("/")
+def api_docs_html():
+    """Serve API documentation as HTML at root path"""
+    from flask import render_template
+    api_docs = _get_api_documentation()
+    return render_template('api_docs.html', **api_docs)
+
+
 def _get_api_documentation():
-    """Get API documentation object - shared by /api and /api/docs"""
+    """Get API documentation object"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.3.0",
-        "description": "Complete and verified API documentation for the C.O.G.N.I.T. research platform",
+        "version": "4.0.0",
+        "description": "Complete API documentation for C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling)",
         "base_url": "/api",
         "security": {
             "rate_limiting": "200 per day, 50 per hour (default)",
@@ -1599,25 +1651,12 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "4.0.0": "Major update: Renamed to Cognitive Network for Image & Text Modeling, added priority_users and rewards tables, removed CSV functionality, improved data management",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
         }
     }
-
-
-@app.route("/api")
-@limiter.limit("30 per minute")
-def api_root():
-    """API root endpoint - serves same documentation as /api/docs"""
-    return jsonify(_get_api_documentation())
-
-
-@app.route("/api/docs")
-@limiter.limit("30 per minute")
-def api_docs():
-    """Comprehensive API documentation - only working routes"""
-    return jsonify(_get_api_documentation())
 
 
 def regenerate_database_from_schema():
@@ -1688,7 +1727,8 @@ initialize_app()
 
 if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
-    print("API Documentation available at: http://localhost:5000/api/docs")
+    print("C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling")
+    print("API Documentation available at: http://localhost:5000/")
     print("API available at: http://localhost:5000/api/")
     print("Security Info available at: http://localhost:5000/api/security/info")
     port = int(os.getenv("PORT", "5000"))
