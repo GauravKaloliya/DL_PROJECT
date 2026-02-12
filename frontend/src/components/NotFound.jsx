@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import dogImage from '../assets/cute-dog.svg';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -13,6 +14,11 @@ export default function NotFound() {
           <p style={{ color: 'var(--muted)', marginBottom: '32px', fontSize: '18px' }}>
             Oops! The page you're looking for doesn't exist.
           </p>
+          <img
+            src={dogImage}
+            alt="Cute dog illustration"
+            style={{ maxWidth: '280px', width: '100%', margin: '0 auto 24px', display: 'block' }}
+          />
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button className="primary" onClick={() => navigate('/')}>
               Go Home

@@ -93,8 +93,8 @@ All backend API routes remain unchanged and fully functional:
 - `GET /api/consent/{participant_id}` - Get consent status
 
 #### Image Management
-- `GET /api/images/random?type={normal|survey|attention}` - Get random image
-- `GET /api/images/{image_id}` - Serve specific image file
+- `GET /api/images/random?type={normal|survey|attention}` - Get random image from the unified survey library
+- `GET /api/images/{image_id}` - Serve specific image file (image IDs use the `survey/<filename>` format)
 
 #### Submission Management
 - `POST /api/submit` - Submit image description

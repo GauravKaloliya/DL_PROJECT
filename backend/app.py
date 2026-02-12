@@ -15,8 +15,22 @@ from flask_limiter.util import get_remote_address
 
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
+IMAGE_LIBRARY_DIR = IMAGES_DIR / "survey"
 DATA_DIR = BASE_DIR / "data"
 DB_PATH = BASE_DIR / "COGNIT.db"
+
+SURVEY_IMAGE_NAMES = {
+    "hamster-wheel.svg",
+    "kitten-yarn.svg",
+    "puppy-ball.svg",
+    "sample-practice.svg",
+}
+ATTENTION_IMAGE_NAMES = {
+    "attention-circle.svg",
+    "attention-ocean.svg",
+    "attention-red.svg",
+}
+LAST_IMAGE_BY_TYPE = {}
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
@@ -827,7 +841,7 @@ def health_check():
     
     # Check images directory
     try:
-        if IMAGES_DIR.exists():
+        if IMAGE_LIBRARY_DIR.exists():
             status["services"]["images"] = "accessible"
         else:
             status["services"]["images"] = "not found"
@@ -1071,18 +1085,30 @@ def get_consent(participant_id):
 # ============== IMAGE ENDPOINTS ==============
 
 def list_images(image_type: str):
-    folder = IMAGES_DIR / image_type
-    if not folder.exists():
+    if not IMAGE_LIBRARY_DIR.exists():
         return []
-    return [
+
+    images = [
         path
-        for path in folder.iterdir()
+        for path in IMAGE_LIBRARY_DIR.iterdir()
         if path.is_file() and not path.name.startswith(".")
+    ]
+
+    if image_type == "attention":
+        return [image for image in images if image.name in ATTENTION_IMAGE_NAMES]
+
+    if image_type == "survey":
+        return [image for image in images if image.name in SURVEY_IMAGE_NAMES]
+
+    return [
+        image
+        for image in images
+        if image.name not in ATTENTION_IMAGE_NAMES | SURVEY_IMAGE_NAMES
     ]
 
 
 def build_image_payload(image_path: Path, image_type: str):
-    image_id = f"{image_type}/{image_path.name}"
+    image_id = f"survey/{image_path.name}"
     image_url = f"/api/images/{image_id}"
     return {
         "image_id": image_id,
@@ -1090,6 +1116,27 @@ def build_image_payload(image_path: Path, image_type: str):
         "is_survey": image_type == "survey",
         "is_attention": image_type == "attention",
     }
+
+
+def _choose_random_image(images, image_type):
+    if not images:
+        return None
+
+    if len(images) == 1:
+        image_path = images[0]
+        LAST_IMAGE_BY_TYPE[image_type] = image_path.name
+        return image_path
+
+    last_image_name = LAST_IMAGE_BY_TYPE.get(image_type)
+    image_path = random.choice(images)
+
+    if last_image_name and image_path.name == last_image_name:
+        available = [image for image in images if image.name != last_image_name]
+        if available:
+            image_path = random.choice(available)
+
+    LAST_IMAGE_BY_TYPE[image_type] = image_path.name
+    return image_path
 
 
 @app.route("/api/images/random")
@@ -1102,7 +1149,10 @@ def random_image():
     if not images:
         return jsonify({"error": f"No images available for {requested_type}"}), 404
 
-    image_path = random.choice(images)
+    image_path = _choose_random_image(images, requested_type)
+    if not image_path:
+        return jsonify({"error": f"No images available for {requested_type}"}), 404
+
     payload = build_image_payload(image_path, requested_type)
     return jsonify(payload)
 
@@ -1306,7 +1356,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.4.0",
+            "version": "3.5.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1395,8 +1445,8 @@ def _get_api_documentation():
     """Get API documentation object - available at /"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.4.0",
-        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform",
+        "version": "3.5.0",
+        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform with unified survey image management",
         "base_url": "/api",
         "security": {
             "rate_limiting": "200 per day, 50 per hour (default)",
@@ -1501,14 +1551,14 @@ def _get_api_documentation():
             "random_image": {
                 "path": "/api/images/random",
                 "method": "GET",
-                "description": "Get a random image from specified category",
+                "description": "Get a random image from the unified survey library by category",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "query_params": {
                     "type": "normal|survey|attention (default: normal)"
                 },
                 "response": {
-                    "image_id": "string",
+                    "image_id": "string (survey/<filename>)",
                     "image_url": "string",
                     "is_survey": "boolean",
                     "is_attention": "boolean"
@@ -1597,6 +1647,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "3.5.0": "Unified image library under the survey folder, regenerated API documentation UI, and improved random image rotation",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
@@ -1612,7 +1663,7 @@ def api_docs_ui():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 
@@ -1631,7 +1682,7 @@ def api_docs_ui_alt():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 

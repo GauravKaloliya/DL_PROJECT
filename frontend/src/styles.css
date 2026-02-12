@@ -215,7 +215,8 @@ body.dark .banner.info {
   margin-top: 0;
 }
 
-.welcome-info ul {
+.welcome-info ul,
+.welcome-info ol {
   margin: 12px 0;
   padding-left: 24px;
 }

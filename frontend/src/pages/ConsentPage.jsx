@@ -53,30 +53,39 @@ export default function ConsentPage({
       <div className="welcome-info">
         <h3>About the Study</h3>
         <p>
-          C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a research platform that advances our understanding of how humans describe visual content and how AI can better model this cognitive process. Your contributions help improve image-text understanding and generation systems.
+          C.O.G.N.I.T. (Cognitive Network for Image &amp; Text Modeling) explores how people describe visual content and how AI can learn from those descriptions. Your responses directly improve image-text understanding and generation models.
         </p>
 
-        <h3>What Participation Involves</h3>
+        <h3>Study Flow</h3>
+        <ol>
+          <li>Provide consent and basic contact details.</li>
+          <li>Complete a quick ₹1 participation payment screen.</li>
+          <li>Start with short survey/practice images to get comfortable.</li>
+          <li>Move into main trials with occasional attention-check images.</li>
+          <li>Finish the study and view reward eligibility information.</li>
+        </ol>
+
+        <h3>What You Will Do</h3>
         <ul>
-          <li>Review a series of images presented one at a time</li>
-          <li>Write detailed descriptive responses for each image (minimum 60 words)</li>
-          <li>Rate each image on a 1-10 complexity scale</li>
-          <li>Provide brief feedback on your experience</li>
-          <li>Complete a short survey set before starting main trials</li>
+          <li>Review images presented one at a time.</li>
+          <li>Write detailed descriptions for each image (minimum 60 words).</li>
+          <li>Rate each image on a 1–10 complexity scale.</li>
+          <li>Share brief feedback after each response.</li>
+          <li>Follow special instructions on attention-check images.</li>
         </ul>
 
-        <h3>Time Commitment</h3>
+        <h3>Time &amp; Compensation</h3>
         <p>
-          The session takes approximately 15-20 minutes. You may pause between images and withdraw at any time without penalty.
+          The session takes approximately 15–20 minutes. You may pause between images and withdraw at any time. Participants who complete the study are eligible for a ₹10 UPI reward, selected through the built-in reward system.
         </p>
 
         <h3>Privacy &amp; Data Use</h3>
         <ul>
-          <li>All responses are stored without directly identifying information</li>
-          <li>Your IP address is cryptographically hashed for security</li>
-          <li>Data is used exclusively for academic research and AI model training</li>
-          <li>Results may be summarized in research publications, presentations, or shared with other researchers</li>
-          <li>Your data is stored securely using industry-standard encryption practices</li>
+          <li>Responses are stored without direct identifiers.</li>
+          <li>Your IP address is cryptographically hashed for security.</li>
+          <li>Data is used exclusively for academic research and AI model training.</li>
+          <li>Results may be summarized in research publications or shared with other researchers.</li>
+          <li>Your data is stored securely using industry-standard encryption practices.</li>
         </ul>
 
         <h3>Voluntary Participation</h3>
@@ -95,10 +104,10 @@ export default function ConsentPage({
           By checking the consent box below and clicking "Continue", you confirm that:
         </p>
         <ul>
-          <li>You are at least 18 years old</li>
-          <li>You have read and understood the information above</li>
-          <li>You agree to participate voluntarily</li>
-          <li>You understand your responses will be recorded for research use</li>
+          <li>You are at least 18 years old.</li>
+          <li>You have read and understood the information above.</li>
+          <li>You agree to participate voluntarily.</li>
+          <li>You understand your responses will be recorded for research use.</li>
         </ul>
       </div>
       

@@ -180,7 +180,7 @@ class TestBackendAPI(unittest.TestCase):
 
     def test_serve_image(self):
         """Test image serving"""
-        response = get(f"{BASE_URL}/api/images/normal/aurora-lake.svg")
+        response = get(f"{BASE_URL}/api/images/survey/aurora-lake.svg")
         self.assertEqual(response.status_code, 200)
         self.assertIn("image/svg+xml", response.headers["Content-Type"])
 
@@ -189,8 +189,8 @@ class TestBackendAPI(unittest.TestCase):
         payload = {
             "participant_id": self.test_participant_id,
             "session_id": self.test_session_id,
-            "image_id": "normal/test-image.svg",
-            "image_url": "/api/images/normal/test-image.svg",
+            "image_id": "survey/test-image.svg",
+            "image_url": "/api/images/survey/test-image.svg",
             "description": "This is a beautiful scene with mountains and lakes showing natural beauty with clouds in the sky and trees in the foreground. The colors are vibrant and the composition is excellent for this nature scene.",
             "rating": 8,
             "feedback": "Great image!",

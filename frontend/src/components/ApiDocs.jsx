@@ -98,7 +98,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 3.0.0
+              Version {docs?.version || '3.5.0'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -155,7 +155,7 @@ export default function ApiDocs() {
               fontSize: '14px',
               display: 'inline-block'
             }}>
-              {docs?.version || '3.4.0'}
+              {docs?.version || '3.5.0'}
             </div>
 
             <h3 style={{ marginTop: '32px' }}>Base URL</h3>
@@ -183,7 +183,7 @@ export default function ApiDocs() {
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
-              <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
+              <li><strong>Image Management:</strong> Fetch random images from a unified survey library with normal, survey, and attention categories</li>
               <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
               <li><strong>Health Monitoring:</strong> Check system connectivity and service status</li>
               <li><strong>Security:</strong> Rate limiting and hardened security headers</li>
@@ -308,8 +308,8 @@ export default function ApiDocs() {
                     { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
                   ]}
                   response={{
-                    "image_id": "normal/aurora-lake.svg",
-                    "image_url": "/api/images/normal/aurora-lake.svg",
+                    "image_id": "survey/aurora-lake.svg",
+                    "image_url": "/api/images/survey/aurora-lake.svg",
                     "is_survey": false,
                     "is_attention": false
                   }}
@@ -402,7 +402,7 @@ console.log(image.image_url);
 const submission = {
   participant_id: 'user-123',
   session_id: 'session-456',
-  image_id: 'normal/aurora-lake.svg',
+  image_id: 'survey/aurora-lake.svg',
   description: 'The image shows a beautiful sunset over mountains...',
   rating: 8,
   feedback: 'Interesting image',
@@ -437,7 +437,7 @@ print(image['image_url'])
 submission = {
     'participant_id': 'user-123',
     'session_id': 'session-456',
-    'image_id': 'normal/aurora-lake.svg',
+    'image_id': 'survey/aurora-lake.svg',
     'description': 'The image shows a beautiful sunset...',
     'rating': 8,
     'feedback': 'Interesting image',
@@ -466,7 +466,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
   -d '{
     "participant_id": "user-123",
     "session_id": "session-456",
-    "image_id": "normal/aurora-lake.svg",
+    "image_id": "survey/aurora-lake.svg",
     "description": "The image shows...",
     "rating": 8,
     "feedback": "Great image",
