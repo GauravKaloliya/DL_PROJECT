@@ -8,7 +8,7 @@ import functools
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, abort, g
+from flask import Flask, jsonify, request, send_from_directory, abort, g, render_template
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -1743,9 +1743,27 @@ def initialize_app():
 # Initialize when module is loaded
 initialize_app()
 
+# ============== API DOCUMENTATION ==============
+
+@app.route("/")
+def serve_api_docs():
+    """Serve API documentation at root path"""
+    return render_template("api_docs.html", 
+                         version="3.5.0", 
+                         base_url="/api")
+
+@app.route("/api/docs")
+@limiter.limit("30 per minute")
+@track_performance
+def get_api_docs():
+    """Get API documentation as JSON"""
+    return jsonify(_get_api_documentation())
+
+
 if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
     print("API endpoints available at: http://localhost:5000/api/")
+    print("API Documentation available at: http://localhost:5000/")
     print("Security Info available at: http://localhost:5000/api/security/info")
     port = int(os.getenv("PORT", "5000"))
     debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
