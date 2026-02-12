@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE } from "../utils/apiBase";
+import { API_BASE, getApiUrl } from "../utils/apiBase";
 
 export default function ApiDocs() {
   const navigate = useNavigate();
@@ -16,7 +16,7 @@ export default function ApiDocs() {
   const fetchApiDocs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/api/docs`);
+      const response = await fetch(getApiUrl('/api/docs'));
       if (!response.ok) {
         throw new Error('Failed to fetch API documentation');
       }

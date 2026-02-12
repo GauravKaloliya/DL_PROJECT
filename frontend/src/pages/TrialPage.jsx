@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { API_BASE } from "../utils/apiBase";
+import { getApiUrl } from "../utils/apiBase";
 
 const MIN_WORDS = 60;
 
@@ -129,7 +129,7 @@ export default function TrialPage({
     return "Submit your response";
   };
 
-  const imageSrc = trial ? `${API_BASE}${trial.image_url}` : "";
+  const imageSrc = trial ? getApiUrl(trial.image_url) : "";
 
   if (isSurvey && surveyFeedbackReady) {
     return (

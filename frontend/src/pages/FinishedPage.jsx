@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE } from "../utils/apiBase";
+import { getApiUrl } from "../utils/apiBase";
 
 export default function FinishedPage({ surveyCompleted, participantId }) {
   const [rewardStatus, setRewardStatus] = useState(null);
@@ -17,13 +17,13 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
   const checkRewardWinner = async () => {
     try {
       // First check current status
-      const statusResponse = await fetch(`${API_BASE}/api/reward/${participantId}`);
+      const statusResponse = await fetch(getApiUrl(`/api/reward/${participantId}`));
       if (statusResponse.ok) {
         const statusData = await statusResponse.json();
-        
+
         // If not already a winner, try to select
         if (!statusData.is_winner) {
-          const selectResponse = await fetch(`${API_BASE}/api/reward/select/${participantId}`, {
+          const selectResponse = await fetch(getApiUrl(`/api/reward/select/${participantId}`), {
             method: "POST",
             headers: { "Content-Type": "application/json" }
           });
@@ -57,7 +57,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
     if (darkMode !== null) {
       sessionStorage.setItem("darkMode", darkMode);
     }
-    window.location.href = "/app";
+    window.location.href = "/";
   };
 
   const isWinner = rewardStatus?.is_winner;
@@ -89,12 +89,11 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
               <>
                 <div style={{ fontSize: '48px', marginBottom: '12px' }}>🎉</div>
                 <h3 style={{ margin: '0 0 12px', color: 'white' }}>Congratulations!</h3>
-                <p style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px' }}>
-                  You've won ₹{rewardStatus.reward_amount}!
+                <p style={{ fontSize: '20px', fontWeight: 'bold', margin: '0 0 8px' }}>
+                  You've been selected as a reward winner!
                 </p>
-                <p style={{ margin: '0', opacity: 0.9 }}>
-                  You have been selected for the reward. The amount will be transferred 
-                  to your UPI ID within 24-48 hours.
+                <p style={{ margin: '0', opacity: 0.9, fontSize: '14px' }}>
+                  Thank you for your valuable participation. Your reward will be processed shortly.
                 </p>
               </>
             ) : (
@@ -142,7 +141,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
           contribute to improving image-text understanding and generation systems.
         </p>
 
-        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '10px 24px' }}>
+        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '8px 24px', fontSize: '14px' }}>
           Finish
         </button>
       </div>
