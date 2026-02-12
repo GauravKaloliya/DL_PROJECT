@@ -453,6 +453,7 @@ export default function App() {
             onPaymentComplete={handlePaymentComplete}
             onBack={() => setStage("user-details")}
             systemReady={systemReady}
+            participantId={participantId}
           />
         );
       
@@ -488,7 +489,7 @@ export default function App() {
         );
       
       case "finished":
-        return <FinishedPage surveyCompleted={surveyCompleted} />;
+        return <FinishedPage surveyCompleted={surveyCompleted} participantId={participantId} />;
       
       default:
         return <UserDetailsPage demographics={demographics} setDemographics={setDemographics} onSubmit={handleUserDetailsSubmit} onBack={() => setStage("consent")} systemReady={systemReady} />;
