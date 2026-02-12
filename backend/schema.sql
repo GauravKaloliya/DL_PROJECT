@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS participants (
 
 CREATE TABLE IF NOT EXISTS images (
     image_id VARCHAR(200) PRIMARY KEY,
-    category VARCHAR(100),
     difficulty_score DOUBLE PRECISION,
     object_count INTEGER,
     width INTEGER,
@@ -152,7 +151,6 @@ CREATE INDEX IF NOT EXISTS idx_submissions_attention ON submissions(is_attention
 CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id);
 CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp);
 
-CREATE INDEX IF NOT EXISTS idx_images_category ON images(category);
 CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at);
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
