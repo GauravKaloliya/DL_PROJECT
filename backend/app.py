@@ -392,7 +392,7 @@ def _create_triggers():
             CREATE TRIGGER trg_participant_insert_audit
             AFTER INSERT ON participants
             FOR EACH ROW
-            EXECUTE FUNCTION fn_participant_insert_audit();
+            EXECUTE FUNCTION fn_participant_insert_audit()
         """),
         ("fn_consent_insert_audit", """
             CREATE OR REPLACE FUNCTION fn_consent_insert_audit()
