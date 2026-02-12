@@ -1683,7 +1683,7 @@ def api_docs_ui():
     """API documentation UI at root endpoint"""
     docs = _get_api_documentation()
     return render_template(
-        "api_docs.html",
+        "api_docs_v2.html",
         version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
@@ -1702,7 +1702,7 @@ def api_docs_ui_alt():
     """API documentation UI at /api/docs/ui endpoint"""
     docs = _get_api_documentation()
     return render_template(
-        "api_docs.html",
+        "api_docs_v2.html",
         version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )

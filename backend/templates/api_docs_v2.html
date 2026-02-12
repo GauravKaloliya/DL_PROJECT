@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C.O.G.N.I.T. API Reference</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f0f2f5;
+            --panel: #ffffff;
+            --text: #1c1e21;
+            --muted: #65676b;
+            --primary: #1877f2;
+            --secondary: #e7f3ff;
+            --accent: #d2e2ff;
+            --accent-bg: rgba(24, 119, 242, 0.08);
+            --warning: #ffb347;
+            --success: #42b72a;
+            --error: #c9444a;
+            --border: #ccd0d5;
+            --shadow: 0 8px 32px rgba(24, 119, 242, 0.15);
+            --gradient: linear-gradient(135deg, #f0f2f5 0%, #e7f3ff 100%);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Quicksand', 'Nunito', system-ui, sans-serif;
+            background: var(--gradient);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.6;
+        }
+
+        .app {
+            max-width: 1024px;
+            margin: 0 auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 2px solid var(--border);
+            border-radius: 24px;
+            padding: 28px;
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 32px;
+        }
+
+        h2 {
+            color: var(--primary);
+            font-weight: 700;
+            margin-top: 32px;
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            color: var(--text);
+            font-weight: 600;
+            margin-top: 24px;
+            margin-bottom: 12px;
+        }
+
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: var(--text);
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            background: #edf2f7;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .header h1 {
+            margin: 0;
+            color: var(--primary);
+        }
+
+        .header p {
+            color: var(--muted);
+            margin: 8px 0 0;
+            font-size: 14px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Buttons */
+        .ghost {
+            padding: 14px 28px;
+            border-radius: 50px;
+            border: 2px solid var(--border);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            font-family: inherit;
+            background: transparent;
+            color: var(--text);
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .ghost:hover {
+            background: var(--panel);
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Navigation Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 32px;
+            border-bottom: 2px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            color: var(--muted);
+            font-weight: 600;
+            cursor: pointer;
+            text-transform: capitalize;
+            border-radius: 8px 8px 0 0;
+            font-family: inherit;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .tab:hover {
+            background: rgba(24, 119, 242, 0.05);
+        }
+
+        .tab.active {
+            background: rgba(24, 119, 242, 0.1);
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Sections */
+        .section {
+            display: none;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        /* Info Boxes */
+        .info-box {
+            background: var(--bg);
+            padding: 12px 16px;
+            border-radius: 8px;
+            border: 2px solid var(--border);
+            font-family: monospace;
+            font-size: 14px;
+            display: inline-block;
+        }
+
+        .info-box-large {
+            background: var(--bg);
+            padding: 16px;
+            border-radius: 12px;
+            border: 2px solid var(--border);
+            font-family: monospace;
+            font-size: 14px;
+            display: block;
+        }
+
+        /* Lists */
+        ul, ol {
+            line-height: 1.8;
+            padding-left: 24px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        /* Endpoint Cards */
+        .endpoint-card {
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .endpoint-header {
+            padding: 16px 20px;
+            background: var(--bg);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            transition: background 0.2s ease;
+        }
+
+        .endpoint-header:hover {
+            background: var(--accent-bg);
+        }
+
+        .method {
+            background: #666;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .method.GET { background: #42b72a; }
+        .method.POST { background: #1877f2; }
+        .method.PUT { background: #ffb347; }
+        .method.DELETE { background: #c9444a; }
+        .method.PATCH { background: #9966ff; }
+
+        .endpoint-path {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            color: var(--text);
+        }
+
+        .endpoint-toggle {
+            margin-left: auto;
+            font-size: 20px;
+            color: var(--muted);
+        }
+
+        .endpoint-content {
+            padding: 20px;
+            display: none;
+        }
+
+        .endpoint-content.expanded {
+            display: block;
+        }
+
+        .endpoint-description {
+            color: var(--muted);
+            margin-bottom: 16px;
+        }
+
+        .endpoint-meta {
+            margin-bottom: 12px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .endpoint-meta strong {
+            color: var(--text);
+        }
+
+        .endpoint-meta.auth-yes {
+            color: #f59e0b;
+        }
+
+        .endpoint-meta.auth-no {
+            color: #42b72a;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+
+        thead tr {
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            padding: 8px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 16px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            margin: 10px 0;
+        }
+
+        .code-block.small {
+            padding: 12px;
+            font-size: 12px;
+        }
+
+        .code-block pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 2px solid var(--border);
+            text-align: center;
+            color: var(--muted);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .app {
+                padding: 16px;
+            }
+
+            .header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .panel {
+                padding: 20px;
+            }
+
+            .tabs {
+                flex-wrap: wrap;
+            }
+
+            .tab {
+                padding: 10px 16px;
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app">
+        <div class="panel">
+            <!-- Header -->
+            <div class="header">
+                <div>
+                    <h1>C.O.G.N.I.T. API Reference</h1>
+                    <p class="muted">Version {{ version }}</p>
+                </div>
+                <div class="header-actions">
+                    <a href="/admin" class="ghost">← Back to Admin</a>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs -->
+            <div class="tabs">
+                <button class="tab active" data-section="overview">Overview</button>
+                <button class="tab" data-section="endpoints">Endpoints</button>
+                <button class="tab" data-section="examples">Examples</button>
+                <button class="tab" data-section="errors">Errors</button>
+            </div>
+
+            <!-- Overview Section -->
+            <div id="overview" class="section active">
+                <h2>Overview</h2>
+                <p>
+                    The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API provides programmatic access to the research platform. This RESTful API allows you to integrate image description tasks into your applications and manage submissions.
+                </p>
+
+                <h3>Version</h3>
+                <div class="info-box">{{ version }}</div>
+
+                <h3>Base URL</h3>
+                <div class="info-box-large">{{ base_url }}</div>
+
+                <h3>Security</h3>
+                <ul>
+                    <li><strong>Rate Limiting:</strong> Configurable limits per endpoint</li>
+                    <li><strong>Authentication:</strong> No authentication required for public endpoints</li>
+                    <li><strong>Data Protection:</strong> IP hashing for privacy-preserving analytics</li>
+                </ul>
+
+                <h3>Features</h3>
+                <ul>
+                    <li><strong>Image Management:</strong> Fetch random images for normal, survey, and attention tasks</li>
+                    <li><strong>Data Submission:</strong> Submit participant responses with descriptions, ratings, and feedback</li>
+                    <li><strong>Health Monitoring:</strong> Check system connectivity and service status</li>
+                    <li><strong>Security:</strong> Rate limiting and hardened security headers</li>
+                </ul>
+
+                <h3>Quick Start</h3>
+                <ol>
+                    <li>Make your first request to <code>/api/images/random</code></li>
+                    <li>Submit participant data via <code>/api/submit</code></li>
+                    <li>Retrieve submissions via <code>/api/submissions/&lt;participant_id&gt;</code></li>
+                </ol>
+            </div>
+
+            <!-- Endpoints Section -->
+            <div id="endpoints" class="section">
+                <h2>API Endpoints</h2>
+
+                <h3>Available Endpoints</h3>
+
+                <!-- Health Check -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/health</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Check system health and connectivity status</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "status": "healthy",
+  "timestamp": "2024-01-01T00:00:00Z",
+  "services": {
+    "database": "connected",
+    "images": "accessible"
+  }
+}</div>
+                    </div>
+                </div>
+
+                <!-- Participants -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method POST">POST</span>
+                        <span class="endpoint-path">/api/participants</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Create a new participant record with user details</p>
+                        <h4>Request Body</h4>
+                        <div class="code-block small">{
+  "participant_id": "string (required)",
+  "session_id": "string (required)",
+  "username": "string (required)",
+  "email": "string (optional)",
+  "phone": "string (optional)",
+  "gender": "string (required)",
+  "age": "integer (required)",
+  "place": "string (required)",
+  "native_language": "string (required)",
+  "prior_experience": "string (required)"
+}</div>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "status": "success",
+  "participant_id": "uuid-string",
+  "message": "Participant created successfully"
+}</div>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/participants/{participant_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Get participant details</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "participant_id": "uuid-string",
+  "username": "john_doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "gender": "male",
+  "age": 25,
+  "place": "New York",
+  "native_language": "English",
+  "prior_experience": "Photography",
+  "consent_given": true,
+  "created_at": "2024-01-01T00:00:00Z"
+}</div>
+                    </div>
+                </div>
+
+                <!-- Consent -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method POST">POST</span>
+                        <span class="endpoint-path">/api/consent</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Record participant consent</p>
+                        <h4>Request Body</h4>
+                        <div class="code-block small">{
+  "participant_id": "string (required)",
+  "consent_given": "boolean (required)"
+}</div>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "status": "success",
+  "message": "Consent recorded successfully",
+  "timestamp": "2024-01-01T00:00:00Z"
+}</div>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/consent/{participant_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Get consent status for a participant</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "participant_id": "uuid-string",
+  "consent_given": true,
+  "consent_timestamp": "2024-01-01T00:00:00Z"
+}</div>
+                    </div>
+                </div>
+
+                <!-- Get Random Image -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/images/random</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Retrieve a random image for the study</p>
+                        <h4>Parameters</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>type</code></td>
+                                    <td>string</td>
+                                    <td>No</td>
+                                    <td>Image type: normal, survey, or attention (default: normal)</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "image_id": "survey/aurora-lake.svg",
+  "image_url": "/api/images/survey/aurora-lake.svg",
+  "is_survey": false,
+  "is_attention": false
+}</div>
+                    </div>
+                </div>
+
+                <!-- Get Image -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/images/{image_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Serve a specific image file</p>
+                        <h4>Parameters</h4>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Type</th>
+                                    <th>Required</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><code>image_id</code></td>
+                                    <td>string</td>
+                                    <td>Yes</td>
+                                    <td>ID of the image to retrieve</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <h4>Response</h4>
+                        <div class="code-block small">Binary image data</div>
+                    </div>
+                </div>
+
+                <!-- Submit Data -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method POST">POST</span>
+                        <span class="endpoint-path">/api/submit</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Submit participant response data (requires prior consent)</p>
+                        <h4>Request Body</h4>
+                        <div class="code-block small">{
+  "participant_id": "string (required)",
+  "session_id": "string (required)",
+  "image_id": "string (required)",
+  "description": "string (required, min 60 words)",
+  "rating": "integer (required, 1-10)",
+  "feedback": "string (required, min 5 chars)",
+  "time_spent_seconds": "number (required)",
+  "is_survey": "boolean",
+  "is_attention": "boolean",
+  "attention_expected": "string (for attention checks)"
+}</div>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "status": "ok",
+  "word_count": 45,
+  "attention_passed": true
+}</div>
+                    </div>
+                </div>
+
+                <!-- Get Submissions -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/submissions/{participant_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Get all submissions for a participant</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">[{...submission objects...}]</div>
+                    </div>
+                </div>
+
+                <!-- Reward Endpoints -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/reward/{participant_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Get reward status for a participant including stats and eligibility</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "is_winner": false,
+  "reward_amount": null,
+  "status": null,
+  "total_words": 500,
+  "survey_rounds": 5,
+  "priority_eligible": true
+}</div>
+                    </div>
+                </div>
+
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method POST">POST</span>
+                        <span class="endpoint-path">/api/reward/select/{participant_id}</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Check and select participant as reward winner (random selection with priority boost)</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "selected": true,
+  "reward_amount": 10,
+  "already_winner": false,
+  "priority_eligible": true
+}</div>
+                    </div>
+                </div>
+
+                <!-- Security Info -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/security/info</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Get security configuration details</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">{
+  "security": {
+    "rate_limits": "object",
+    "cors_allowed_origins": "array",
+    "security_headers": "array"
+  }
+}</div>
+                    </div>
+                </div>
+
+                <!-- API Docs -->
+                <div class="endpoint-card">
+                    <div class="endpoint-header" onclick="toggleEndpoint(this)">
+                        <span class="method GET">GET</span>
+                        <span class="endpoint-path">/api/docs</span>
+                        <span class="endpoint-toggle">▶</span>
+                    </div>
+                    <div class="endpoint-content">
+                        <p class="endpoint-description">Retrieve the API documentation</p>
+                        <h4>Response</h4>
+                        <div class="code-block small">Documentation payload</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Examples Section -->
+            <div id="examples" class="section">
+                <h2>Code Examples</h2>
+
+                <h3>JavaScript / Fetch</h3>
+                <div class="code-block">// Check system health
+const healthResponse = await fetch('/api/health');
+const health = await healthResponse.json();
+console.log(health.status); // 'healthy' or 'degraded'
+
+// Get a random image
+const response = await fetch('/api/images/random?type=normal');
+const image = await response.json();
+console.log(image.image_url);
+
+// Submit participant data
+const submission = {
+  participant_id: 'user-123',
+  session_id: 'session-456',
+  image_id: 'survey/aurora-lake.svg',
+  description: 'The image shows a beautiful sunset over mountains...',
+  rating: 8,
+  feedback: 'Interesting image',
+  time_spent_seconds: 45,
+  is_survey: false,
+  is_attention: false
+};
+
+const submitResponse = await fetch('/api/submit', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(submission)
+});
+
+const result = await submitResponse.json();
+console.log(result.status); // 'ok'</div>
+
+                <h3>Python / Requests</h3>
+                <div class="code-block">import requests
+
+# Check system health
+health_response = requests.get('http://localhost:5000/api/health')
+health = health_response.json()
+print(health['status'])  # 'healthy' or 'degraded'
+
+# Get a random image
+response = requests.get('http://localhost:5000/api/images/random?type=normal')
+image = response.json()
+print(image['image_url'])
+
+# Submit participant data
+submission = {
+    'participant_id': 'user-123',
+    'session_id': 'session-456',
+    'image_id': 'survey/aurora-lake.svg',
+    'description': 'The image shows a beautiful sunset...',
+    'rating': 8,
+    'feedback': 'Interesting image',
+    'time_spent_seconds': 45,
+    'is_survey': False,
+    'is_attention': False
+}
+
+response = requests.post(
+    'http://localhost:5000/api/submit',
+    json=submission
+)
+result = response.json()
+print(result['status'])  # 'ok'</div>
+
+                <h3>cURL</h3>
+                <div class="code-block"># Check system health
+curl -X GET "http://localhost:5000/api/health"
+
+# Get a random image
+curl -X GET "http://localhost:5000/api/images/random?type=normal"
+
+# Submit participant data
+curl -X POST "http://localhost:5000/api/submit" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "participant_id": "user-123",
+    "session_id": "session-456",
+    "image_id": "survey/aurora-lake.svg",
+    "description": "The image shows...",
+    "rating": 8,
+    "feedback": "Great image",
+    "time_spent_seconds": 45,
+    "is_survey": false,
+    "is_attention": false
+  }'</div>
+            </div>
+
+            <!-- Errors Section -->
+            <div id="errors" class="section">
+                <h2>Error Handling</h2>
+                <p>
+                    The API uses standard HTTP response codes to indicate the success or failure of requests.
+                </p>
+
+                <h3>HTTP Status Codes</h3>
+                <table style="margin-top: 16px;">
+                    <thead>
+                        <tr style="background: var(--primary); color: white;">
+                            <th style="padding: 12px;">Code</th>
+                            <th style="padding: 12px;">Meaning</th>
+                            <th style="padding: 12px;">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>200</code></td>
+                            <td style="padding: 12px;">OK</td>
+                            <td style="padding: 12px;">Request succeeded</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>400</code></td>
+                            <td style="padding: 12px;">Bad Request</td>
+                            <td style="padding: 12px;">Invalid parameters or missing required fields</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>401</code></td>
+                            <td style="padding: 12px;">Unauthorized</td>
+                            <td style="padding: 12px;">Authentication required</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>403</code></td>
+                            <td style="padding: 12px;">Forbidden</td>
+                            <td style="padding: 12px;">Consent not given</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>404</code></td>
+                            <td style="padding: 12px;">Not Found</td>
+                            <td style="padding: 12px;">Resource not found</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>409</code></td>
+                            <td style="padding: 12px;">Conflict</td>
+                            <td style="padding: 12px;">Duplicate participant ID</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>415</code></td>
+                            <td style="padding: 12px;">Unsupported Media Type</td>
+                            <td style="padding: 12px;">Request must use application/json</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 12px;"><code>429</code></td>
+                            <td style="padding: 12px;">Too Many Requests</td>
+                            <td style="padding: 12px;">Rate limit exceeded</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 12px;"><code>500</code></td>
+                            <td style="padding: 12px;">Internal Server Error</td>
+                            <td style="padding: 12px;">Server-side error</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>Error Response Format</h3>
+                <div class="code-block">{
+  "error": "Description of what went wrong"
+}</div>
+
+                <h3>Common Errors</h3>
+                <ul>
+                    <li><code>Minimum 60 words required</code> - Description is too short</li>
+                    <li><code>rating must be an integer between 1-10</code> - Invalid rating value</li>
+                    <li><code>comments must be at least 5 characters</code> - Feedback is too short</li>
+                    <li><code>image_id is required</code> - Missing required field</li>
+                </ul>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                <p>C.O.G.N.I.T. API Documentation • Created by Gaurav Kaloliya</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching functionality
+        const tabs = document.querySelectorAll('.tab');
+        const sections = document.querySelectorAll('.section');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetSection = tab.dataset.section;
+
+                // Remove active class from all tabs and sections
+                tabs.forEach(t => t.classList.remove('active'));
+                sections.forEach(s => s.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding section
+                tab.classList.add('active');
+                document.getElementById(targetSection).classList.add('active');
+            });
+        });
+
+        // Endpoint expand/collapse functionality
+        function toggleEndpoint(header) {
+            const content = header.nextElementSibling;
+            const toggle = header.querySelector('.endpoint-toggle');
+
+            if (content.classList.contains('expanded')) {
+                content.classList.remove('expanded');
+                toggle.textContent = '▶';
+            } else {
+                content.classList.add('expanded');
+                toggle.textContent = '▼';
+            }
+        }
+    </script>
+</body>
+</html>
