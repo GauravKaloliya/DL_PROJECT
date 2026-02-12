@@ -24,12 +24,9 @@ def get_database_url():
     # Try multiple environment variable names (Neon uses different names)
     url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRES_PRISMA_URL")
     
+    # Default to production Neon database if no environment variable is set
     if not url:
-        print("Error: No database URL provided!")
-        print("Usage:")
-        print("  python init_db.py <connection-url>")
-        print("  OR set DATABASE_URL environment variable")
-        sys.exit(1)
+        url = "postgresql://neondb_owner:npg_XGug6dnRMl9j@ep-super-cloud-aif6l6hr-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require"
     
     # Fix for SQLAlchemy (some providers use postgres:// instead of postgresql://)
     if url.startswith("postgres://"):
