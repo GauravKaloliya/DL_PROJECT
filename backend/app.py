@@ -1607,9 +1607,14 @@ def _get_api_documentation():
 
 @app.route("/")
 @limiter.limit("30 per minute")
-def api_docs_html():
-    """API documentation at root endpoint"""
-    return jsonify(_get_api_documentation())
+def api_docs_ui():
+    """API documentation UI at root endpoint"""
+    docs = _get_api_documentation()
+    return render_template(
+        "api_docs.html",
+        version=docs.get("version", "3.4.0"),
+        base_url=docs.get("base_url", "/api")
+    )
 
 
 @app.route("/api/docs")
@@ -1617,6 +1622,18 @@ def api_docs_html():
 def api_docs_json():
     """API documentation as JSON"""
     return jsonify(_get_api_documentation())
+
+
+@app.route("/api/docs/ui")
+@limiter.limit("30 per minute")
+def api_docs_ui_alt():
+    """API documentation UI at /api/docs/ui endpoint"""
+    docs = _get_api_documentation()
+    return render_template(
+        "api_docs.html",
+        version=docs.get("version", "3.4.0"),
+        base_url=docs.get("base_url", "/api")
+    )
 
 
 def regenerate_database_from_schema():
@@ -1687,8 +1704,10 @@ initialize_app()
 
 if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
-    print("API Documentation available at: http://localhost:5000/ (root endpoint)")
-    print("API available at: http://localhost:5000/api/")
+    print("API Documentation (HTML UI) available at: http://localhost:5000/")
+    print("API Documentation (HTML UI) also at: http://localhost:5000/api/docs/ui")
+    print("API Documentation (JSON) available at: http://localhost:5000/api/docs")
+    print("API endpoints available at: http://localhost:5000/api/")
     print("Security Info available at: http://localhost:5000/api/security/info")
     port = int(os.getenv("PORT", "5000"))
     debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
