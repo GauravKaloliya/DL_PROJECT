@@ -82,7 +82,7 @@ export default function UserDetailsPage({
 
   return (
     <div className="panel">
-      <div style={{ marginBottom: '16px' }}>
+      <div className="page-top-actions">
         {onBack && (
           <button
             className="ghost"
@@ -94,7 +94,7 @@ export default function UserDetailsPage({
         )}
       </div>
       <h2>Participant Information</h2>
-      <p style={{ color: 'var(--muted)', marginBottom: '24px' }}>
+      <p className="page-subtitle">
         Please provide your details to participate in the C.O.G.N.I.T. research study.
       </p>
       
@@ -218,7 +218,7 @@ export default function UserDetailsPage({
         </div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+      <div className="page-actions">
         <button
           className="primary"
           onClick={handleSubmit}

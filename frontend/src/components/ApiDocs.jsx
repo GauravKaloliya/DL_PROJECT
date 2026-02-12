@@ -33,7 +33,7 @@ export default function ApiDocs() {
     return (
       <div className="app">
         <div className="panel">
-          <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div className="page-hero">
             <h2>Loading API Documentation...</h2>
           </div>
         </div>
@@ -45,12 +45,14 @@ export default function ApiDocs() {
     return (
       <div className="app">
         <div className="panel">
-          <div style={{ textAlign: 'center', padding: '40px' }}>
+          <div className="page-hero">
             <h2>Error Loading Documentation</h2>
             <p style={{ color: 'var(--muted)' }}>{error}</p>
-            <button className="primary" onClick={fetchApiDocs}>
-              Retry
-            </button>
+            <div className="page-actions">
+              <button className="primary" onClick={fetchApiDocs}>
+                Retry
+              </button>
+            </div>
           </div>
         </div>
       </div>

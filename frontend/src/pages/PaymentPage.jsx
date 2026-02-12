@@ -66,7 +66,7 @@ export default function PaymentPage({
 
   return (
     <div className="panel">
-      <div style={{ marginBottom: '16px' }}>
+      <div className="page-top-actions">
         {onBack && (
           <button
             className="ghost"
@@ -78,7 +78,7 @@ export default function PaymentPage({
         )}
       </div>
       <h2>🎁 Win ₹10 Cashback - Get 10X Returns!</h2>
-      <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
+      <p className="page-subtitle">
         <strong>Pay just ₹1 to participate and get a chance to win ₹10 directly to your UPI!</strong>
       </p>
       
@@ -98,7 +98,7 @@ export default function PaymentPage({
           border: 'none'
         }}>
           <div style={{  
-            backgroundColor: 'white',  
+            backgroundColor: 'var(--panel)',  
             borderRadius: '50%',  
             width: '80px',  
             height: '80px',
@@ -106,7 +106,8 @@ export default function PaymentPage({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+            border: '2px solid var(--border)'
           }}>
             <span style={{ fontSize: '40px' }}>{isWinner ? '🏆' : '🎁'}</span>
           </div>
@@ -155,10 +156,11 @@ export default function PaymentPage({
           </p>
           {!loadingStatus && !priorityEligible && (
             <div style={{ 
-              backgroundColor: 'rgba(255,255,255,0.5)', 
+              backgroundColor: 'var(--soft-panel)', 
               padding: '12px', 
               borderRadius: '8px',
-              fontSize: '14px'
+              fontSize: '14px',
+              border: '1px solid var(--border)'
             }}>
               <strong>How to get priority status:</strong>
               <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
@@ -212,12 +214,13 @@ export default function PaymentPage({
             Pay only <strong style={{ fontSize: '20px', color: '#667eea' }}>₹1</strong> to unlock your chance to win <strong style={{ fontSize: '20px', color: '#11998e' }}>₹10</strong>!
           </p>
           <div style={{ 
-            backgroundColor: 'rgba(255,255,255,0.7)', 
+            backgroundColor: 'var(--soft-panel)', 
             padding: '15px', 
             borderRadius: '8px',
-            marginBottom: '12px'
+            marginBottom: '12px',
+            border: '1px solid var(--border)'
           }}>
-            <p style={{ margin: '0 0 8px', fontWeight: '600', color: '#333' }}>🎯 Why Pay ₹1?</p>
+            <p style={{ margin: '0 0 8px', fontWeight: '600', color: 'var(--text)' }}>🎯 Why Pay ₹1?</p>
             <ul style={{ paddingLeft: '20px', marginBottom: '0', fontSize: '14px' }}>
               <li>Ensures genuine participation (no spam/bots)</li>
               <li>Guarantees quality research data</li>
@@ -268,7 +271,7 @@ export default function PaymentPage({
         </label>
       </div>
       
-      <div style={{ display: 'flex', justifyContent: 'center', marginTop: '24px' }}>
+      <div className="page-actions">
         <button
           className="primary"
           onClick={handleSubmit}

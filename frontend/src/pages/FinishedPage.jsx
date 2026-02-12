@@ -68,7 +68,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
     <div className="panel">
       <div style={{ textAlign: 'center' }}>
         <h2>Thank you for completing the C.O.G.N.I.T. survey</h2>
-        <p>
+        <p className="page-subtitle">
           You have completed {surveyCompleted} survey trials!
           Your responses have been recorded.
         </p>
@@ -141,9 +141,11 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
           contribute to improving image-text understanding and generation systems.
         </p>
 
-        <button className="primary" onClick={handleFinish} style={{ marginTop: '20px', padding: '16px 32px', fontSize: '16px' }}>
-          Finish
-        </button>
+        <div className="page-actions">
+          <button className="primary" onClick={handleFinish} style={{ padding: '16px 32px', fontSize: '16px' }}>
+            Finish
+          </button>
+        </div>
       </div>
     </div>
   );
