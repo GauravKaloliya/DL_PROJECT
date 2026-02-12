@@ -138,56 +138,45 @@ def _populate_images():
     if not IMAGES_DIR.exists():
         app.logger.warning(f"Images directory not found at {IMAGES_DIR}")
         return
-    
+
     image_files = []
-    survey_specific_files = ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]
-    
+
     # Find all SVG files in the images directory and subdirectories
     for image_path in IMAGES_DIR.rglob("*.svg"):
         # Create image_id relative to images directory
         rel_path = image_path.relative_to(IMAGES_DIR)
         image_id = str(rel_path)
-        filename = image_path.name
-        
-        # Determine category based on filename
-        if filename.startswith("attention-"):
-            category = "attention"
-        elif filename.startswith("sample-") or filename in survey_specific_files:
-            category = "survey"
-        else:
-            category = "normal"
-        
+
         image_files.append({
             "image_id": image_id,
-            "category": category,
             "difficulty_score": 5.0,
             "object_count": 1,
             "width": 800,
             "height": 600
         })
-    
+
     if not image_files:
         app.logger.warning("No image files found in images directory")
         return
-    
+
     app.logger.info(f"Found {len(image_files)} image files")
-    
+
     # Insert images into database
     with engine.connect() as conn:
         inserted = 0
-        
+
         for image_data in image_files:
             try:
                 conn.execute(text('''
-                    INSERT INTO images 
-                    (image_id, category, difficulty_score, object_count, width, height)
-                    VALUES (:image_id, :category, :difficulty_score, :object_count, :width, :height)
+                    INSERT INTO images
+                    (image_id, difficulty_score, object_count, width, height)
+                    VALUES (:image_id, :difficulty_score, :object_count, :width, :height)
                     ON CONFLICT (image_id) DO NOTHING
                 '''), image_data)
                 inserted += 1
             except Exception as e:
                 app.logger.error(f"Failed to insert {image_data['image_id']}: {e}")
-        
+
         conn.commit()
         app.logger.info(f"Inserted {inserted} images into database")
 
@@ -230,8 +219,7 @@ def _create_indexes():
         
         ("idx_consent_participant", "CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id)"),
         ("idx_consent_timestamp", "CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp)"),
-        
-        ("idx_images_category", "CREATE INDEX IF NOT EXISTS idx_images_category ON images(category)"),
+
         ("idx_images_created", "CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at)"),
         
         ("idx_audit_timestamp", "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)"),
@@ -290,9 +278,8 @@ def _create_views():
         """),
         ("vw_image_coverage", """
             CREATE OR REPLACE VIEW vw_image_coverage AS
-            SELECT 
+            SELECT
                 i.image_id,
-                i.category,
                 i.difficulty_score,
                 i.object_count,
                 i.width,
@@ -307,7 +294,7 @@ def _create_views():
                 SUM(CASE WHEN s.attention_passed = TRUE THEN 1 ELSE 0 END) AS attention_passed_submissions,
                 MIN(s.created_at) AS first_submission_time,
                 MAX(s.created_at) AS last_submission_time,
-                CASE 
+                CASE
                     WHEN COUNT(s.id) = 0 THEN 'unused'
                     WHEN COUNT(s.id) < 5 THEN 'low_usage'
                     WHEN COUNT(s.id) < 20 THEN 'medium_usage'
@@ -315,7 +302,7 @@ def _create_views():
                 END AS usage_category
             FROM images i
             LEFT JOIN submissions s ON i.image_id = s.image_id
-            GROUP BY i.image_id, i.category, i.difficulty_score, i.object_count, i.width, i.height;
+            GROUP BY i.image_id, i.difficulty_score, i.object_count, i.width, i.height;
         """),
         ("vw_submission_quality", """
             CREATE OR REPLACE VIEW vw_submission_quality AS
@@ -487,7 +474,6 @@ def migrate_database_schema():
             conn.execute(text("""
                 CREATE TABLE IF NOT EXISTS images (
                     image_id VARCHAR(200) PRIMARY KEY,
-                    category VARCHAR(100),
                     difficulty_score DOUBLE PRECISION,
                     object_count INTEGER,
                     width INTEGER,
@@ -495,7 +481,7 @@ def migrate_database_schema():
                     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
                 )
             """))
-            
+
             conn.commit()
             print("Database migration completed successfully")
         except Exception as e:
@@ -1039,52 +1025,39 @@ def get_consent(participant_id):
 
 # ============== IMAGE ENDPOINTS ==============
 
-def get_images_from_db(image_type: str = None):
-    """Query images from database, optionally filtered by type"""
+def get_images_from_db():
+    """Query images from database"""
     db = get_db()
-    
+
     try:
-        if image_type:
-            result = db.execute(text('''
-                SELECT image_id, category
-                FROM images
-                WHERE category = :category
-            '''), {"category": image_type})
-        else:
-            result = db.execute(text('''
-                SELECT image_id, category
-                FROM images
-            '''))
-        
-        return [{"image_id": row[0], "category": row[1]} for row in result.fetchall()]
+        result = db.execute(text('''
+            SELECT image_id
+            FROM images
+        '''))
+
+        return [{"image_id": row[0]} for row in result.fetchall()]
     except Exception as e:
         app.logger.error(f"Error querying images from database: {e}")
         return []
 
 
-def build_image_payload(image_id: str, category: str):
+def build_image_payload(image_id: str):
     image_url = f"/api/images/{image_id}"
     return {
         "image_id": image_id,
-        "image_url": image_url,
-        "is_survey": category == "survey",
-        "is_attention": category == "attention",
+        "image_url": image_url
     }
 
 
 @app.route("/api/images/random")
 def random_image():
-    requested_type = request.args.get("type", "normal")
-    if requested_type not in {"normal", "survey", "attention"}:
-        return jsonify({"error": "Invalid type"}), 400
-
-    images = get_images_from_db(requested_type)
+    images = get_images_from_db()
     if not images:
-        return jsonify({"error": f"No images available for {requested_type}"}), 404
+        return jsonify({"error": "No images available"}), 404
 
     # Ensure we get a new random image each time by not using any caching
     image_data = random.choice(images)
-    payload = build_image_payload(image_data["image_id"], image_data["category"])
+    payload = build_image_payload(image_data["image_id"])
     return jsonify(payload)
 
 
@@ -1186,25 +1159,21 @@ def submit():
         image_result = db.execute(text('''
             SELECT image_id FROM images WHERE image_id = :image_id
         '''), {"image_id": image_id})
-        
+
         if not image_result.fetchone():
             # Image doesn't exist, insert it with basic metadata
-            # Extract category from image_id (e.g., "survey/image.svg" -> "survey")
-            category = image_id.split('/')[0] if '/' in image_id else 'unknown'
-            
             db.execute(text('''
-                INSERT INTO images 
-                (image_id, category, difficulty_score, object_count, width, height)
-                VALUES (:image_id, :category, 5.0, 1, 800, 600)
+                INSERT INTO images
+                (image_id, difficulty_score, object_count, width, height)
+                VALUES (:image_id, 5.0, 1, 800, 600)
                 ON CONFLICT (image_id) DO NOTHING
             '''), {
-                "image_id": image_id,
-                "category": category
+                "image_id": image_id
             })
             db.commit()
     except Exception as e:
         # If we can't insert the image, log it but don't fail the submission
-        _log_audit_event(db, 
+        _log_audit_event(db,
                        event_type='image_insert_failed',
                        participant_id=participant_id,
                        endpoint='/api/submit',
@@ -1569,17 +1538,12 @@ def _get_api_documentation():
             "random_image": {
                 "path": "/api/images/random",
                 "method": "GET",
-                "description": "Get a random image from specified category",
+                "description": "Get a random image",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
-                "query_params": {
-                    "type": "normal|survey|attention (default: normal)"
-                },
                 "response": {
                     "image_id": "string",
-                    "image_url": "string",
-                    "is_survey": "boolean",
-                    "is_attention": "boolean"
+                    "image_url": "string"
                 }
             },
             "serve_image": {
