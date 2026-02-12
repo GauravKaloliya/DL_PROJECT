@@ -8,7 +8,7 @@ import functools
 from datetime import datetime, timezone
 from pathlib import Path
 
-from flask import Flask, jsonify, request, send_from_directory, abort, g
+from flask import Flask, jsonify, request, send_from_directory, abort, g, render_template
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -1607,8 +1607,19 @@ def _get_api_documentation():
 
 @app.route("/")
 @limiter.limit("30 per minute")
-def api_docs():
-    """API documentation - first page of API"""
+def api_docs_html():
+    """API documentation - first page of API (HTML)"""
+    docs = _get_api_documentation()
+    return render_template('api_docs.html',
+        version=docs.get('version', '3.4.0'),
+        base_url=docs.get('base_url', '/api')
+    )
+
+
+@app.route("/api/docs")
+@limiter.limit("30 per minute")
+def api_docs_json():
+    """API documentation as JSON"""
     return jsonify(_get_api_documentation())
 
 

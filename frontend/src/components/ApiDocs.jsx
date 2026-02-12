@@ -16,7 +16,7 @@ export default function ApiDocs() {
   const fetchApiDocs = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_BASE}/`);
+      const response = await fetch(`${API_BASE}/api/docs`);
       if (!response.ok) {
         throw new Error('Failed to fetch API documentation');
       }
@@ -78,7 +78,7 @@ export default function ApiDocs() {
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
-            <button className="ghost" onClick={() => navigate('/')}>
+            <button className="ghost" onClick={() => navigate('/app')}>
               ← Back to Survey
             </button>
           </div>
