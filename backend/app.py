@@ -546,6 +546,173 @@ def get_ip_hash():
     return digest
 
 
+def update_participant_stats(participant_id, word_count, is_survey):
+    """Update participant engagement stats for reward eligibility"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Check if participant_stats table exists, create if not
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS participant_stats (
+                participant_id TEXT PRIMARY KEY,
+                total_words INTEGER DEFAULT 0,
+                total_submissions INTEGER DEFAULT 0,
+                survey_rounds INTEGER DEFAULT 0,
+                priority_eligible BOOLEAN DEFAULT 0,
+                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Get current stats
+        cursor.execute('''
+            SELECT total_words, total_submissions, survey_rounds 
+            FROM participant_stats 
+            WHERE participant_id = ?
+        ''', (participant_id,))
+        row = cursor.fetchone()
+        
+        if row:
+            new_words = row[0] + word_count
+            new_submissions = row[1] + 1
+            new_survey_rounds = row[2] + (1 if is_survey else 0)
+        else:
+            new_words = word_count
+            new_submissions = 1
+            new_survey_rounds = 1 if is_survey else 0
+        
+        # Priority eligibility: more words or more survey rounds increases chance
+        # Threshold: 500+ words total OR 3+ survey rounds makes you priority eligible
+        priority_eligible = new_words >= 500 or new_survey_rounds >= 3
+        
+        cursor.execute('''
+            INSERT INTO participant_stats 
+            (participant_id, total_words, total_submissions, survey_rounds, priority_eligible)
+            VALUES (?, ?, ?, ?, ?)
+            ON CONFLICT(participant_id) DO UPDATE SET
+            total_words = excluded.total_words,
+            total_submissions = excluded.total_submissions,
+            survey_rounds = excluded.survey_rounds,
+            priority_eligible = excluded.priority_eligible
+        ''', (participant_id, new_words, new_submissions, new_survey_rounds, priority_eligible))
+        
+        conn.commit()
+    except Exception as e:
+        # Don't let stats update failures break the main functionality
+        pass
+
+
+def get_reward_eligibility(participant_id):
+    """Check if participant is eligible for reward and return details"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Ensure table exists
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reward_winners (
+                participant_id TEXT PRIMARY KEY,
+                reward_amount INTEGER DEFAULT 10,
+                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'pending',
+                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Check if already a winner
+        cursor.execute('''
+            SELECT reward_amount, status FROM reward_winners WHERE participant_id = ?
+        ''', (participant_id,))
+        winner_row = cursor.fetchone()
+        
+        if winner_row:
+            return {
+                "is_winner": True,
+                "reward_amount": winner_row[0],
+                "status": winner_row[1]
+            }
+        
+        # Get participant stats
+        cursor.execute('''
+            SELECT total_words, survey_rounds, priority_eligible 
+            FROM participant_stats 
+            WHERE participant_id = ?
+        ''', (participant_id,))
+        stats_row = cursor.fetchone()
+        
+        if stats_row:
+            return {
+                "is_winner": False,
+                "total_words": stats_row[0],
+                "survey_rounds": stats_row[1],
+                "priority_eligible": bool(stats_row[2])
+            }
+        
+        return {
+            "is_winner": False,
+            "total_words": 0,
+            "survey_rounds": 0,
+            "priority_eligible": False
+        }
+    except Exception as e:
+        return {
+            "is_winner": False,
+            "total_words": 0,
+            "survey_rounds": 0,
+            "priority_eligible": False,
+            "error": str(e)
+        }
+
+
+def select_reward_winner(participant_id):
+    """Select participant as a reward winner with 5% probability, prioritizing engaged users"""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # Ensure table exists
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS reward_winners (
+                participant_id TEXT PRIMARY KEY,
+                reward_amount INTEGER DEFAULT 10,
+                selected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                status TEXT DEFAULT 'pending',
+                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
+            )
+        ''')
+        
+        # Check if already selected
+        cursor.execute('SELECT participant_id FROM reward_winners WHERE participant_id = ?', (participant_id,))
+        if cursor.fetchone():
+            return {"selected": False, "already_winner": True}
+        
+        # Get participant's priority status
+        cursor.execute('''
+            SELECT priority_eligible FROM participant_stats WHERE participant_id = ?
+        ''', (participant_id,))
+        stats_row = cursor.fetchone()
+        priority_eligible = bool(stats_row[0]) if stats_row else False
+        
+        # Weighted random selection:
+        # - Priority eligible participants have higher chance (15% instead of 5%)
+        # - But all participants have a chance
+        base_probability = 0.05  # 5%
+        priority_boost = 0.10 if priority_eligible else 0.0  # Additional 10% for priority
+        selection_probability = base_probability + priority_boost
+        
+        if random.random() < selection_probability:
+            cursor.execute('''
+                INSERT INTO reward_winners (participant_id, reward_amount, status)
+                VALUES (?, 10, 'pending')
+            ''', (participant_id,))
+            conn.commit()
+            return {"selected": True, "reward_amount": 10}
+        
+        return {"selected": False, "priority_eligible": priority_eligible}
+    except Exception as e:
+        return {"selected": False, "error": str(e)}
+
+
 def count_words(text: str):
     """Count words in text"""
     return len([word for word in text.strip().split() if word])
@@ -1069,6 +1236,9 @@ def submit():
         
         conn.commit()
         
+        # Update participant stats for reward eligibility
+        update_participant_stats(participant_id, word_count, is_survey)
+        
         return jsonify({
             "status": "ok", 
             "word_count": word_count, 
@@ -1077,6 +1247,21 @@ def submit():
         
     except Exception as e:
         return jsonify({"error": "Failed to save submission", "details": str(e)}), 500
+
+
+@app.route("/api/reward/<participant_id>")
+def get_reward_status(participant_id):
+    """Get reward status for a participant"""
+    status = get_reward_eligibility(participant_id)
+    return jsonify(status)
+
+
+@app.route("/api/reward/select/<participant_id>", methods=["POST"])
+@limiter.limit("10 per minute")
+def check_reward_winner(participant_id):
+    """Check and select reward winner for a participant"""
+    result = select_reward_winner(participant_id)
+    return jsonify(result)
 
 
 @app.route("/api/submissions/<participant_id>")
@@ -1123,7 +1308,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.2.0",
+            "version": "3.3.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1214,7 +1399,7 @@ def api_docs():
     """Comprehensive API documentation - only working routes"""
     return jsonify({
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.2.0",
+        "version": "3.3.0",
         "description": "Complete and verified API documentation for the C.O.G.N.I.T. research platform",
         "base_url": "/api",
         "security": {
@@ -1371,6 +1556,34 @@ def api_docs():
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "response": "Array of submission objects with details"
+            },
+            "get_reward_status": {
+                "path": "/api/reward/<participant_id>",
+                "method": "GET",
+                "description": "Get reward status for a participant including stats and eligibility",
+                "auth_required": False,
+                "rate_limit": "200 per day, 50 per hour",
+                "response": {
+                    "is_winner": "boolean - whether participant has won",
+                    "reward_amount": "integer|null - amount if winner",
+                    "status": "string|null - payment status if winner",
+                    "total_words": "integer - total words written",
+                    "survey_rounds": "integer - number of survey rounds completed",
+                    "priority_eligible": "boolean - whether in priority pool"
+                }
+            },
+            "select_reward_winner": {
+                "path": "/api/reward/select/<participant_id>",
+                "method": "POST",
+                "description": "Check and select participant as reward winner (5% base chance, higher for priority)",
+                "auth_required": False,
+                "rate_limit": "10 per minute",
+                "response": {
+                    "selected": "boolean - whether participant was selected",
+                    "reward_amount": "integer|null - amount if selected",
+                    "already_winner": "boolean|null - if already selected before",
+                    "priority_eligible": "boolean|null - priority status"
+                }
             }
         },
         "error_handling": {
@@ -1388,6 +1601,7 @@ def api_docs():
             }
         },
         "changelog": {
+            "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
         }
@@ -1441,8 +1655,10 @@ def regenerate_database_from_schema():
         return False
 
 
-if __name__ == "__main__":
-    # Check if we should regenerate the database
+# Initialize database on module load (for gunicorn)
+def initialize_app():
+    """Initialize the application - run migrations and init db"""
+    # Check if we should regenerate the database (only when run directly)
     import sys
     if len(sys.argv) > 1 and sys.argv[1] == "--regenerate-db":
         if regenerate_database_from_schema():
@@ -1453,8 +1669,12 @@ if __name__ == "__main__":
     
     # Run database migration for schema updates
     migrate_database_schema()
-    
     init_db()
+
+# Initialize when module is loaded
+initialize_app()
+
+if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
     print("API Documentation available at: http://localhost:5000/api/docs")
     print("API available at: http://localhost:5000/api/")
