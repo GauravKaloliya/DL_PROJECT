@@ -1320,7 +1320,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.4.0",
+            "version": "3.5.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1409,14 +1409,71 @@ def _get_api_documentation():
     """Get API documentation object - available at /"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.4.0",
-        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform",
+        "version": "3.5.0",
+        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform. This RESTful API provides endpoints for participant management, image retrieval, data submission, and reward system with comprehensive security features.",
         "base_url": "/api",
         "security": {
-            "rate_limiting": "200 per day, 50 per hour (default)",
-            "cors_allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
-            "authentication": "None required for participant endpoints",
-            "data_protection": "IP hashing, privacy-preserving storage"
+            "overview": "The API implements multiple layers of security including rate limiting, CORS restrictions, security headers, input validation, and privacy-preserving data collection",
+            "rate_limiting": {
+                "default": "200 requests per day, 50 per hour",
+                "endpoints": {
+                    "participant_creation": "30 per minute",
+                    "consent_recording": "20 per minute",
+                    "submission": "60 per minute",
+                    "api_docs": "30 per minute",
+                    "reward_selection": "10 per minute"
+                },
+                "implementation": "Per-IP based rate limiting using flask-limiter"
+            },
+            "cors_configuration": {
+                "allowed_origins": ["http://localhost:5173", "https://your-production-domain.com"],
+                "allowed_methods": ["GET", "POST", "OPTIONS"],
+                "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+                "supports_credentials": False,
+                "max_age": 86400
+            },
+            "security_headers": {
+                "X-Content-Type-Options": "nosniff",
+                "X-Frame-Options": "DENY",
+                "X-XSS-Protection": "1; mode=block",
+                "X-Permitted-Cross-Domain-Policies": "none",
+                "X-Download-Options": "noopen",
+                "X-DNS-Prefetch-Control": "off",
+                "Content-Security-Policy": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'",
+                "Strict-Transport-Security": "max-age=63072000; includeSubDomains; preload",
+                "Referrer-Policy": "no-referrer",
+                "Permissions-Policy": "geolocation=(), microphone=(), camera=(), payment=()",
+                "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate"
+            },
+            "data_protection": {
+                "ip_hashing": "SHA-256 with configurable salt (IP_HASH_SALT)",
+                "anonymous_data": True,
+                "storage": "SQLite with WAL mode and comprehensive indexing",
+                "encryption": "At-rest protection via filesystem encryption",
+                "data_validation": "Comprehensive input validation and sanitization"
+            },
+            "database_security": {
+                "foreign_key_constraints": "Enabled",
+                "input_validation": "Length and format constraints on all fields",
+                "audit_logging": "Automatic logging of all participant actions via triggers",
+                "performance_monitoring": "Comprehensive endpoint performance tracking",
+                "data_integrity": "Check constraints and validation rules",
+                "sqlite_pragmas": ["PRAGMA foreign_keys = ON", "PRAGMA journal_mode = WAL", "PRAGMA synchronous = NORMAL", "PRAGMA temp_store = MEMORY"]
+            },
+            "api_security": {
+                "input_sanitization": "Protection against injection attacks",
+                "content_validation": "Strict validation of all user inputs",
+                "error_handling": "Secure error messages without sensitive data",
+                "rate_limiting": "Per-IP and global rate limiting",
+                "cors_restriction": "Strict origin and method restrictions"
+            },
+            "authentication": "None required for participant endpoints - participants are identified by participant_id and session_id",
+            "compliance": {
+                "gdpr": "Privacy-preserving data collection",
+                "data_minimization": "Only essential data collected",
+                "consent_management": "Explicit consent recording before data submission",
+                "data_retention": "Configurable retention policies"
+            }
         },
         "endpoints": {
             "health": {
@@ -1611,6 +1668,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "3.5.0": "Enhanced API documentation with comprehensive security details, added red border validation styling for frontend forms, removed sample-practice.svg, fixed API docs loading issue in Vite dev server proxy configuration",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
@@ -1626,7 +1684,7 @@ def api_docs_ui():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 
@@ -1645,7 +1703,7 @@ def api_docs_ui_alt():
     docs = _get_api_documentation()
     return render_template(
         "api_docs.html",
-        version=docs.get("version", "3.4.0"),
+        version=docs.get("version", "3.5.0"),
         base_url=docs.get("base_url", "/api")
     )
 

@@ -8,9 +8,13 @@ export default defineConfig({
       "/api": {
         target: "http://localhost:5000",
         bypass: (req) => {
-          // Bypass proxy for /api/docs to allow React Router to handle it
-          if (req.url === '/api/docs' && req.headers.accept?.includes('text/html')) {
-            return req.url;
+          // Bypass proxy for /api/docs HTML requests to allow React Router to handle it
+          // But allow JSON requests to be proxied to the backend
+          if (req.url === '/api/docs' || req.url.startsWith('/api/docs?')) {
+            if (req.headers.accept?.includes('text/html')) {
+              return req.url; // Let React Router handle HTML navigation
+            }
+            // For JSON requests (fetch API), don't bypass - proxy to backend
           }
         }
       },
