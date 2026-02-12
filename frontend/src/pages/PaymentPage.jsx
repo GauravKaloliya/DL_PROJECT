@@ -77,9 +77,9 @@ export default function PaymentPage({
           </button>
         )}
       </div>
-      <h2>🎁 Reward Opportunity</h2>
+      <h2>🎁 Win ₹10 Cashback - Get 10X Returns!</h2>
       <p style={{ color: 'var(--muted)', fontSize: '15px', marginBottom: '20px' }}>
-        <strong>Complete the study and stand a chance to win ₹10 cashback!</strong>
+        <strong>Pay just ₹1 to participate and get a chance to win ₹10 directly to your UPI!</strong>
       </p>
       
       <div className="welcome-info">
@@ -114,7 +114,7 @@ export default function PaymentPage({
             ₹10
           </p>
           <p style={{ margin: '8px 0 0', color: 'rgba(255,255,255,0.9)', fontSize: '14px' }}>
-            {isWinner ? "🎉 Congratulations! You've been selected!" : "Assured reward for selected participants"}
+            {isWinner ? "🎉 Congratulations! You've been selected!" : "10X Your Money - Win ₹10 with Just ₹1!"}
           </p>
         </div>
 
@@ -126,12 +126,13 @@ export default function PaymentPage({
           marginBottom: '20px',
           borderLeft: '4px solid var(--primary)'
         }}>
-          <h3 style={{ marginTop: '0', color: 'var(--primary)' }}>How It Works</h3>
+          <h3 style={{ marginTop: '0', color: 'var(--primary)' }}>✨ How It Works</h3>
           <ul style={{ paddingLeft: '20px', marginBottom: '0' }}>
-            <li><strong>5% Chance to Win:</strong> Every participant has a 5% chance of being randomly selected for the ₹10 reward</li>
-            <li><strong>Priority List Advantage:</strong> Active participants get added to a priority list, increasing their chances of winning</li>
-            <li><strong>Instant UPI Transfer:</strong> Winners receive ₹10 directly to their UPI ID</li>
-            <li><strong>Assured Reward:</strong> Selected participants are guaranteed to receive the reward</li>
+            <li><strong>🎯 Simple Entry:</strong> Pay just ₹1 to participate in this exciting research study</li>
+            <li><strong>💎 Win Big:</strong> Get randomly selected to win ₹10 - that's 10X your entry amount!</li>
+            <li><strong>⭐ Priority Advantage:</strong> Active participants get added to a priority list for higher winning chances</li>
+            <li><strong>⚡ Instant Payout:</strong> Winners receive ₹10 directly to their UPI ID within 24-48 hours</li>
+            <li><strong>🎁 Guaranteed Transfer:</strong> If selected, your reward is 100% assured</li>
           </ul>
         </div>
 
@@ -145,12 +146,12 @@ export default function PaymentPage({
           border: priorityEligible ? '1px solid #11998e' : undefined
         }}>
           <h3 style={{ marginTop: '0', color: priorityEligible ? '#11998e' : 'var(--warning)' }}>
-            {priorityEligible ? '✅ You are on the Priority List!' : '⭐ Priority List Benefits'}
+            {priorityEligible ? '✅ You are on the Priority List!' : '⭐ Boost Your Winning Chances!'}
           </h3>
           <p style={{ marginBottom: '12px' }}>
             {priorityEligible 
-              ? "Great job! You're in the priority pool for reward selection. This increases your chances of winning!"
-              : "Get added to the priority list by being an active participant. Priority members have higher chances of winning!"}
+              ? "Excellent! You're in the priority pool with significantly higher chances of winning the ₹10 reward!"
+              : "Get on the priority list to maximize your chances! Priority members have better odds of winning."}
           </p>
           {!loadingStatus && !priorityEligible && (
             <div style={{ 
@@ -203,19 +204,28 @@ export default function PaymentPage({
           padding: '20px', 
           borderRadius: '12px',
           marginBottom: '20px',
-          borderLeft: '4px solid var(--muted)'
+          borderLeft: '4px solid #667eea',
+          background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.05) 0%, rgba(118, 75, 162, 0.05) 100%)'
         }}>
-          <h3 style={{ marginTop: '0', color: 'var(--muted)' }}>Participation Fee</h3>
-          <p style={{ marginBottom: '12px' }}>
-            A nominal fee of <strong>₹1</strong> is required to participate. This helps ensure:
+          <h3 style={{ marginTop: '0', color: '#667eea' }}>💰 Just ₹1 Entry Fee!</h3>
+          <p style={{ marginBottom: '12px', fontSize: '16px', fontWeight: '500' }}>
+            Pay only <strong style={{ fontSize: '20px', color: '#667eea' }}>₹1</strong> to unlock your chance to win <strong style={{ fontSize: '20px', color: '#11998e' }}>₹10</strong>!
           </p>
-          <ul style={{ paddingLeft: '20px', marginBottom: '0' }}>
-            <li>Serious and committed participants</li>
-            <li>Protection against spam and bot activity</li>
-            <li>Quality responses for our research</li>
-          </ul>
-          <p style={{ marginTop: '12px', marginBottom: '0', fontSize: '14px', color: 'var(--muted)' }}>
-            Think of it as an entry ticket to a lucky draw where you can win ₹10!
+          <div style={{ 
+            backgroundColor: 'rgba(255,255,255,0.7)', 
+            padding: '15px', 
+            borderRadius: '8px',
+            marginBottom: '12px'
+          }}>
+            <p style={{ margin: '0 0 8px', fontWeight: '600', color: '#333' }}>🎯 Why Pay ₹1?</p>
+            <ul style={{ paddingLeft: '20px', marginBottom: '0', fontSize: '14px' }}>
+              <li>Ensures genuine participation (no spam/bots)</li>
+              <li>Guarantees quality research data</li>
+              <li>Funds the ₹10 reward pool</li>
+            </ul>
+          </div>
+          <p style={{ marginTop: '12px', marginBottom: '0', fontSize: '15px', fontWeight: '500', color: '#11998e' }}>
+            ✨ Think of it as your lucky ticket to win 10X more!
           </p>
         </div>
 
@@ -249,11 +259,11 @@ export default function PaymentPage({
           style={{ transform: 'scale(1.2)', marginRight: '12px' }}
         />
         <label htmlFor="payment-check" style={{ fontSize: '16px' }}>
-          <strong>I agree to pay ₹1.00 to participate and understand the reward terms</strong>
+          <strong>I agree to pay ₹1 and accept the reward terms</strong>
           <p style={{ margin: '8px 0 0', fontSize: '14px', color: 'var(--muted)', fontWeight: '400' }}>
-            I understand that I have a chance to win ₹10 through random selection, 
-            with priority given to active participants. I agree that the ₹1 participation 
-            fee is non-refundable and payment details will be kept separate from research responses.
+            I understand that paying ₹1 gives me a chance to win ₹10 through random selection. 
+            Active participants get priority status for better winning chances. The ₹1 fee is 
+            non-refundable and payment details remain separate from research responses.
           </p>
         </label>
       </div>
@@ -263,9 +273,16 @@ export default function PaymentPage({
           className="primary"
           onClick={handleSubmit}
           disabled={!systemReady || submitting}
-          style={{ padding: '12px 24px', fontSize: '16px' }}
+          style={{ 
+            padding: '12px 32px', 
+            fontSize: '18px', 
+            fontWeight: '600',
+            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            border: 'none',
+            boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)'
+          }}
         >
-          {submitting ? "Processing..." : "Pay ₹1 & Start Study"}
+          {submitting ? "Processing..." : "🎯 Pay ₹1 & Win ₹10!"}
         </button>
       </div>
     </div>
