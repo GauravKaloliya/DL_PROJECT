@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .header p { font-size: 1.1rem; opacity: 0.9; }
+        .badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            margin-top: 15px;
+            font-size: 0.9rem;
+        }
+        .section {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 10px;
+        }
+        .endpoint {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            background: #fafafa;
+        }
+        .method {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 5px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-right: 10px;
+        }
+        .get { background: #61affe; color: white; }
+        .post { background: #49cc90; color: white; }
+        .path {
+            font-family: 'Courier New', monospace;
+            font-size: 1.1rem;
+            color: #333;
+            font-weight: 600;
+        }
+        .description { color: #666; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>{{ title }}</h1>
+            <p>{{ description }}</p>
+            <div class="badge">Version {{ version }}</div>
+        </div>
+
+        <div class="section">
+            <h2>📖 Overview</h2>
+            <p>C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a full-stack research platform for running image-description studies. Participants review images, write detailed descriptions, rate complexity, and provide feedback.</p>
+            <p style="margin-top: 15px;"><strong>Base URL:</strong> <code>{{ base_url }}</code></p>
+        </div>
+
+        <div class="section">
+            <h2>🔒 Security</h2>
+            <p><strong>Rate Limiting:</strong> {{ security.rate_limiting }}</p>
+            <p><strong>CORS Origins:</strong> {{ security.cors_allowed_origins|join(', ') }}</p>
+            <p><strong>Authentication:</strong> {{ security.authentication }}</p>
+            <p><strong>Data Protection:</strong> {{ security.data_protection }}</p>
+        </div>
+
+        <div class="section">
+            <h2>📡 Endpoints</h2>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.health.path }}</span>
+                <p class="description">{{ endpoints.health.description }}</p>
+                <p><small>Rate Limit: {{ endpoints.health.rate_limit }}</small></p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.security_info.path }}</span>
+                <p class="description">{{ endpoints.security_info.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="path">{{ endpoints.create_participant.path }}</span>
+                <p class="description">{{ endpoints.create_participant.description }}</p>
+                <p><small>Required: {{ endpoints.create_participant.request_body.required|join(', ') }}</small></p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.get_participant.path }}</span>
+                <p class="description">{{ endpoints.get_participant.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="path">{{ endpoints.record_consent.path }}</span>
+                <p class="description">{{ endpoints.record_consent.description }}</p>
+                <p><small>Required: {{ endpoints.record_consent.request_body.required|join(', ') }}</small></p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.get_consent.path }}</span>
+                <p class="description">{{ endpoints.get_consent.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.random_image.path }}?type=normal|survey|attention</span>
+                <p class="description">{{ endpoints.random_image.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.serve_image.path }}</span>
+                <p class="description">{{ endpoints.serve_image.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="path">{{ endpoints.submit_description.path }}</span>
+                <p class="description">{{ endpoints.submit_description.description }}</p>
+                <p><small>Required: {{ endpoints.submit_description.request_body.required|join(', ') }}</small></p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.get_submissions.path }}</span>
+                <p class="description">{{ endpoints.get_submissions.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method get">GET</span>
+                <span class="path">{{ endpoints.get_reward_status.path }}</span>
+                <p class="description">{{ endpoints.get_reward_status.description }}</p>
+            </div>
+
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <span class="path">{{ endpoints.select_reward_winner.path }}</span>
+                <p class="description">{{ endpoints.select_reward_winner.description }}</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📝 Changelog</h2>
+            {% for version, changes in changelog.items() %}
+            <div style="margin-bottom: 15px;">
+                <strong style="color: #667eea;">Version {{ version }}:</strong>
+                <p style="margin-top: 5px;">{{ changes }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

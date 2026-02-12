@@ -408,6 +408,9 @@ export default function App() {
         <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
           <h2>Loading C.O.G.N.I.T.</h2>
           <p style={{ color: 'var(--muted)', marginTop: '16px' }}>
+            Cognitive Network for Image & Text Modeling
+          </p>
+          <p style={{ color: 'var(--muted)' }}>
             Checking system connectivity...
           </p>
           <div className="spinner" style={{ margin: '24px auto 0' }} />
@@ -505,14 +508,14 @@ export default function App() {
             <p className="subtitle">Describe each image with as much detail as possible</p>
           </div>
           <div className="header-actions">
-            <button 
-              className="ghost dark-mode-toggle" 
+            <button
+              className="ghost dark-mode-toggle"
               onClick={() => setDarkMode((prev) => !prev)}
               title={darkMode ? "Switch to light mode" : "Switch to dark mode"}
             >
               {darkMode ? "☀️" : "🌙"}
             </button>
-            <button className="ghost" onClick={() => navigate("/api/docs")}>
+            <button className="ghost" onClick={() => navigate("/")}>
               API Docs
             </button>
             <div className={`status-dot ${online ? "online" : "offline"}`}>
