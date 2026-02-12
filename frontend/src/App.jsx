@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import UserDetailsPage from "./pages/UserDetailsPage.jsx";
 import ConsentPage from "./pages/ConsentPage.jsx";
 import PaymentPage from "./pages/PaymentPage.jsx";
 import TrialPage from "./pages/TrialPage.jsx";
 import FinishedPage from "./pages/FinishedPage.jsx";
-import { API_BASE, getApiUrl } from "./utils/apiBase";
+import { getApiUrl } from "./utils/apiBase";
 
 function createId() {
   if (crypto?.randomUUID) {
