@@ -1070,19 +1070,32 @@ def get_consent(participant_id):
 
 # ============== IMAGE ENDPOINTS ==============
 
-def list_images(image_type: str):
-    folder = IMAGES_DIR / image_type
+def list_images(image_type: str = None):
+    """List images from survey folder, optionally filtered by type"""
+    folder = IMAGES_DIR / "survey"
     if not folder.exists():
         return []
-    return [
+    
+    all_images = [
         path
         for path in folder.iterdir()
         if path.is_file() and not path.name.startswith(".")
     ]
+    
+    # Filter by type if specified
+    if image_type:
+        if image_type == "attention":
+            return [img for img in all_images if img.name.startswith("attention-")]
+        elif image_type == "survey":
+            return [img for img in all_images if img.name.startswith("sample-") or img.name in ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]]
+        elif image_type == "normal":
+            return [img for img in all_images if not img.name.startswith("attention-") and not img.name.startswith("sample-") and img.name not in ["hamster-wheel.svg", "kitten-yarn.svg", "puppy-ball.svg"]]
+    
+    return all_images
 
 
 def build_image_payload(image_path: Path, image_type: str):
-    image_id = f"{image_type}/{image_path.name}"
+    image_id = f"survey/{image_path.name}"
     image_url = f"/api/images/{image_id}"
     return {
         "image_id": image_id,
@@ -1102,6 +1115,7 @@ def random_image():
     if not images:
         return jsonify({"error": f"No images available for {requested_type}"}), 404
 
+    # Ensure we get a new random image each time by not using any caching
     image_path = random.choice(images)
     payload = build_image_payload(image_path, requested_type)
     return jsonify(payload)
