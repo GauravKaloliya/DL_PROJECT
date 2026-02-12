@@ -27,6 +27,10 @@ IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 # PostgreSQL Database URL from environment
 DATABASE_URL = os.getenv("DATABASE_URL", f"postgresql://postgres:postgres@localhost:5432/cognit")
 
+# Fix for SQLAlchemy (Render uses postgres:// sometimes)
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 app = Flask(__name__)
 
 # Security Configuration
