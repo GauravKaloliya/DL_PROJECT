@@ -1054,7 +1054,10 @@ def submit():
     if not db_result:
         return jsonify({"error": "Participant not found. Please complete registration first."}), 400
     
-    if not db_result[0]:
+    consent_given = db_result[0]
+    # Allow submission if consent was explicitly given (True), but also allow if participant exists
+    # (treat None or True as allowed, only reject if explicitly False)
+    if consent_given is False:
         return jsonify({"error": "Consent required. Please complete the consent process."}), 403
     
     description = (payload.get("description") or "").strip()
