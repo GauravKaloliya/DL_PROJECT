@@ -24,12 +24,17 @@ MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
 TOO_FAST_SECONDS = float(os.getenv("TOO_FAST_SECONDS", "5"))
 IP_HASH_SALT = os.getenv("IP_HASH_SALT", "local-salt")
 
-# PostgreSQL Database URL - production Neon database
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_XGug6dnRMl9j@ep-super-cloud-aif6l6hr-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require")
+# PostgreSQL Database URL - must be set via environment variable
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL environment variable is required")
 
 # Fix for SQLAlchemy (Render uses postgres:// sometimes)
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+# Website URL for CORS and documentation
+WEBSITE_URL = os.getenv("WEBSITE_URL", "http://localhost:5173")
 
 app = Flask(__name__)
 
@@ -57,11 +62,8 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
-    # Default origins include localhost for development and production frontend
-    return [
-        "http://localhost:5173",
-        "https://cognit-weld.vercel.app"
-    ]
+    # Default to localhost for development
+    return ["http://localhost:5173"]
 
 
 # CORS Configuration with enhanced security
@@ -181,314 +183,8 @@ def _populate_images():
         app.logger.info(f"Inserted {inserted} images into database")
 
 
-def init_db():
-    """Initialize the PostgreSQL database with schema"""
-    # Create tables using SQLAlchemy
-    from sqlalchemy import create_engine
-    
-    # Create all tables
-    Base.metadata.create_all(bind=engine)
-    
-    # Create indexes, views, and other PostgreSQL-specific objects
-    _create_indexes()
-    _create_views()
-    _create_triggers()
-    _insert_metadata()
-    
-    # Populate images from the images folder
-    _populate_images()
 
-
-def _create_indexes():
-    """Create comprehensive database indexes for performance optimization"""
-    indexes = [
-        ("idx_participants_id", "CREATE INDEX IF NOT EXISTS idx_participants_id ON participants(participant_id)"),
-        ("idx_participants_session", "CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id)"),
-        ("idx_participants_created", "CREATE INDEX IF NOT EXISTS idx_participants_created ON participants(created_at)"),
-        ("idx_participants_consent", "CREATE INDEX IF NOT EXISTS idx_participants_consent ON participants(consent_given)"),
-        ("idx_participants_email", "CREATE INDEX IF NOT EXISTS idx_participants_email ON participants(email)"),
-        
-        ("idx_submissions_participant", "CREATE INDEX IF NOT EXISTS idx_submissions_participant ON submissions(participant_id)"),
-        ("idx_submissions_session", "CREATE INDEX IF NOT EXISTS idx_submissions_session ON submissions(session_id)"),
-        ("idx_submissions_created", "CREATE INDEX IF NOT EXISTS idx_submissions_created ON submissions(created_at)"),
-        ("idx_submissions_image", "CREATE INDEX IF NOT EXISTS idx_submissions_image ON submissions(image_id)"),
-        ("idx_submissions_survey", "CREATE INDEX IF NOT EXISTS idx_submissions_survey ON submissions(is_survey)"),
-        ("idx_submissions_attention", "CREATE INDEX IF NOT EXISTS idx_submissions_attention ON submissions(is_attention)"),
-        ("idx_submissions_rating", "CREATE INDEX IF NOT EXISTS idx_submissions_rating ON submissions(rating)"),
-        ("idx_submissions_word_count", "CREATE INDEX IF NOT EXISTS idx_submissions_word_count ON submissions(word_count)"),
-        
-        ("idx_consent_participant", "CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id)"),
-        ("idx_consent_timestamp", "CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp)"),
-
-        ("idx_images_created", "CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at)"),
-        
-        ("idx_audit_timestamp", "CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp)"),
-        ("idx_audit_user", "CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id)"),
-        ("idx_audit_participant", "CREATE INDEX IF NOT EXISTS idx_audit_participant ON audit_log(participant_id)"),
-        ("idx_audit_endpoint", "CREATE INDEX IF NOT EXISTS idx_audit_endpoint ON audit_log(endpoint)"),
-        
-        ("idx_performance_timestamp", "CREATE INDEX IF NOT EXISTS idx_performance_timestamp ON performance_metrics(timestamp)"),
-        ("idx_performance_endpoint", "CREATE INDEX IF NOT EXISTS idx_performance_endpoint ON performance_metrics(endpoint)")
-    ]
-    
-    with engine.connect() as conn:
-        for idx_name, idx_sql in indexes:
-            try:
-                conn.execute(text(idx_sql))
-            except Exception:
-                pass  # Index might already exist
-        conn.commit()
-
-
-def _create_views():
-    """Create views for common queries"""
-    views = [
-        ("vw_participant_summary", """
-            CREATE OR REPLACE VIEW vw_participant_summary AS
-            SELECT 
-                p.participant_id,
-                p.username,
-                p.email,
-                p.age,
-                p.gender,
-                p.place,
-                p.native_language,
-                p.prior_experience,
-                p.consent_given,
-                COUNT(s.id) AS submission_count,
-                AVG(s.word_count) AS avg_word_count,
-                MAX(s.created_at) AS last_submission_time
-            FROM participants p
-            LEFT JOIN submissions s ON p.participant_id = s.participant_id
-            GROUP BY p.participant_id;
-        """),
-        ("vw_submission_stats", """
-            CREATE OR REPLACE VIEW vw_submission_stats AS
-            SELECT 
-                participant_id,
-                COUNT(*) AS total_submissions,
-                SUM(CASE WHEN is_survey = TRUE THEN 1 ELSE 0 END) AS survey_count,
-                SUM(CASE WHEN is_attention = TRUE THEN 1 ELSE 0 END) AS attention_count,
-                SUM(CASE WHEN attention_passed = TRUE THEN 1 ELSE 0 END) AS attention_passed_count,
-                AVG(word_count) AS avg_word_count,
-                AVG(rating) AS avg_rating,
-                AVG(time_spent_seconds) AS avg_time_seconds
-            FROM submissions
-            GROUP BY participant_id;
-        """),
-        ("vw_image_coverage", """
-            CREATE OR REPLACE VIEW vw_image_coverage AS
-            SELECT
-                i.image_id,
-                i.difficulty_score,
-                i.object_count,
-                i.width,
-                i.height,
-                COUNT(s.id) AS submission_count,
-                COUNT(DISTINCT s.participant_id) AS unique_participants,
-                AVG(s.word_count) AS avg_word_count,
-                AVG(s.rating) AS avg_rating,
-                AVG(s.time_spent_seconds) AS avg_time_seconds,
-                SUM(CASE WHEN s.is_survey = TRUE THEN 1 ELSE 0 END) AS survey_submissions,
-                SUM(CASE WHEN s.is_attention = TRUE THEN 1 ELSE 0 END) AS attention_submissions,
-                SUM(CASE WHEN s.attention_passed = TRUE THEN 1 ELSE 0 END) AS attention_passed_submissions,
-                MIN(s.created_at) AS first_submission_time,
-                MAX(s.created_at) AS last_submission_time,
-                CASE
-                    WHEN COUNT(s.id) = 0 THEN 'unused'
-                    WHEN COUNT(s.id) < 5 THEN 'low_usage'
-                    WHEN COUNT(s.id) < 20 THEN 'medium_usage'
-                    ELSE 'high_usage'
-                END AS usage_category
-            FROM images i
-            LEFT JOIN submissions s ON i.image_id = s.image_id
-            GROUP BY i.image_id, i.difficulty_score, i.object_count, i.width, i.height;
-        """),
-        ("vw_submission_quality", """
-            CREATE OR REPLACE VIEW vw_submission_quality AS
-            SELECT 
-                s.id,
-                s.participant_id,
-                s.image_id,
-                s.trial_index,
-                s.word_count,
-                s.rating,
-                s.time_spent_seconds,
-                s.is_survey,
-                s.is_attention,
-                s.attention_passed,
-                s.too_fast_flag,
-                s.created_at,
-                CASE
-                    WHEN s.word_count >= 60 THEN 20
-                    WHEN s.word_count >= 40 THEN 15
-                    WHEN s.word_count >= 20 THEN 10
-                    ELSE 5
-                END +
-                CASE
-                    WHEN s.rating >= 8 THEN 20
-                    WHEN s.rating >= 6 THEN 15
-                    WHEN s.rating >= 4 THEN 10
-                    ELSE 5
-                END +
-                CASE
-                    WHEN s.time_spent_seconds IS NULL THEN 0
-                    WHEN s.time_spent_seconds BETWEEN 30 AND 300 THEN 20
-                    WHEN s.time_spent_seconds BETWEEN 15 AND 600 THEN 15
-                    WHEN s.time_spent_seconds BETWEEN 5 AND 900 THEN 10
-                    ELSE 5
-                END +
-                CASE
-                    WHEN s.is_attention = FALSE THEN 20
-                    WHEN s.attention_passed = TRUE THEN 20
-                    WHEN s.attention_passed = FALSE THEN 5
-                    ELSE 10
-                END +
-                CASE
-                    WHEN s.too_fast_flag = TRUE THEN 0
-                    ELSE 20
-                END AS data_quality_score,
-                CASE
-                    WHEN s.word_count >= 60 AND s.rating >= 7 AND s.time_spent_seconds BETWEEN 30 AND 300 AND 
-                         (s.is_attention = FALSE OR s.attention_passed = TRUE) AND s.too_fast_flag = FALSE THEN 'excellent'
-                    WHEN s.word_count >= 40 AND s.rating >= 5 AND s.time_spent_seconds >= 15 AND 
-                         (s.is_attention = FALSE OR s.attention_passed IS NOT NULL) THEN 'good'
-                    WHEN s.word_count >= 20 AND s.rating >= 3 AND s.time_spent_seconds >= 5 THEN 'acceptable'
-                    ELSE 'poor'
-                END AS quality_category
-            FROM submissions s;
-        """)
-    ]
-    
-    with engine.connect() as conn:
-        for view_name, view_sql in views:
-            try:
-                conn.execute(text(view_sql))
-            except Exception:
-                pass  # View might already exist
-        conn.commit()
-
-
-def _create_triggers():
-    """Create triggers for automatic audit logging"""
-    triggers = [
-        ("fn_participant_insert_audit", """
-            CREATE OR REPLACE FUNCTION fn_participant_insert_audit()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                INSERT INTO audit_log
-                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES
-                ('participant_created', NEW.participant_id,
-                 '/api/participants', 'POST', 201,
-                 NEW.ip_hash, NEW.user_agent,
-                 'New participant created');
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-        """),
-        ("trg_participant_insert_audit", """
-            DROP TRIGGER IF EXISTS trg_participant_insert_audit ON participants;
-            CREATE TRIGGER trg_participant_insert_audit
-            AFTER INSERT ON participants
-            FOR EACH ROW
-            EXECUTE FUNCTION fn_participant_insert_audit()
-        """),
-        ("fn_consent_insert_audit", """
-            CREATE OR REPLACE FUNCTION fn_consent_insert_audit()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                INSERT INTO audit_log
-                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES
-                ('consent_recorded', NEW.participant_id,
-                 '/api/consent', 'POST', 200,
-                 NEW.ip_hash, NEW.user_agent,
-                 'Consent recorded for participant');
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-        """),
-        ("trg_consent_insert_audit", """
-            DROP TRIGGER IF EXISTS trg_consent_insert_audit ON consent_records;
-            CREATE TRIGGER trg_consent_insert_audit
-            AFTER INSERT ON consent_records
-            FOR EACH ROW
-            EXECUTE FUNCTION fn_consent_insert_audit();
-        """),
-        ("fn_submission_insert_audit", """
-            CREATE OR REPLACE FUNCTION fn_submission_insert_audit()
-            RETURNS TRIGGER AS $$
-            BEGIN
-                INSERT INTO audit_log
-                (event_type, participant_id, endpoint, method, status_code, ip_hash, user_agent, details)
-                VALUES
-                ('submission_created', NEW.participant_id,
-                 '/api/submit', 'POST', 200,
-                 NEW.ip_hash, NEW.user_agent,
-                 'New submission created for image: ' || NEW.image_id);
-                RETURN NEW;
-            END;
-            $$ LANGUAGE plpgsql;
-        """),
-        ("trg_submission_insert_audit", """
-            DROP TRIGGER IF EXISTS trg_submission_insert_audit ON submissions;
-            CREATE TRIGGER trg_submission_insert_audit
-            AFTER INSERT ON submissions
-            FOR EACH ROW
-            EXECUTE FUNCTION fn_submission_insert_audit();
-        """)
-    ]
-    
-    with engine.connect() as conn:
-        for trigger_name, trigger_sql in triggers:
-            try:
-                conn.execute(text(trigger_sql))
-            except Exception:
-                pass  # Trigger might already exist
-        conn.commit()
-
-
-def _insert_metadata():
-    """Insert initial database metadata"""
-    with engine.connect() as conn:
-        try:
-            conn.execute(text("""
-                INSERT INTO database_metadata (key, value)
-                VALUES 
-                    ('version', '3.2.0'),
-                    ('schema_updated', CURRENT_TIMESTAMP::text),
-                    ('description', 'C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) Research Platform Database')
-                ON CONFLICT (key) DO NOTHING
-            """))
-            conn.commit()
-        except Exception:
-            pass
-
-
-def migrate_database_schema():
-    """Migrate existing database to new schema"""
-    with engine.connect() as conn:
-        try:
-            # Check if images table exists, create if not
-            conn.execute(text("""
-                CREATE TABLE IF NOT EXISTS images (
-                    image_id VARCHAR(200) PRIMARY KEY,
-                    difficulty_score DOUBLE PRECISION,
-                    object_count INTEGER,
-                    width INTEGER,
-                    height INTEGER,
-                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
-                )
-            """))
-
-            conn.commit()
-            print("Database migration completed successfully")
-        except Exception as e:
-            conn.rollback()
-            print(f"Database migration failed: {str(e)}")
-            raise
-
+# Database schema is managed via SQL editor in Neon DB - no DDL code here
 
 def get_ip_hash():
     """Generate hash of IP address for privacy"""
@@ -501,18 +197,6 @@ def update_participant_stats(participant_id, word_count, is_survey):
     """Update participant engagement stats for reward eligibility"""
     try:
         db = get_db()
-        
-        # Check if participant_stats table exists, create if not
-        db.execute(text("""
-            CREATE TABLE IF NOT EXISTS participant_stats (
-                participant_id TEXT PRIMARY KEY,
-                total_words INTEGER DEFAULT 0,
-                total_submissions INTEGER DEFAULT 0,
-                survey_rounds INTEGER DEFAULT 0,
-                priority_eligible BOOLEAN DEFAULT FALSE,
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        """))
         
         # Get current stats
         result = db.execute(text('''
@@ -561,17 +245,6 @@ def get_reward_eligibility(participant_id):
     """Check if participant is eligible for reward and return details"""
     try:
         db = get_db()
-        
-        # Ensure table exists
-        db.execute(text('''
-            CREATE TABLE IF NOT EXISTS reward_winners (
-                participant_id TEXT PRIMARY KEY,
-                reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'pending',
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        '''))
         
         # Check if already a winner
         result = db.execute(text('''
@@ -622,17 +295,6 @@ def select_reward_winner(participant_id):
     """Select participant as a reward winner with 5% probability, prioritizing engaged users"""
     try:
         db = get_db()
-        
-        # Ensure table exists
-        db.execute(text('''
-            CREATE TABLE IF NOT EXISTS reward_winners (
-                participant_id TEXT PRIMARY KEY,
-                reward_amount INTEGER DEFAULT 10,
-                selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-                status TEXT DEFAULT 'pending',
-                FOREIGN KEY (participant_id) REFERENCES participants (participant_id) ON DELETE CASCADE
-            )
-        '''))
         
         # Check if already selected
         result = db.execute(text('SELECT participant_id FROM reward_winners WHERE participant_id = :participant_id'), {"participant_id": participant_id})
@@ -1297,7 +959,7 @@ def security_info():
                 "api_docs": "30 per minute"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
+                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
@@ -1393,7 +1055,7 @@ def _get_api_documentation():
                 "implementation": "Per-IP based rate limiting using flask-limiter"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
+                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
@@ -1637,76 +1299,6 @@ def _get_api_documentation():
         }
     }
 
-
-def regenerate_database_from_schema():
-    """Regenerate the database from the schema.sql file"""
-    schema_path = BASE_DIR / "schema.sql"
-    if not schema_path.exists():
-        print(f"Schema file not found at {schema_path}")
-        return False
-    
-    try:
-        with open(schema_path, 'r', encoding='utf-8') as f:
-            schema_sql = f.read()
-        
-        with engine.connect() as conn:
-            # Execute schema statements
-            for statement in schema_sql.split(';'):
-                statement = statement.strip()
-                if statement and not statement.startswith('--'):
-                    try:
-                        conn.execute(text(statement))
-                    except Exception as e:
-                        print(f"Statement error (may be expected): {e}")
-            
-            conn.commit()
-        
-        print("Database successfully regenerated from schema")
-        return True
-        
-    except Exception as e:
-        print(f"Failed to regenerate database: {str(e)}")
-        return False
-
-
-# Initialize database on module load (for gunicorn)
-def initialize_app():
-    """Initialize the application - run migrations and init db"""
-    # Check if DATABASE_URL is set to a non-default value
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url or "localhost:5432" in db_url:
-        print("Warning: DATABASE_URL not set or using default localhost. Database initialization will be skipped.")
-        print("Set a valid DATABASE_URL environment variable to initialize the database.")
-        return
-    
-    # Check if we should regenerate the database (only when run directly)
-    import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "--regenerate-db":
-        if regenerate_database_from_schema():
-            print("Database regeneration completed successfully")
-        else:
-            print("Database regeneration failed")
-        sys.exit(0)
-    
-    # Skip automatic initialization in serverless environments (Vercel)
-    # Vercel sets VERCEL=1 environment variable
-    is_vercel = os.getenv("VERCEL") == "1"
-    if is_vercel:
-        print("Running in Vercel serverless environment. Skipping automatic DB initialization.")
-        print("Use the /api/admin/init-db endpoint or run init script manually.")
-        return
-    
-    try:
-        # Run database migration for schema updates
-        migrate_database_schema()
-        init_db()
-        print("Database initialized successfully")
-    except Exception as e:
-        print(f"Warning: Database initialization failed: {e}")
-        print("The application will continue, but database functionality will not work.")
-
-# Initialize when module is loaded (only in non-serverless environments)
-initialize_app()
 
 # ============== API DOCUMENTATION ==============
 

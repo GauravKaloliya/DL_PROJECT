@@ -24,72 +24,15 @@ def get_database_url():
     # Try multiple environment variable names (Neon uses different names)
     url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRES_PRISMA_URL")
     
-    # Default to production Neon database if no environment variable is set
     if not url:
-        url = "postgresql://neondb_owner:npg_XGug6dnRMl9j@ep-super-cloud-aif6l6hr-pooler.c-4.us-east-1.aws.neon.tech/neondb?sslmode=require"
+        print("Error: DATABASE_URL environment variable is required")
+        sys.exit(1)
     
     # Fix for SQLAlchemy (some providers use postgres:// instead of postgresql://)
     if url.startswith("postgres://"):
         url = url.replace("postgres://", "postgresql://", 1)
     
     return url
-
-def read_schema():
-    """Read the schema.sql file"""
-    script_dir = Path(__file__).resolve().parent
-    schema_path = script_dir / "schema.sql"
-    
-    if not schema_path.exists():
-        print(f"Error: schema.sql not found at {schema_path}")
-        sys.exit(1)
-    
-    with open(schema_path, 'r', encoding='utf-8') as f:
-        return f.read()
-
-def execute_schema(engine, schema_sql):
-    """Execute the schema SQL statements"""
-    print("Executing schema...")
-    
-    # Split by semicolon and execute each statement
-    statements = schema_sql.split(';')
-    
-    with engine.connect() as conn:
-        executed = 0
-        failed = 0
-        
-        for statement in statements:
-            statement = statement.strip()
-            
-            # Skip empty statements and comments
-            if not statement or statement.startswith('--'):
-                continue
-            
-            try:
-                conn.execute(text(statement))
-                executed += 1
-                
-                # Print first few words to show progress
-                first_line = statement.split('\n')[0][:60]
-                print(f"✓ {first_line}...")
-                
-            except Exception as e:
-                # Some errors are expected (e.g., "relation already exists")
-                error_msg = str(e).lower()
-                if any(expected in error_msg for expected in ['already exists', 'duplicate']):
-                    print(f"⚠ {first_line}... (already exists)")
-                else:
-                    print(f"✗ {first_line}...")
-                    print(f"  Error: {e}")
-                    failed += 1
-        
-        conn.commit()
-        
-    print(f"\nExecution complete:")
-    print(f"  ✓ Executed: {executed}")
-    if failed > 0:
-        print(f"  ✗ Failed: {failed}")
-    
-    return failed == 0
 
 def verify_database(engine):
     """Verify that the database was initialized correctly"""
@@ -181,9 +124,9 @@ def populate_images(engine):
 
 
 def main():
-    """Main initialization function"""
+    """Main initialization function - verifies DB and populates images only"""
     print("=" * 60)
-    print("C.O.G.N.I.T. Database Initialization")
+    print("C.O.G.N.I.T. Database Verification & Image Population")
     print("=" * 60)
     
     # Get database URL
@@ -209,31 +152,18 @@ def main():
         print(f"✗ Failed to connect to database: {e}")
         sys.exit(1)
     
-    # Read schema
-    print(f"\nReading schema.sql...")
-    schema_sql = read_schema()
-    print(f"✓ Schema loaded ({len(schema_sql)} characters)")
-    
-    # Execute schema
-    print(f"\nInitializing database schema...")
-    success = execute_schema(engine, schema_sql)
-    
-    if not success:
-        print("\n⚠ Some statements failed. This may be normal if the database already exists.")
-        print("  Proceeding with verification...")
-    
     # Populate images from folder
     populate_images(engine)
     
     # Verify database
     if verify_database(engine):
         print("\n" + "=" * 60)
-        print("✓ Database initialization completed successfully!")
+        print("✓ Database verification passed!")
         print("=" * 60)
         return 0
     else:
         print("\n" + "=" * 60)
-        print("✗ Database initialization failed verification")
+        print("✗ Database verification failed")
         print("=" * 60)
         return 1
 

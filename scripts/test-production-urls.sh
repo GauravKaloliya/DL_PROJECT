@@ -5,7 +5,7 @@
 
 set -e
 
-FRONTEND_URL="${FRONTEND_URL:-https://cognit-weld.vercel.app}"
+FRONTEND_URL="${FRONTEND_URL:-${WEBSITE_URL:-http://localhost:5173}}"
 BACKEND_URL="${BACKEND_URL:-$FRONTEND_URL}"
 
 echo "=============================================="
