@@ -49,6 +49,20 @@ CORS(app, resources={
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
         "supports_credentials": False,
         "max_age": 86400
+    },
+    r"/": {
+        "origins": _get_cors_origins(),
+        "methods": ["GET", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": False,
+        "max_age": 86400
+    },
+    r"/api/docs/ui": {
+        "origins": _get_cors_origins(),
+        "methods": ["GET", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": False,
+        "max_age": 86400
     }
 })
 
