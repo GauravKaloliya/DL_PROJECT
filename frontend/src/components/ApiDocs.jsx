@@ -308,8 +308,8 @@ export default function ApiDocs() {
                     { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
                   ]}
                   response={{
-                    "image_id": "normal/aurora-lake.svg",
-                    "image_url": "/api/images/normal/aurora-lake.svg",
+                    "image_id": "survey/aurora-lake.svg",
+                    "image_url": "/api/images/survey/aurora-lake.svg",
                     "is_survey": false,
                     "is_attention": false
                   }}
@@ -402,7 +402,7 @@ console.log(image.image_url);
 const submission = {
   participant_id: 'user-123',
   session_id: 'session-456',
-  image_id: 'normal/aurora-lake.svg',
+  image_id: 'survey/aurora-lake.svg',
   description: 'The image shows a beautiful sunset over mountains...',
   rating: 8,
   feedback: 'Interesting image',
@@ -437,7 +437,7 @@ print(image['image_url'])
 submission = {
     'participant_id': 'user-123',
     'session_id': 'session-456',
-    'image_id': 'normal/aurora-lake.svg',
+    'image_id': 'survey/aurora-lake.svg',
     'description': 'The image shows a beautiful sunset...',
     'rating': 8,
     'feedback': 'Interesting image',
@@ -466,7 +466,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
   -d '{
     "participant_id": "user-123",
     "session_id": "session-456",
-    "image_id": "normal/aurora-lake.svg",
+    "image_id": "survey/aurora-lake.svg",
     "description": "The image shows...",
     "rating": 8,
     "feedback": "Great image",
