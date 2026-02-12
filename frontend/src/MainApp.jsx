@@ -33,8 +33,8 @@ function MainApp() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<ApiDocs />} />
-        <Route path="/survey" element={<App />} />
+        <Route path="/" element={<App />} />
+        <Route path="/api/docs" element={<ApiDocs />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </Router>
