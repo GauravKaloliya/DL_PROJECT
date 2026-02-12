@@ -12,6 +12,7 @@ node_modules/
 
 # Env
 .env
+.env.local
 
 # Data
 /backend/data/*.csv
@@ -20,3 +21,15 @@ node_modules/
 
 # Logs
 *.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PostgreSQL backup files
+*.sql.backup
+*.dump
