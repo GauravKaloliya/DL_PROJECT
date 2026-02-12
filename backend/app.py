@@ -1070,8 +1070,8 @@ def get_consent(participant_id):
 
 # ============== IMAGE ENDPOINTS ==============
 
-def list_images(image_type: str):
-    folder = IMAGES_DIR / image_type
+def list_images():
+    folder = IMAGES_DIR / "survey"
     if not folder.exists():
         return []
     return [
@@ -1081,29 +1081,31 @@ def list_images(image_type: str):
     ]
 
 
-def build_image_payload(image_path: Path, image_type: str):
-    image_id = f"{image_type}/{image_path.name}"
+def build_image_payload(image_path: Path):
+    image_id = f"survey/{image_path.name}"
     image_url = f"/api/images/{image_id}"
+    # Determine if it's an attention check image based on filename
+    is_attention = image_path.name.startswith("attention-")
+    # Determine if it's a practice/sample image
+    is_survey = image_path.name.startswith("sample-") or image_path.name.startswith("practice-")
     return {
         "image_id": image_id,
         "image_url": image_url,
-        "is_survey": image_type == "survey",
-        "is_attention": image_type == "attention",
+        "is_survey": is_survey,
+        "is_attention": is_attention,
     }
 
 
 @app.route("/api/images/random")
 def random_image():
-    requested_type = request.args.get("type", "normal")
-    if requested_type not in {"normal", "survey", "attention"}:
-        return jsonify({"error": "Invalid type"}), 400
-
-    images = list_images(requested_type)
+    # Note: type parameter is kept for backward compatibility but ignored
+    # All images are now served from the survey folder
+    images = list_images()
     if not images:
-        return jsonify({"error": f"No images available for {requested_type}"}), 404
+        return jsonify({"error": "No images available"}), 404
 
     image_path = random.choice(images)
-    payload = build_image_payload(image_path, requested_type)
+    payload = build_image_payload(image_path)
     return jsonify(payload)
 
 
@@ -1396,7 +1398,7 @@ def _get_api_documentation():
     return {
         "title": "C.O.G.N.I.T. API Documentation",
         "version": "3.4.0",
-        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform",
+        "description": "The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API provides programmatic access to the research platform. This RESTful API allows you to integrate image description tasks into your applications and manage submissions.",
         "base_url": "/api",
         "security": {
             "rate_limiting": "200 per day, 50 per hour (default)",
@@ -1425,7 +1427,14 @@ def _get_api_documentation():
                 "method": "GET",
                 "description": "Get detailed security configuration information",
                 "auth_required": False,
-                "rate_limit": "200 per day, 50 per hour"
+                "rate_limit": "200 per day, 50 per hour",
+                "response": {
+                    "security": {
+                        "rate_limits": "object",
+                        "cors_allowed_origins": "array",
+                        "security_headers": "array"
+                    }
+                }
             },
             "create_participant": {
                 "path": "/api/participants",
@@ -1434,8 +1443,16 @@ def _get_api_documentation():
                 "auth_required": False,
                 "rate_limit": "30 per minute",
                 "request_body": {
-                    "required": ["participant_id", "session_id", "username", "gender", "age", "place", "native_language", "prior_experience"],
-                    "optional": ["email", "phone"]
+                    "participant_id": "string (required)",
+                    "session_id": "string (required)",
+                    "username": "string (required)",
+                    "email": "string (optional)",
+                    "phone": "string (optional)",
+                    "gender": "string (required)",
+                    "age": "integer (required)",
+                    "place": "string (required)",
+                    "native_language": "string (required)",
+                    "prior_experience": "string (required)"
                 },
                 "validation": {
                     "email": "Valid email format if provided",
@@ -1443,9 +1460,9 @@ def _get_api_documentation():
                     "age": "Integer between 1-120"
                 },
                 "response": {
-                    "status": "success|error",
-                    "participant_id": "string",
-                    "message": "string"
+                    "status": "success",
+                    "participant_id": "uuid-string",
+                    "message": "Participant created successfully"
                 }
             },
             "get_participant": {
@@ -1455,17 +1472,17 @@ def _get_api_documentation():
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "response": {
-                    "participant_id": "string",
-                    "username": "string",
-                    "email": "string|null",
-                    "phone": "string|null",
-                    "gender": "string",
-                    "age": "integer",
-                    "place": "string",
-                    "native_language": "string",
-                    "prior_experience": "string",
-                    "consent_given": "boolean",
-                    "created_at": "timestamp"
+                    "participant_id": "uuid-string",
+                    "username": "john_doe",
+                    "email": "john@example.com",
+                    "phone": "+1234567890",
+                    "gender": "male",
+                    "age": 25,
+                    "place": "New York",
+                    "native_language": "English",
+                    "prior_experience": "Photography",
+                    "consent_given": True,
+                    "created_at": "2024-01-01T00:00:00Z"
                 }
             },
             "record_consent": {
@@ -1475,15 +1492,16 @@ def _get_api_documentation():
                 "auth_required": False,
                 "rate_limit": "20 per minute",
                 "request_body": {
-                    "required": ["participant_id", "consent_given"],
-                    "validation": {
-                        "consent_given": "Must be true to proceed"
-                    }
+                    "participant_id": "string (required)",
+                    "consent_given": "boolean (required)"
+                },
+                "validation": {
+                    "consent_given": "Must be true to proceed"
                 },
                 "response": {
-                    "status": "success|error",
-                    "message": "string",
-                    "timestamp": "ISO format"
+                    "status": "success",
+                    "message": "Consent recorded successfully",
+                    "timestamp": "2024-01-01T00:00:00Z"
                 }
             },
             "get_consent": {
@@ -1493,56 +1511,66 @@ def _get_api_documentation():
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "response": {
-                    "participant_id": "string",
-                    "consent_given": "boolean",
-                    "consent_timestamp": "timestamp|null"
+                    "participant_id": "uuid-string",
+                    "consent_given": True,
+                    "consent_timestamp": "2024-01-01T00:00:00Z"
                 }
             },
             "random_image": {
                 "path": "/api/images/random",
                 "method": "GET",
-                "description": "Get a random image from specified category",
+                "description": "Retrieve a random image for the study. All images are now served from the unified survey folder.",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
-                "query_params": {
-                    "type": "normal|survey|attention (default: normal)"
-                },
+                "parameters": [
+                    {"name": "type", "type": "string", "required": False, "description": "Deprecated - kept for backward compatibility"}
+                ],
                 "response": {
-                    "image_id": "string",
-                    "image_url": "string",
-                    "is_survey": "boolean",
-                    "is_attention": "boolean"
+                    "image_id": "survey/aurora-lake.svg",
+                    "image_url": "/api/images/survey/aurora-lake.svg",
+                    "is_survey": False,
+                    "is_attention": False
                 }
             },
             "serve_image": {
                 "path": "/api/images/<image_id>",
                 "method": "GET",
-                "description": "Get a specific image file by ID",
+                "description": "Serve a specific image file by ID",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
+                "parameters": [
+                    {"name": "image_id", "type": "string", "required": True, "description": "ID of the image to retrieve (e.g., survey/image-name.svg)"}
+                ],
                 "response": "Binary image data"
             },
             "submit_description": {
                 "path": "/api/submit",
                 "method": "POST",
-                "description": "Submit a description and rating for an image",
+                "description": "Submit a description and rating for an image (requires prior consent)",
                 "auth_required": False,
                 "rate_limit": "60 per minute",
                 "request_body": {
-                    "required": ["participant_id", "image_id", "description", "rating", "feedback", "time_spent_seconds"],
-                    "optional": ["session_id", "image_url", "trial_index", "is_survey", "is_attention", "attention_expected"]
+                    "participant_id": "string (required)",
+                    "session_id": "string (required)",
+                    "image_id": "string (required)",
+                    "description": "string (required, min 60 words)",
+                    "rating": "integer (required, 1-10)",
+                    "feedback": "string (required, min 5 chars)",
+                    "time_spent_seconds": "number (required)",
+                    "is_survey": "boolean",
+                    "is_attention": "boolean",
+                    "attention_expected": "string (for attention checks)"
                 },
                 "validation": {
                     "description": f"Minimum {MIN_WORD_COUNT} words required",
                     "rating": "Integer between 1-10",
                     "feedback": "Minimum 5 characters",
-                    "participant_consent": "Participant must have given consent",
-                    "trial_index": "Optional trial sequence number (integer, defaults to 0)"
+                    "participant_consent": "Participant must have given consent"
                 },
                 "response": {
-                    "status": "ok|error",
-                    "word_count": "integer",
-                    "attention_passed": "boolean|null"
+                    "status": "ok",
+                    "word_count": 45,
+                    "attention_passed": True
                 }
             },
             "get_submissions": {
@@ -1560,44 +1588,46 @@ def _get_api_documentation():
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
                 "response": {
-                    "is_winner": "boolean - whether participant has won",
-                    "reward_amount": "integer|null - amount if winner",
-                    "status": "string|null - payment status if winner",
-                    "total_words": "integer - total words written",
-                    "survey_rounds": "integer - number of survey rounds completed",
-                    "priority_eligible": "boolean - whether in priority pool"
+                    "is_winner": False,
+                    "reward_amount": None,
+                    "status": None,
+                    "total_words": 500,
+                    "survey_rounds": 5,
+                    "priority_eligible": True
                 }
             },
             "select_reward_winner": {
                 "path": "/api/reward/select/<participant_id>",
                 "method": "POST",
-                "description": "Check and select participant as reward winner (random selection, higher chances for priority participants)",
+                "description": "Check and select participant as reward winner (random selection with priority boost)",
                 "auth_required": False,
                 "rate_limit": "10 per minute",
                 "response": {
-                    "selected": "boolean - whether participant was selected",
-                    "reward_amount": "integer|null - amount if selected",
-                    "already_winner": "boolean|null - if already selected before",
-                    "priority_eligible": "boolean|null - priority status"
+                    "selected": True,
+                    "reward_amount": 10,
+                    "already_winner": False,
+                    "priority_eligible": True
                 }
             }
         },
         "error_handling": {
             "common_errors": {
-                "400": "Bad request - validation failed",
+                "200": "OK - Request succeeded",
+                "400": "Bad Request - Invalid parameters or missing required fields",
+                "401": "Unauthorized - Authentication required",
                 "403": "Forbidden - consent not given",
-                "404": "Not found - resource doesn't exist",
+                "404": "Not Found - Resource doesn't exist",
                 "409": "Conflict - duplicate participant ID",
-                "429": "Too many requests - rate limit exceeded",
+                "415": "Unsupported Media Type - Request must use application/json",
+                "429": "Too Many Requests - rate limit exceeded",
                 "500": "Internal server error"
             },
             "error_format": {
-                "error": "string - error message",
-                "details": "object - additional error details (if available)"
+                "error": "Description of what went wrong"
             }
         },
         "changelog": {
-            "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
+            "3.4.0": "Updated application name to C.O.G.N.I.T., merged image folders (normal, survey, attention) into unified survey folder, updated API documentation",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"

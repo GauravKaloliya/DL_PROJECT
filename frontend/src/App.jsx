@@ -276,7 +276,7 @@ export default function App() {
   const handlePaymentComplete = async () => {
     setStage("survey");
     try {
-      await fetchImage("survey");
+      await fetchImage();
       addToast("Payment completed successfully", "success");
     } catch (err) {
       addToast("Failed to load first survey image. Please try again.", "error");
@@ -285,13 +285,13 @@ export default function App() {
   };
 
   // Fetch image
-  const fetchImage = async (type) => {
+  const fetchImage = async () => {
     setFetchingImage(true);
     setReadyForNext(false);
     setSurveyFeedbackReady(false);
 
     try {
-      const response = await fetch(getApiUrl(`/api/images/random?type=${type}&session_id=${sessionId}`));
+      const response = await fetch(getApiUrl(`/api/images/random?session_id=${sessionId}`));
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Unable to fetch image");
@@ -305,17 +305,6 @@ export default function App() {
     } finally {
       setFetchingImage(false);
     }
-  };
-
-  // Get next image type
-  const getNextType = () => {
-    if (mainCompleted >= 14) {
-      return "attention";
-    }
-    if (Math.random() < 0.25) {
-      return "attention";
-    }
-    return "normal";
   };
 
   // Handle submission
@@ -372,7 +361,7 @@ export default function App() {
     if (stage === "survey") {
       // Transition from survey to main trials
       addToast("Starting main trials...", "success");
-      await fetchImage(getNextType());
+      await fetchImage();
       setStage("trial");
       return;
     }
@@ -382,7 +371,7 @@ export default function App() {
       return;
     }
 
-    await fetchImage(getNextType());
+    await fetchImage();
   };
 
   // Handle finish
@@ -393,7 +382,7 @@ export default function App() {
   // Handle survey continue
   const handleSurveyContinue = async () => {
     setSurveyFeedbackReady(false);
-    await fetchImage("survey");
+    await fetchImage();
   };
 
   // Handle survey finish
