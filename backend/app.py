@@ -33,6 +33,9 @@ if not DATABASE_URL:
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+# Website URL for CORS and documentation
+WEBSITE_URL = os.getenv("WEBSITE_URL", "http://localhost:5173")
+
 app = Flask(__name__)
 
 # Security Configuration
@@ -956,7 +959,7 @@ def security_info():
                 "api_docs": "30 per minute"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
+                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
@@ -1052,7 +1055,7 @@ def _get_api_documentation():
                 "implementation": "Per-IP based rate limiting using flask-limiter"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", "https://cognit-weld.vercel.app"],
+                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
