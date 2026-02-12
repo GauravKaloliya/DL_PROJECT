@@ -1628,6 +1628,14 @@ def initialize_app():
             print("Database regeneration failed")
         sys.exit(0)
     
+    # Skip automatic initialization in serverless environments (Vercel)
+    # Vercel sets VERCEL=1 environment variable
+    is_vercel = os.getenv("VERCEL") == "1"
+    if is_vercel:
+        print("Running in Vercel serverless environment. Skipping automatic DB initialization.")
+        print("Use the /api/admin/init-db endpoint or run init script manually.")
+        return
+    
     try:
         # Run database migration for schema updates
         migrate_database_schema()
@@ -1637,7 +1645,7 @@ def initialize_app():
         print(f"Warning: Database initialization failed: {e}")
         print("The application will continue, but database functionality will not work.")
 
-# Initialize when module is loaded
+# Initialize when module is loaded (only in non-serverless environments)
 initialize_app()
 
 # ============== API DOCUMENTATION ==============

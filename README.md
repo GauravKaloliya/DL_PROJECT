@@ -17,7 +17,7 @@ C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a full-stack resea
 - **Frontend:** React 18 + Vite 5 (SPA)
 - **Backend:** Python Flask 3 (REST API)
 - **Storage:** PostgreSQL database for participants, consent, submissions, and audit logs
-- **Deployment:** Render.com compatible
+- **Deployment:** Vercel + Neon PostgreSQL, Render.com compatible
 
 ## Repository Structure
 
@@ -86,62 +86,41 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 | --- | --- | --- |
 | `VITE_API_BASE` | `http://localhost:5000/api` | Backend API base URL |
 
-## Deployment to Render.com
+## Deployment
 
-### 1. Database Setup
+### Vercel + Neon PostgreSQL (Recommended)
 
-1. Create a PostgreSQL database on Render:
-   - Go to [Render Dashboard](https://dashboard.render.com)
-   - Create a new PostgreSQL database
-   - Note the connection string from the dashboard
+For serverless deployment with Neon PostgreSQL:
 
-### 2. Backend Deployment
+**Quick Start:**
+See [VERCEL_QUICKSTART.md](./VERCEL_QUICKSTART.md) for a condensed deployment guide.
 
-1. Fork/clone this repository
-2. Create a new Web Service on Render
-3. Connect your repository
-4. Configure environment variables:
-   - `DATABASE_URL`: Your PostgreSQL connection string
-   - `SECRET_KEY`: Generate a strong secret key (e.g., `openssl rand -hex 32`)
-   - `CORS_ORIGINS`: Your frontend URL (e.g., `https://your-frontend.onrender.com`)
-   - `MIN_WORD_COUNT`: `60`
-   - `TOO_FAST_SECONDS`: `5`
-   - `PORT`: `10000` (Render sets this automatically)
-   - `FLASK_DEBUG`: `0`
+**Detailed Guide:**
+See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for comprehensive step-by-step instructions.
 
-5. Build Command:
-   ```bash
-   cd backend && pip install -r requirements.txt
-   ```
+**Key Steps:**
+1. Create a Neon PostgreSQL database ([neon.tech](https://neon.tech))
+2. Deploy backend to Vercel (root directory: `backend`)
+3. Deploy frontend to Vercel (root directory: `frontend`)
+4. Initialize database: `python backend/init_db.py <database-url>`
+5. Configure CORS and environment variables
 
-6. Start Command:
-   ```bash   cd backend && python app.py
-   ```
+**Helper Script:**
+```bash
+./scripts/vercel-setup.sh  # Verify setup before deployment
+```
 
-### 3. Frontend Deployment
+### Render.com (Alternative)
 
-1. Create a new Static Site on Render
-2. Connect your repository
-3. Configure environment variables:
-   - `VITE_API_BASE`: Your backend URL (e.g., `https://your-backend.onrender.com/api`)
+For traditional server-based deployment:
 
-4. Build Command:
-   ```bash
-   cd frontend && npm install && npm run build
-   ```
+See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Render.com deployment instructions.
 
-5. Publish Directory: `frontend/dist`
-
-### 4. Database Initialization
-
-After deploying the backend:
-
-1. Access your backend URL with `--regenerate-db` flag:
-   ```bash
-   curl https://your-backend.onrender.com/health  # Verify backend is running
-   ```
-
-2. The database will be automatically initialized when the app starts
+**Quick Steps:**
+1. Create PostgreSQL database on Render
+2. Deploy backend as Web Service (from `backend/` directory)
+3. Deploy frontend as Static Site (from `frontend/` directory)
+4. Database initializes automatically on first backend start
 
 ## Key Endpoints
 
