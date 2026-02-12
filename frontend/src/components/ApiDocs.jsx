@@ -59,6 +59,30 @@ export default function ApiDocs() {
 
   const apiBaseUrl = API_BASE ? `${API_BASE}/api` : `${window.location.origin}/api`;
 
+  // Render endpoint from fetched docs
+  const renderEndpointFromDocs = (key, endpoint) => {
+    if (!endpoint) return null;
+    return (
+      <EndpointCard
+        key={key}
+        method={endpoint.method}
+        path={endpoint.path}
+        description={endpoint.description}
+        rateLimit={endpoint.rate_limit}
+        authRequired={endpoint.auth_required}
+        requestBody={endpoint.request_body}
+        response={endpoint.response}
+        validation={endpoint.validation}
+        parameters={endpoint.query_params ? [{
+          name: 'type',
+          type: 'string',
+          required: false,
+          description: typeof endpoint.query_params === 'string' ? endpoint.query_params : endpoint.query_params.type || 'Query parameter'
+        }] : endpoint.parameters}
+      />
+    );
+  };
+
   return (
     <div className="app">
       <div className="panel">
@@ -118,22 +142,44 @@ export default function ApiDocs() {
           <div>
             <h2 style={{ color: 'var(--primary)' }}>Overview</h2>
             <p style={{ fontSize: '16px', lineHeight: '1.6' }}>
-              The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API 
-              provides programmatic access to the research platform. This RESTful API allows you to 
-              integrate image description tasks into your applications and manage submissions.
+              {docs?.description || 'The C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) API provides programmatic access to the research platform. This RESTful API allows you to integrate image description tasks into your applications and manage submissions.'}
             </p>
-            
+
+            <h3 style={{ marginTop: '32px' }}>Version</h3>
+            <div style={{
+              background: 'var(--bg)',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: '2px solid var(--border)',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              display: 'inline-block'
+            }}>
+              {docs?.version || '3.4.0'}
+            </div>
+
             <h3 style={{ marginTop: '32px' }}>Base URL</h3>
-            <div style={{ 
-              background: 'var(--bg)', 
-              padding: '16px', 
+            <div style={{
+              background: 'var(--bg)',
+              padding: '16px',
               borderRadius: '12px',
               border: '2px solid var(--border)',
               fontFamily: 'monospace',
               fontSize: '14px'
             }}>
-              {apiBaseUrl}
+              {docs?.base_url || apiBaseUrl}
             </div>
+
+            {docs?.security && (
+              <>
+                <h3 style={{ marginTop: '32px' }}>Security</h3>
+                <ul style={{ lineHeight: '1.8' }}>
+                  <li><strong>Rate Limiting:</strong> {docs.security.rate_limiting}</li>
+                  <li><strong>Authentication:</strong> {docs.security.authentication}</li>
+                  <li><strong>Data Protection:</strong> {docs.security.data_protection}</li>
+                </ul>
+              </>
+            )}
 
             <h3 style={{ marginTop: '32px' }}>Features</h3>
             <ul style={{ lineHeight: '1.8' }}>
@@ -156,173 +202,183 @@ export default function ApiDocs() {
         {activeSection === 'endpoints' && (
           <div>
             <h2 style={{ color: 'var(--primary)' }}>API Endpoints</h2>
-            
-            {/* Public Endpoints */}
-            <h3 style={{ marginTop: '24px' }}>Public Endpoints</h3>
 
-            {/* Health Check */}
-            <EndpointCard
-              method="GET"
-              path="/api/health"
-              description="Check system health and connectivity status"
-              response={{
-                "status": "healthy",
-                "timestamp": "2024-01-01T00:00:00Z",
-                "services": {
-                  "database": "connected",
-                  "images": "accessible"
-                }
-              }}
-            />
+            {docs?.endpoints ? (
+              <>
+                <h3 style={{ marginTop: '24px' }}>Available Endpoints</h3>
+                {Object.entries(docs.endpoints).map(([key, endpoint]) =>
+                  renderEndpointFromDocs(key, endpoint)
+                )}
+              </>
+            ) : (
+              <>
+                <h3 style={{ marginTop: '24px' }}>Public Endpoints</h3>
 
-            {/* Participants */}
-            <EndpointCard
-              method="POST"
-              path="/api/participants"
-              description="Create a new participant record with user details"
-              requestBody={{
-                "participant_id": "string (required)",
-                "session_id": "string (required)",
-                "username": "string (required)",
-                "email": "string (optional)",
-                "phone": "string (optional)",
-                "gender": "string (required)",
-                "age": "integer (required)",
-                "place": "string (required)",
-                "native_language": "string (required)",
-                "prior_experience": "string (required)"
-              }}
-              response={{
-                "status": "success",
-                "participant_id": "uuid-string",
-                "message": "Participant created successfully"
-              }}
-            />
+                {/* Health Check */}
+                <EndpointCard
+                  method="GET"
+                  path="/api/health"
+                  description="Check system health and connectivity status"
+                  response={{
+                    "status": "healthy",
+                    "timestamp": "2024-01-01T00:00:00Z",
+                    "services": {
+                      "database": "connected",
+                      "images": "accessible"
+                    }
+                  }}
+                />
 
-            <EndpointCard
-              method="GET"
-              path="/api/participants/{participant_id}"
-              description="Get participant details"
-              response={{
-                "participant_id": "uuid-string",
-                "username": "john_doe",
-                "email": "john@example.com",
-                "phone": "+1234567890",
-                "gender": "male",
-                "age": 25,
-                "place": "New York",
-                "native_language": "English",
-                "prior_experience": "Photography",
-                "consent_given": true,
-                "created_at": "2024-01-01T00:00:00Z"
-              }}
-            />
+                {/* Participants */}
+                <EndpointCard
+                  method="POST"
+                  path="/api/participants"
+                  description="Create a new participant record with user details"
+                  requestBody={{
+                    "participant_id": "string (required)",
+                    "session_id": "string (required)",
+                    "username": "string (required)",
+                    "email": "string (optional)",
+                    "phone": "string (optional)",
+                    "gender": "string (required)",
+                    "age": "integer (required)",
+                    "place": "string (required)",
+                    "native_language": "string (required)",
+                    "prior_experience": "string (required)"
+                  }}
+                  response={{
+                    "status": "success",
+                    "participant_id": "uuid-string",
+                    "message": "Participant created successfully"
+                  }}
+                />
 
-            {/* Consent */}
-            <EndpointCard
-              method="POST"
-              path="/api/consent"
-              description="Record participant consent"
-              requestBody={{
-                "participant_id": "string (required)",
-                "consent_given": "boolean (required)"
-              }}
-              response={{
-                "status": "success",
-                "message": "Consent recorded successfully",
-                "timestamp": "2024-01-01T00:00:00Z"
-              }}
-            />
+                <EndpointCard
+                  method="GET"
+                  path="/api/participants/{participant_id}"
+                  description="Get participant details"
+                  response={{
+                    "participant_id": "uuid-string",
+                    "username": "john_doe",
+                    "email": "john@example.com",
+                    "phone": "+1234567890",
+                    "gender": "male",
+                    "age": 25,
+                    "place": "New York",
+                    "native_language": "English",
+                    "prior_experience": "Photography",
+                    "consent_given": true,
+                    "created_at": "2024-01-01T00:00:00Z"
+                  }}
+                />
 
-            <EndpointCard
-              method="GET"
-              path="/api/consent/{participant_id}"
-              description="Get consent status for a participant"
-              response={{
-                "participant_id": "uuid-string",
-                "consent_given": true,
-                "consent_timestamp": "2024-01-01T00:00:00Z"
-              }}
-            />
-            
-            {/* Get Random Image */}
-            <EndpointCard
-              method="GET"
-              path="/api/images/random"
-              description="Retrieve a random image for the study"
-              parameters={[
-                { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
-              ]}
-              response={{
-                "image_id": "normal/aurora-lake.svg",
-                "image_url": "/api/images/normal/aurora-lake.svg",
-                "is_survey": false,
-                "is_attention": false
-              }}
-            />
+                {/* Consent */}
+                <EndpointCard
+                  method="POST"
+                  path="/api/consent"
+                  description="Record participant consent"
+                  requestBody={{
+                    "participant_id": "string (required)",
+                    "consent_given": "boolean (required)"
+                  }}
+                  response={{
+                    "status": "success",
+                    "message": "Consent recorded successfully",
+                    "timestamp": "2024-01-01T00:00:00Z"
+                  }}
+                />
 
-            {/* Get Image */}
-            <EndpointCard
-              method="GET"
-              path="/api/images/{image_id}"
-              description="Serve a specific image file"
-              parameters={[
-                { name: 'image_id', type: 'string', required: true, description: 'ID of the image to retrieve' }
-              ]}
-              response="Binary image data"
-            />
+                <EndpointCard
+                  method="GET"
+                  path="/api/consent/{participant_id}"
+                  description="Get consent status for a participant"
+                  response={{
+                    "participant_id": "uuid-string",
+                    "consent_given": true,
+                    "consent_timestamp": "2024-01-01T00:00:00Z"
+                  }}
+                />
 
-            {/* Submit Data */}
-            <EndpointCard
-              method="POST"
-              path="/api/submit"
-              description="Submit participant response data (requires prior consent)"
-              requestBody={{
-                "participant_id": "string (required)",
-                "session_id": "string (required)",
-                "image_id": "string (required)",
-                "description": "string (required, min 60 words)",
-                "rating": "integer (required, 1-10)",
-                "feedback": "string (required, min 5 chars)",
-                "time_spent_seconds": "number (required)",
-                "is_survey": "boolean",
-                "is_attention": "boolean",
-                "attention_expected": "string (for attention checks)"
-              }}
-              response={{
-                "status": "ok",
-                "word_count": 45,
-                "attention_passed": true
-              }}
-            />
+                {/* Get Random Image */}
+                <EndpointCard
+                  method="GET"
+                  path="/api/images/random"
+                  description="Retrieve a random image for the study"
+                  parameters={[
+                    { name: 'type', type: 'string', required: false, description: 'Image type: normal, survey, or attention', default: 'normal' }
+                  ]}
+                  response={{
+                    "image_id": "normal/aurora-lake.svg",
+                    "image_url": "/api/images/normal/aurora-lake.svg",
+                    "is_survey": false,
+                    "is_attention": false
+                  }}
+                />
 
-            {/* Get Submissions */}
-            <EndpointCard
-              method="GET"
-              path="/api/submissions/{participant_id}"
-              description="Get all submissions for a participant"
-              response="[{...submission objects...}]"
-            />
+                {/* Get Image */}
+                <EndpointCard
+                  method="GET"
+                  path="/api/images/{image_id}"
+                  description="Serve a specific image file"
+                  parameters={[
+                    { name: 'image_id', type: 'string', required: true, description: 'ID of the image to retrieve' }
+                  ]}
+                  response="Binary image data"
+                />
 
-            <EndpointCard
-              method="GET"
-              path="/api/security/info"
-              description="Get security configuration details"
-              response={{
-                "security": {
-                  "rate_limits": "object",
-                  "cors_allowed_origins": "array",
-                  "security_headers": "array"
-                }
-              }}
-            />
+                {/* Submit Data */}
+                <EndpointCard
+                  method="POST"
+                  path="/api/submit"
+                  description="Submit participant response data (requires prior consent)"
+                  requestBody={{
+                    "participant_id": "string (required)",
+                    "session_id": "string (required)",
+                    "image_id": "string (required)",
+                    "description": "string (required, min 60 words)",
+                    "rating": "integer (required, 1-10)",
+                    "feedback": "string (required, min 5 chars)",
+                    "time_spent_seconds": "number (required)",
+                    "is_survey": "boolean",
+                    "is_attention": "boolean",
+                    "attention_expected": "string (for attention checks)"
+                  }}
+                  response={{
+                    "status": "ok",
+                    "word_count": 45,
+                    "attention_passed": true
+                  }}
+                />
 
-            <EndpointCard
-              method="GET"
-              path="/api/docs"
-              description="Retrieve the API documentation"
-              response="Documentation payload"
-            />
+                {/* Get Submissions */}
+                <EndpointCard
+                  method="GET"
+                  path="/api/submissions/{participant_id}"
+                  description="Get all submissions for a participant"
+                  response="[{...submission objects...}]"
+                />
+
+                <EndpointCard
+                  method="GET"
+                  path="/api/security/info"
+                  description="Get security configuration details"
+                  response={{
+                    "security": {
+                      "rate_limits": "object",
+                      "cors_allowed_origins": "array",
+                      "security_headers": "array"
+                    }
+                  }}
+                />
+
+                <EndpointCard
+                  method="GET"
+                  path="/api/docs"
+                  description="Retrieve the API documentation"
+                  response="Documentation payload"
+                />
+              </>
+            )}
           </div>
         )}
 
@@ -430,8 +486,8 @@ curl -X POST "http://localhost:5000/api/submit" \\
             </p>
 
             <h3 style={{ marginTop: '24px' }}>HTTP Status Codes</h3>
-            <table style={{ 
-              width: '100%', 
+            <table style={{
+              width: '100%',
               borderCollapse: 'collapse',
               marginTop: '16px'
             }}>
@@ -443,46 +499,68 @@ curl -X POST "http://localhost:5000/api/submit" \\
                 </tr>
               </thead>
               <tbody>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>200</code></td>
-                  <td style={{ padding: '12px' }}>OK</td>
-                  <td style={{ padding: '12px' }}>Request succeeded</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>400</code></td>
-                  <td style={{ padding: '12px' }}>Bad Request</td>
-                  <td style={{ padding: '12px' }}>Invalid parameters or missing required fields</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>401</code></td>
-                  <td style={{ padding: '12px' }}>Unauthorized</td>
-                  <td style={{ padding: '12px' }}>Authentication required</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>404</code></td>
-                  <td style={{ padding: '12px' }}>Not Found</td>
-                  <td style={{ padding: '12px' }}>Resource not found</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>415</code></td>
-                  <td style={{ padding: '12px' }}>Unsupported Media Type</td>
-                  <td style={{ padding: '12px' }}>Request must use application/json</td>
-                </tr>
-                <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                  <td style={{ padding: '12px' }}><code>429</code></td>
-                  <td style={{ padding: '12px' }}>Too Many Requests</td>
-                  <td style={{ padding: '12px' }}>Rate limit exceeded</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '12px' }}><code>500</code></td>
-                  <td style={{ padding: '12px' }}>Internal Server Error</td>
-                  <td style={{ padding: '12px' }}>Server-side error</td>
-                </tr>
+                {docs?.error_handling?.common_errors ? (
+                  Object.entries(docs.error_handling.common_errors).map(([code, description]) => (
+                    <tr key={code} style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>{code}</code></td>
+                      <td style={{ padding: '12px' }}>
+                        {code === '200' && 'OK'}
+                        {code === '400' && 'Bad Request'}
+                        {code === '401' && 'Unauthorized'}
+                        {code === '403' && 'Forbidden'}
+                        {code === '404' && 'Not Found'}
+                        {code === '409' && 'Conflict'}
+                        {code === '415' && 'Unsupported Media Type'}
+                        {code === '429' && 'Too Many Requests'}
+                        {code === '500' && 'Internal Server Error'}
+                      </td>
+                      <td style={{ padding: '12px' }}>{description}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>200</code></td>
+                      <td style={{ padding: '12px' }}>OK</td>
+                      <td style={{ padding: '12px' }}>Request succeeded</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>400</code></td>
+                      <td style={{ padding: '12px' }}>Bad Request</td>
+                      <td style={{ padding: '12px' }}>Invalid parameters or missing required fields</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>401</code></td>
+                      <td style={{ padding: '12px' }}>Unauthorized</td>
+                      <td style={{ padding: '12px' }}>Authentication required</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>404</code></td>
+                      <td style={{ padding: '12px' }}>Not Found</td>
+                      <td style={{ padding: '12px' }}>Resource not found</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>415</code></td>
+                      <td style={{ padding: '12px' }}>Unsupported Media Type</td>
+                      <td style={{ padding: '12px' }}>Request must use application/json</td>
+                    </tr>
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <td style={{ padding: '12px' }}><code>429</code></td>
+                      <td style={{ padding: '12px' }}>Too Many Requests</td>
+                      <td style={{ padding: '12px' }}>Rate limit exceeded</td>
+                    </tr>
+                    <tr>
+                      <td style={{ padding: '12px' }}><code>500</code></td>
+                      <td style={{ padding: '12px' }}>Internal Server Error</td>
+                      <td style={{ padding: '12px' }}>Server-side error</td>
+                    </tr>
+                  </>
+                )}
               </tbody>
             </table>
 
             <h3 style={{ marginTop: '32px' }}>Error Response Format</h3>
-            <CodeBlock code={`{
+            <CodeBlock code={docs?.error_handling?.error_format ? JSON.stringify(docs.error_handling.error_format, null, 2) : `{
   "error": "Description of what went wrong"
 }`} />
 
@@ -512,7 +590,7 @@ curl -X POST "http://localhost:5000/api/submit" \\
 }
 
 // Helper Components
-function EndpointCard({ method, path, description, parameters, requestBody, response }) {
+function EndpointCard({ method, path, description, parameters, requestBody, response, rateLimit, authRequired, validation }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const methodColors = {
@@ -524,13 +602,13 @@ function EndpointCard({ method, path, description, parameters, requestBody, resp
   };
 
   return (
-    <div style={{ 
-      border: '2px solid var(--border)', 
-      borderRadius: '12px', 
+    <div style={{
+      border: '2px solid var(--border)',
+      borderRadius: '12px',
       marginBottom: '16px',
       overflow: 'hidden'
     }}>
-      <div 
+      <div
         onClick={() => setIsExpanded(!isExpanded)}
         style={{
           padding: '16px 20px',
@@ -562,6 +640,22 @@ function EndpointCard({ method, path, description, parameters, requestBody, resp
         <div style={{ padding: '20px' }}>
           <p style={{ color: 'var(--muted)', marginBottom: '16px' }}>{description}</p>
 
+          {rateLimit && (
+            <div style={{ marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
+                <strong>Rate Limit:</strong> {rateLimit}
+              </span>
+            </div>
+          )}
+
+          {authRequired !== undefined && (
+            <div style={{ marginBottom: '12px' }}>
+              <span style={{ fontSize: '12px', color: authRequired ? '#f59e0b' : '#42b72a' }}>
+                <strong>Auth Required:</strong> {authRequired ? 'Yes' : 'No'}
+              </span>
+            </div>
+          )}
+
           {parameters && parameters.length > 0 && (
             <div style={{ marginBottom: '16px' }}>
               <h4 style={{ marginBottom: '8px' }}>Parameters</h4>
@@ -585,6 +679,13 @@ function EndpointCard({ method, path, description, parameters, requestBody, resp
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {validation && (
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ marginBottom: '8px' }}>Validation Rules</h4>
+              <CodeBlock code={JSON.stringify(validation, null, 2)} small />
             </div>
           )}
 
