@@ -1665,11 +1665,4 @@ def get_api_docs():
     return jsonify(_get_api_documentation())
 
 
-if __name__ == "__main__":
-    print("Starting C.O.G.N.I.T. backend server...")
-    print("API endpoints available at: http://localhost:5000/api/")
-    print("API Documentation available at: http://localhost:5000/")
-    print("Security Info available at: http://localhost:5000/api/security/info")
-    port = int(os.getenv("PORT", "5000"))
-    debug_mode = os.getenv("FLASK_DEBUG", "0") == "1"
-    app.run(debug=debug_mode, host="0.0.0.0", port=port)
+
