@@ -736,6 +736,17 @@ def health_check():
     return jsonify(status)
 
 
+@app.route("/test-db")
+def test_db():
+    """Test database connectivity by executing a simple query"""
+    try:
+        db = get_db()
+        db.execute(text("SELECT 1"))
+        return jsonify({"status": "Database working"})
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+
 # ============== PARTICIPANT ENDPOINTS ==============
 
 @app.route("/api/participants", methods=["POST"])
