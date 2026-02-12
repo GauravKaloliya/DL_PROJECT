@@ -380,7 +380,15 @@
                     <span class="method GET">GET</span>
                     <span class="path">/api/reward/&lt;participant_id&gt;</span>
                 </div>
-                <div class="endpoint-desc">Get reward status for a participant</div>
+                <div class="endpoint-desc">Get reward status for a participant including stats and eligibility</div>
+                <div class="json-box">{
+  "is_winner": false,
+  "reward_amount": null,
+  "status": null,
+  "total_words": 500,
+  "survey_rounds": 5,
+  "priority_eligible": true
+}</div>
             </div>
 
             <div class="endpoint">
@@ -388,7 +396,13 @@
                     <span class="method POST">POST</span>
                     <span class="path">/api/reward/select/&lt;participant_id&gt;</span>
                 </div>
-                <div class="endpoint-desc">Check and select participant as reward winner</div>
+                <div class="endpoint-desc">Check and select participant as reward winner (random selection with priority boost)</div>
+                <div class="json-box">{
+  "selected": true,
+  "reward_amount": 10,
+  "already_winner": false,
+  "priority_eligible": true
+}</div>
             </div>
         </div>
 
@@ -477,7 +491,9 @@
         <footer>
             <p>C.O.G.N.I.T. API Documentation • Created by Gaurav Kaloliya</p>
             <p style="margin-top: 10px; font-size: 0.9rem;">
-                <a href="{{ base_url }}/docs" style="color: white; text-decoration: underline;">View JSON Documentation</a>
+                <a href="/api/docs" style="color: white; text-decoration: underline;">View JSON Documentation</a>
+                <span style="margin: 0 10px;">|</span>
+                <a href="/api/docs/ui" style="color: white; text-decoration: underline;">HTML UI Version</a>
             </p>
         </footer>
     </div>
