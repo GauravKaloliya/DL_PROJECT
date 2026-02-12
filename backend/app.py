@@ -181,8 +181,30 @@ def _populate_images():
         app.logger.info(f"Inserted {inserted} images into database")
 
 
+def _schema_exists():
+    """Check if database schema already exists (tables are present)"""
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'participants'
+                )
+            """))
+            return result.scalar()
+    except Exception:
+        return False
+
+
 def init_db():
     """Initialize the PostgreSQL database with schema"""
+    # Skip if schema already exists (e.g., created via SQL editor)
+    if _schema_exists():
+        print("Database schema already exists. Skipping initialization.")
+        # Still populate images if needed
+        _populate_images()
+        return
+    
     # Create tables using SQLAlchemy
     from sqlalchemy import create_engine
     
@@ -468,6 +490,10 @@ def _insert_metadata():
 
 def migrate_database_schema():
     """Migrate existing database to new schema"""
+    # Skip migration if schema was created via SQL editor
+    if _schema_exists():
+        return
+    
     with engine.connect() as conn:
         try:
             # Check if images table exists, create if not

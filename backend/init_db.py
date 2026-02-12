@@ -180,6 +180,21 @@ def populate_images(engine):
     return True
 
 
+def schema_exists(engine):
+    """Check if database schema already exists"""
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'participants'
+                )
+            """))
+            return result.scalar()
+    except Exception:
+        return False
+
+
 def main():
     """Main initialization function"""
     print("=" * 60)
@@ -208,6 +223,23 @@ def main():
     except Exception as e:
         print(f"✗ Failed to connect to database: {e}")
         sys.exit(1)
+    
+    # Check if schema already exists
+    if schema_exists(engine):
+        print("\n⚠ Database schema already exists (created via SQL editor).")
+        print("  Skipping schema execution, proceeding with verification...")
+        populate_images(engine)
+        
+        if verify_database(engine):
+            print("\n" + "=" * 60)
+            print("✓ Database verification passed!")
+            print("=" * 60)
+            return 0
+        else:
+            print("\n" + "=" * 60)
+            print("✗ Database verification failed")
+            print("=" * 60)
+            return 1
     
     # Read schema
     print(f"\nReading schema.sql...")
