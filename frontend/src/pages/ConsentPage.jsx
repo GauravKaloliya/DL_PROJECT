@@ -45,61 +45,105 @@ export default function ConsentPage({
 
   return (
     <div className="panel">
-      <h2>Research Consent Form</h2>
+      <h2>Informed Consent for Research Participation</h2>
       <p className="page-subtitle">
-        <strong>C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling</strong>
+        <strong>C.O.G.N.I.T. Study: Cognitive Network for Image & Text Modeling</strong>
       </p>
       
       <div className="welcome-info">
-        <h3>About the Study</h3>
+        <h3>Purpose of This Study</h3>
         <p>
-          C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a research platform that advances our understanding of how humans describe visual content and how AI can better model this cognitive process. Your contributions help improve image-text understanding and generation systems.
+          Welcome to the C.O.G.N.I.T. research study. This study aims to advance our understanding 
+          of how humans perceive, interpret, and describe visual content. Your responses will help 
+          researchers and AI developers improve image understanding systems and natural language 
+          generation models. This research is conducted in accordance with ethical guidelines for 
+          human subjects research.
         </p>
 
-        <h3>What Participation Involves</h3>
+        <h3>Study Procedures</h3>
+        <p>If you choose to participate, you will be asked to:</p>
         <ul>
-          <li>Review a series of images presented one at a time</li>
-          <li>Write detailed descriptive responses for each image (minimum 60 words)</li>
-          <li>Rate each image on a 1-10 complexity scale</li>
-          <li>Provide brief feedback on your experience</li>
-          <li>Complete a short survey set before starting main trials</li>
+          <li>Provide basic demographic information (age, gender, language background)</li>
+          <li>View a series of images presented one at a time on your screen</li>
+          <li>Write detailed, descriptive responses for each image (minimum 60 words per description)</li>
+          <li>Rate each image on a complexity scale from 1 to 10</li>
+          <li>Share brief feedback about your experience after each image</li>
+          <li>Complete a practice survey set before proceeding to main trials</li>
+          <li>Participate in occasional attention-check tasks with simple instructions</li>
         </ul>
 
-        <h3>Time Commitment</h3>
+        <h3>Duration & Participation</h3>
         <p>
-          The session takes approximately 15-20 minutes. You may pause between images and withdraw at any time without penalty.
+          The entire session typically takes <strong>15-20 minutes</strong> to complete. 
+          You may take breaks between images as needed. Participation is entirely voluntary, 
+          and you may withdraw at any point without penalty or loss of benefits. If you choose 
+          to withdraw, any data collected up to that point may be retained for research purposes 
+          unless you specifically request its deletion.
         </p>
 
-        <h3>Privacy &amp; Data Use</h3>
+        <h3>Compensation & Rewards</h3>
+        <p>
+          Upon completion, you will be entered into a random selection for a <strong>₹10 reward</strong>. 
+          Active participants who provide detailed, thoughtful descriptions may be added to a 
+          priority pool for increased chances of selection in future studies. Rewards are distributed 
+          via UPI transfer within 24-48 hours of selection.
+        </p>
+
+        <h3>Data Privacy & Protection</h3>
         <ul>
-          <li>All responses are stored without directly identifying information</li>
-          <li>Your IP address is cryptographically hashed for security</li>
-          <li>Data is used exclusively for academic research and AI model training</li>
-          <li>Results may be summarized in research publications, presentations, or shared with other researchers</li>
-          <li>Your data is stored securely using industry-standard encryption practices</li>
+          <li>Your responses are stored securely without directly identifying information</li>
+          <li>IP addresses are cryptographically hashed with a salt for privacy protection</li>
+          <li>Data is used exclusively for academic research, AI model training, and improving cognitive understanding</li>
+          <li>Aggregated results may be published in research papers, presentations, or shared with the scientific community</li>
+          <li>All data is protected using industry-standard encryption and security practices</li>
+          <li>Your personal contact information (if provided for rewards) is stored separately from your research data</li>
         </ul>
 
-        <h3>Voluntary Participation</h3>
+        <h3>Risks & Benefits</h3>
         <p>
-          Taking part is completely optional. You can decline or exit at any time without penalty.
+          <strong>Risks:</strong> The risks associated with this study are minimal. You may 
+          experience mild fatigue from writing descriptions. There are no known physical, psychological, 
+          or social risks.
+        </p>
+        <p>
+          <strong>Benefits:</strong> While you may not receive direct personal benefit, your 
+          participation contributes to scientific knowledge about human cognition and helps improve 
+          AI systems. You will also have the opportunity to win a monetary reward.
         </p>
 
-        <h3>Questions or Concerns</h3>
+        <h3>Voluntary Participation & Right to Withdraw</h3>
         <p>
-          For questions about the study, data use, or to request data deletion, contact the research team at
-          <strong> research@cognit.org</strong>.
+          Your participation is completely voluntary. You are free to decline participation or 
+          withdraw at any time without penalty, prejudice, or loss of benefits. If you withdraw 
+          before completing the study, you will forfeit entry into the reward selection.
         </p>
 
-        <h3>Consent Acknowledgement</h3>
+        <h3>Contact Information</h3>
         <p>
-          By checking the consent box below and clicking "Continue", you confirm that:
+          If you have any questions about this study, your rights as a participant, or wish to 
+          request deletion of your data, please contact:
         </p>
+        <p>
+          <strong>Research Team:</strong> research@cognit.org
+        </p>
+
+        <h3>Eligibility Requirements</h3>
+        <p>By proceeding, you confirm that:</p>
         <ul>
-          <li>You are at least 18 years old</li>
-          <li>You have read and understood the information above</li>
-          <li>You agree to participate voluntarily</li>
-          <li>You understand your responses will be recorded for research use</li>
+          <li>You are at least 18 years of age</li>
+          <li>You have read and understood this consent form</li>
+          <li>You have the capacity to consent to participate</li>
+          <li>You are participating of your own free will</li>
+          <li>You understand that your anonymized responses will be used for research purposes</li>
         </ul>
+
+        <h3>Consent Statement</h3>
+        <p>
+          By checking the box below and clicking "Continue," you acknowledge that you have read 
+          this consent form, understand its contents, and agree to participate in this research 
+          study voluntarily. You understand that your participation is voluntary and that you 
+          are free to withdraw at any time without penalty.
+        </p>
       </div>
       
       {error && (
@@ -119,11 +163,12 @@ export default function ConsentPage({
           id="consent-check"
         />
         <label htmlFor="consent-check">
-          <strong>I consent to participate in this research survey</strong>
+          <strong>I consent to participate in this research study</strong>
           <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
-            I confirm that I am 18 years or older, I have read and understood the consent form, 
-            and I agree to participate voluntarily. I understand my responses will be collected 
-            and used for research purposes only.
+            I confirm that I am 18 years or older, I have read and understood this informed consent form, 
+            and I voluntarily agree to participate in the C.O.G.N.I.T. research study. I understand my 
+            responses will be collected anonymously and used for research purposes, including potential 
+            publication of aggregated findings. I understand I may withdraw at any time without penalty.
           </p>
         </label>
       </div>

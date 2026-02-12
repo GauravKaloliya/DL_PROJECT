@@ -171,16 +171,16 @@ export default function TrialPage({
           </div>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
             <button
-              className="primary survey-button"
+              className="primary"
               onClick={onSurveyContinue}
-              style={{ padding: '10px 24px', backgroundColor: 'var(--primary)', color: 'white', fontSize: '14px' }}
+              style={{ padding: '14px 28px', fontSize: '14px', height: '48px' }}
             >
               Continue Survey
             </button>
             <button
               className="ghost"
               onClick={onSurveyFinish}
-              style={{ padding: '10px 24px', border: '2px solid var(--error)', color: 'var(--error)', fontSize: '14px' }}
+              style={{ padding: '14px 28px', border: '2px solid var(--error)', color: 'var(--error)', fontSize: '14px', height: '48px' }}
             >
               Finish
             </button>
