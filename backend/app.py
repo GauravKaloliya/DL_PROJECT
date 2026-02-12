@@ -1120,6 +1120,38 @@ def submit():
     except (TypeError, ValueError):
         time_spent_seconds = None
 
+    # Ensure image exists in images table (for foreign key constraint)
+    try:
+        # Check if image exists in database
+        image_result = db.execute(text('''
+            SELECT image_id FROM images WHERE image_id = :image_id
+        '''), {"image_id": image_id})
+        
+        if not image_result.fetchone():
+            # Image doesn't exist, insert it with basic metadata
+            # Extract category from image_id (e.g., "survey/image.svg" -> "survey")
+            category = image_id.split('/')[0] if '/' in image_id else 'unknown'
+            
+            db.execute(text('''
+                INSERT INTO images 
+                (image_id, category, difficulty_score, object_count, width, height)
+                VALUES (:image_id, :category, 5.0, 1, 800, 600)
+                ON CONFLICT (image_id) DO NOTHING
+            '''), {
+                "image_id": image_id,
+                "category": category
+            })
+            db.commit()
+    except Exception as e:
+        # If we can't insert the image, log it but don't fail the submission
+        _log_audit_event(db, 
+                       event_type='image_insert_failed',
+                       participant_id=participant_id,
+                       endpoint='/api/submit',
+                       method='POST',
+                       status_code=200,
+                       details=f'Failed to insert image {image_id}: {str(e)}')
+    
     # Insert into database
     try:
         trial_index = payload.get("trial_index", 0)

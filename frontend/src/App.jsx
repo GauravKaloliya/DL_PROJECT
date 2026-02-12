@@ -339,7 +339,30 @@ export default function App() {
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || "Submission failed");
+      let errorMessage = data.error || "Submission failed";
+      
+      // Provide more specific error messages for common issues
+      if (response.status === 400) {
+        if (data.error && data.error.includes("participant_id is required")) {
+          errorMessage = "Participant ID is missing. Please refresh the page and start again.";
+        } else if (data.error && data.error.includes("Participant not found")) {
+          errorMessage = "Participant not found. Please complete the registration process first.";
+        } else if (data.error && data.error.includes("Minimum")) {
+          errorMessage = data.error; // Keep the original word count error
+        } else if (data.error && data.error.includes("rating is required")) {
+          errorMessage = "Please select a rating for the image.";
+        } else if (data.error && data.error.includes("comments must be at least")) {
+          errorMessage = "Comments must be at least 5 characters long.";
+        }
+      } else if (response.status === 403) {
+        if (data.error && data.error.includes("consent")) {
+          errorMessage = "Consent is required. Please complete the consent process first.";
+        }
+      } else if (response.status === 409) {
+        errorMessage = "This submission has already been recorded.";
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const result = await response.json();
