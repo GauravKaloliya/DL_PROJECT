@@ -1608,12 +1608,8 @@ def _get_api_documentation():
 @app.route("/")
 @limiter.limit("30 per minute")
 def api_docs_html():
-    """Redirect to API documentation"""
-    return jsonify({
-        "message": "Welcome to C.O.G.N.I.T. API",
-        "documentation": "/api/docs",
-        "status": "active"
-    })
+    """API documentation at root endpoint"""
+    return jsonify(_get_api_documentation())
 
 
 @app.route("/api/docs")
