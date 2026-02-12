@@ -62,6 +62,31 @@ cd frontend && vercel --prod
 python backend/init_db.py <your-database-url>
 ```
 
+### Alternative: Combined Deployment (Recommended)
+
+Deploy both frontend and backend as a single Vercel project:
+
+```bash
+# 1. Create Neon database and get connection string
+# 2. Fork/clone this repository to GitHub
+# 3. Deploy from project root (includes both frontend and backend)
+vercel --prod
+# 4. Set environment variables in Vercel dashboard:
+#    - DATABASE_URL
+#    - SECRET_KEY
+#    - FLASK_DEBUG=0
+# 5. Initialize database
+python backend/init_db.py <your-database-url>
+# 6. Redeploy to apply all settings
+vercel --prod
+```
+
+**Benefits of combined deployment:**
+- Single project to manage
+- No CORS configuration needed (same origin)
+- Single URL for entire application
+- Simpler environment variable management
+
 ## Detailed Setup
 
 ### Step 1: Set Up Neon PostgreSQL Database
@@ -339,6 +364,167 @@ Open browser console and check for:
 - ✓ Successful API responses
 - ✓ Images loading correctly
 
+## Alternative Deployment: Combined Vercel Project
+
+Instead of deploying frontend and backend separately, you can deploy both as a single Vercel project. This is the **recommended approach** for simpler management.
+
+### Architecture (Combined)
+
+```
+┌─────────────────────────────────────┐
+│        Vercel Project               │
+│  ┌──────────────┐ ┌──────────────┐  │
+│  │   Frontend   │ │   Backend    │  │
+│  │ (Static)     │ │ (Serverless) │  │
+│  └──────────────┘ └──────────────┘  │
+│         │                │          │
+│         └────────────────┘          │
+│              Same Origin            │
+│         https://app.vercel.app      │
+└─────────────────────────────────────┘
+                    │
+                    ▼ PostgreSQL
+            ┌──────────────┐
+            │   Neon DB    │
+            └──────────────┘
+```
+
+### Benefits
+
+1. **No CORS Issues**: Frontend and backend share the same origin
+2. **Single URL**: One domain serves everything
+3. **Simpler Config**: Fewer environment variables to manage
+4. **Unified Management**: One project in Vercel dashboard
+5. **Cost Efficient**: Single project usage on Vercel
+
+### Deployment Steps (Combined)
+
+#### 1. Prepare Repository
+
+Ensure your repository has the root `vercel.json` configured (already done):
+
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "backend/app.py",
+      "use": "@vercel/python"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/assets/(.*)",
+      "dest": "frontend/dist/assets/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/dist/index.html"
+    }
+  ]
+}
+```
+
+#### 2. Deploy to Vercel
+
+**Using Vercel Dashboard:**
+
+1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
+2. Click **"Add New"** → **"Project"**
+3. Import your repository
+4. **IMPORTANT**: Keep root directory as `./` (not `backend` or `frontend`)
+5. Framework preset will be auto-detected
+6. Click **"Deploy"**
+
+**Using Vercel CLI:**
+
+```bash
+# From project root (not backend or frontend)
+vercel --prod
+
+# Follow prompts:
+# - Root directory: ./
+# - Framework: Other (will auto-detect both)
+```
+
+#### 3. Configure Environment Variables
+
+Set these in Vercel dashboard → Your project → Settings → Environment Variables:
+
+| Variable | Value | Required |
+|----------|-------|----------|
+| `DATABASE_URL` | Your Neon connection string | ✓ Yes |
+| `SECRET_KEY` | `openssl rand -hex 32` | ✓ Yes |
+| `FLASK_DEBUG` | `0` | ✓ Yes |
+| `MIN_WORD_COUNT` | `60` | No |
+| `TOO_FAST_SECONDS` | `5` | No |
+| `IP_HASH_SALT` | `openssl rand -hex 16` | No |
+
+**Note**: `CORS_ORIGINS` is not needed for combined deployment since frontend and backend share the same origin.
+
+#### 4. Frontend Configuration
+
+Ensure `frontend/.env.production` has:
+
+```env
+# Empty = use same-origin requests (works with combined deployment)
+VITE_API_BASE=
+```
+
+This makes the frontend use relative URLs like `/api/health` instead of full URLs.
+
+#### 5. Initialize Database
+
+Same as separate deployment:
+
+```bash
+python backend/init_db.py "your-database-url"
+```
+
+#### 6. Redeploy
+
+After setting environment variables:
+
+```bash
+vercel --prod
+```
+
+### Verify Combined Deployment
+
+1. **Main URL**: `https://your-app.vercel.app` → Should show the React app
+2. **API Health**: `https://your-app.vercel.app/api/health` → Should return JSON
+3. **API Docs**: `https://your-app.vercel.app/` → Should show API documentation
+4. **Test Flow**: Complete a full participant journey
+
+### Routing Explanation
+
+The `vercel.json` routes work as follows:
+
+```
+Request: https://your-app.vercel.app/api/health
+├─ Matches: "/api/(.*)"
+└─ Routes to: backend/app.py → Flask handles /api/health
+
+Request: https://your-app.vercel.app/assets/main.js
+├─ Matches: "/assets/(.*)"
+└─ Routes to: frontend/dist/assets/main.js
+
+Request: https://your-app.vercel.app/some-page
+├─ Matches: "/(.*)"
+└─ Routes to: frontend/dist/index.html → React Router handles routing
+```
+
 ## Environment Variables
 
 ### Backend Environment Variables
@@ -347,19 +533,39 @@ Open browser console and check for:
 |----------|----------|-------------|---------|
 | `DATABASE_URL` | ✓ Yes | PostgreSQL connection string | `postgresql://user:pass@host/db` |
 | `SECRET_KEY` | ✓ Yes | Flask session secret (32+ chars) | `openssl rand -hex 32` |
-| `CORS_ORIGINS` | ✓ Yes | Allowed frontend URLs (comma-separated) | `https://app.vercel.app` |
+| `CORS_ORIGINS` | For separate deployments | Allowed frontend URLs (comma-separated) | `https://app.vercel.app` |
 | `MIN_WORD_COUNT` | No | Minimum words per description | `60` (default) |
 | `TOO_FAST_SECONDS` | No | Too-fast threshold in seconds | `5` (default) |
 | `IP_HASH_SALT` | No | Salt for privacy-preserving IP hashing | `openssl rand -hex 16` |
 | `FLASK_DEBUG` | No | Debug mode (0 or 1) | `0` (production) |
 
+**CORS_ORIGINS Notes:**
+- **Combined deployment**: Not needed (leave empty) - same origin
+- **Separate deployments**: Required - set to your frontend URL
+- Multiple origins: Comma-separated list
+
 ### Frontend Environment Variables
 
 | Variable | Required | Description | Example |
 |----------|----------|-------------|---------|
-| `VITE_API_BASE` | No | Backend API URL | `https://cognit-backend.vercel.app` |
+| `VITE_API_BASE` | Depends | Backend API URL | See below |
 
-**Note**: If `VITE_API_BASE` is not set, the frontend will use relative URLs (which won't work on Vercel since frontend and backend are separate deployments).
+**VITE_API_BASE Configuration:**
+
+| Deployment Type | VITE_API_BASE Value | Explanation |
+|-----------------|---------------------|-------------|
+| **Combined** (recommended) | Empty or not set | Uses relative URLs like `/api/health` |
+| **Separate** | Full backend URL | `https://cognit-backend.vercel.app` |
+
+For combined deployment, leave `VITE_API_BASE` empty:
+```env
+VITE_API_BASE=
+```
+
+For separate deployments, set the full backend URL:
+```env
+VITE_API_BASE=https://cognit-backend.vercel.app
+```
 
 ## Database Management
 
@@ -425,6 +631,43 @@ python init_db.py "your-production-database-url"
 Or apply changes manually via Neon SQL Editor.
 
 ## Troubleshooting
+
+### Combined Deployment Issues
+
+#### Error: "404 Not Found" on API routes
+
+**Symptom**: `/api/*` endpoints return 404 page
+
+**Solution**:
+1. Check root `vercel.json` exists and routes are ordered correctly:
+   - `/api/(.*)` must come BEFORE `/(.*)` catch-all
+2. Ensure deploying from project root (`./`), not `backend/` or `frontend/`
+3. Check Vercel build logs for backend build errors
+4. Redeploy: `vercel --prod`
+
+#### Error: "Cannot GET /api/health"
+
+**Symptom**: API returns HTML error instead of JSON
+
+**Solution**:
+1. Verify `DATABASE_URL` environment variable is set
+2. Check backend build succeeded in Vercel logs
+3. Ensure `wsgi.py` properly exports Flask app
+4. Check for Python syntax errors in `app.py`
+
+#### Frontend routes show 404 on refresh
+
+**Symptom**: Navigating to `/some-page` directly shows 404
+
+**Solution**:
+1. Ensure `vercel.json` has SPA fallback:
+   ```json
+   {"src": "/(.*)", "dest": "frontend/dist/index.html"}
+   ```
+2. Must have `{"handle": "filesystem"}` before fallback route
+3. Check that `frontend/dist/index.html` exists after build
+
+### Separate Deployment Issues
 
 ### Backend Deployment Issues
 

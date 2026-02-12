@@ -57,10 +57,13 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
-    # Default origins include localhost for development and production frontend
+    # Default origins include localhost for development
+    # In production with same-origin deployment (Vercel), CORS is not needed
+    # For separate deployments, set CORS_ORIGINS env variable
     return [
         "http://localhost:5173",
-        "https://cognit-weld.vercel.app"
+        "http://localhost:3000",
+        "http://localhost:4173"
     ]
 
 
@@ -714,6 +717,8 @@ def health_check():
     status = {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "3.5.0",
+        "environment": "production" if os.getenv("VERCEL") == "1" else "development",
         "services": {}
     }
     
@@ -729,13 +734,19 @@ def health_check():
     # Check images directory
     try:
         if IMAGES_DIR.exists():
+            image_count = len(list(IMAGES_DIR.rglob("*"))) if IMAGES_DIR.exists() else 0
             status["services"]["images"] = "accessible"
+            status["services"]["image_count"] = image_count
         else:
             status["services"]["images"] = "not found"
             status["status"] = "degraded"
     except Exception as e:
         status["services"]["images"] = f"error: {str(e)}"
         status["status"] = "degraded"
+    
+    # Check CORS configuration
+    cors_origins = _get_cors_origins()
+    status["services"]["cors_origins_count"] = len(cors_origins) if isinstance(cors_origins, list) else 1
     
     return jsonify(status)
 
