@@ -49,8 +49,14 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
   };
 
   const handleFinish = () => {
+    // Preserve dark mode setting before clearing
+    const darkMode = sessionStorage.getItem("darkMode");
     // Clear session storage and reload
     sessionStorage.clear();
+    // Restore dark mode setting
+    if (darkMode !== null) {
+      sessionStorage.setItem("darkMode", darkMode);
+    }
     window.location.href = "/";
   };
 
@@ -94,10 +100,9 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
             ) : (
               <>
                 <div style={{ fontSize: '40px', marginBottom: '12px' }}>🎁</div>
-                <h3 style={{ margin: '0 0 12px', color: 'white' }}>Reward Opportunity</h3>
+                <h3 style={{ margin: '0 0 12px', color: 'white' }}>Thank You for Participating!</h3>
                 <p style={{ margin: '0 0 12px', opacity: 0.9 }}>
-                  Thank you for your participation! While you weren't selected this time, 
-                  your responses are valuable to our research.
+                  Your responses are valuable to our research and contribute to advancing language understanding models.
                 </p>
                 {totalWords > 0 && (
                   <p style={{ margin: '0', fontSize: '14px', opacity: 0.85 }}>
@@ -123,7 +128,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
         }}>
           <h4 style={{ marginTop: '0', color: 'var(--primary)' }}>💰 About the Reward Program</h4>
           <ul style={{ paddingLeft: '20px', marginBottom: '0', fontSize: '14px' }}>
-            <li><strong>5% of participants</strong> are randomly selected to receive <strong>₹10</strong></li>
+            <li>Participants are <strong>randomly selected</strong> to receive <strong>₹10 rewards</strong></li>
             <li>Active participants who write detailed descriptions get added to a <strong>priority list</strong></li>
             <li>Priority participants have <strong>higher chances</strong> of being selected</li>
             <li>Rewards are sent via <strong>UPI transfer</strong> within 24-48 hours</li>

@@ -1393,11 +1393,9 @@ def security_info():
 
 # ============== API DOCUMENTATION ==============
 
-@app.route("/api/docs")
-@limiter.limit("30 per minute")
-def api_docs():
-    """Comprehensive API documentation - only working routes"""
-    return jsonify({
+def _get_api_documentation():
+    """Get API documentation object - shared by /api and /api/docs"""
+    return {
         "title": "C.O.G.N.I.T. API Documentation",
         "version": "3.3.0",
         "description": "Complete and verified API documentation for the C.O.G.N.I.T. research platform",
@@ -1575,7 +1573,7 @@ def api_docs():
             "select_reward_winner": {
                 "path": "/api/reward/select/<participant_id>",
                 "method": "POST",
-                "description": "Check and select participant as reward winner (5% base chance, higher for priority)",
+                "description": "Check and select participant as reward winner (random selection, higher chances for priority participants)",
                 "auth_required": False,
                 "rate_limit": "10 per minute",
                 "response": {
@@ -1605,7 +1603,21 @@ def api_docs():
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
         }
-    })
+    }
+
+
+@app.route("/api")
+@limiter.limit("30 per minute")
+def api_root():
+    """API root endpoint - serves same documentation as /api/docs"""
+    return jsonify(_get_api_documentation())
+
+
+@app.route("/api/docs")
+@limiter.limit("30 per minute")
+def api_docs():
+    """Comprehensive API documentation - only working routes"""
+    return jsonify(_get_api_documentation())
 
 
 def regenerate_database_from_schema():
