@@ -1,4 +1,3 @@
-import csv
 import hashlib
 import os
 import random
@@ -17,7 +16,6 @@ from flask_limiter.util import get_remote_address
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
 DATA_DIR = BASE_DIR / "data"
-CSV_PATH = DATA_DIR / "submissions.csv"
 DB_PATH = BASE_DIR / "COGNIT.db"
 
 MIN_WORD_COUNT = int(os.getenv("MIN_WORD_COUNT", "60"))
@@ -245,7 +243,7 @@ def init_db():
         INSERT OR IGNORE INTO database_metadata (key, value) VALUES 
             ('version', '3.2.0'),
             ('schema_updated', CURRENT_TIMESTAMP),
-            ('description', 'C.O.G.N.I.T. Research Platform Database')
+            ('description', 'C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) Research Platform Database')
     ''')
     
     conn.commit()
@@ -1308,7 +1306,7 @@ def security_info():
     """Get comprehensive security information"""
     return jsonify({
         "security": {
-            "version": "3.3.0",
+            "version": "3.4.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
@@ -1394,11 +1392,11 @@ def security_info():
 # ============== API DOCUMENTATION ==============
 
 def _get_api_documentation():
-    """Get API documentation object - shared by /api and /api/docs"""
+    """Get API documentation object - available at /"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.3.0",
-        "description": "Complete and verified API documentation for the C.O.G.N.I.T. research platform",
+        "version": "3.4.0",
+        "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform",
         "base_url": "/api",
         "security": {
             "rate_limiting": "200 per day, 50 per hour (default)",
@@ -1599,6 +1597,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
             "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
@@ -1606,17 +1605,10 @@ def _get_api_documentation():
     }
 
 
-@app.route("/api")
-@limiter.limit("30 per minute")
-def api_root():
-    """API root endpoint - serves same documentation as /api/docs"""
-    return jsonify(_get_api_documentation())
-
-
-@app.route("/api/docs")
+@app.route("/")
 @limiter.limit("30 per minute")
 def api_docs():
-    """Comprehensive API documentation - only working routes"""
+    """API documentation - first page of API"""
     return jsonify(_get_api_documentation())
 
 
@@ -1688,7 +1680,7 @@ initialize_app()
 
 if __name__ == "__main__":
     print("Starting C.O.G.N.I.T. backend server...")
-    print("API Documentation available at: http://localhost:5000/api/docs")
+    print("API Documentation available at: http://localhost:5000/ (root endpoint)")
     print("API available at: http://localhost:5000/api/")
     print("Security Info available at: http://localhost:5000/api/security/info")
     port = int(os.getenv("PORT", "5000"))

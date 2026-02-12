@@ -1,6 +1,6 @@
 # C.O.G.N.I.T. Image Description Study
 
-C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a full-stack research platform for running an image-description study. Participants review a sequence of images, write detailed descriptions, rate complexity, and provide feedback. The system includes survey and attention-check images to support research quality.
+C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a full-stack research platform for running an image-description study. Participants review a sequence of images, write detailed descriptions, rate complexity, and provide feedback. The system includes survey and attention-check images to support research quality and advances understanding of how humans describe visual content and how AI can better model this cognitive process.
 
 ## Highlights
 
@@ -8,7 +8,8 @@ C.O.G.N.I.T. (Cognitive Observation & Generalized Narrative Inquiry Tool) is a f
 - Survey and main image trials with attention checks
 - Minimum 60-word descriptions with rating/feedback validation
 - Privacy-preserving IP hashing and audit logging
-- Interactive API documentation (`/api/docs`)
+- Interactive API documentation (available at root `/` endpoint)
+- Focus on advancing image-text understanding and generation systems
 
 ## Tech Stack
 
@@ -36,6 +37,7 @@ python app.py
 ```
 
 The backend runs on `http://localhost:5000`.
+API documentation is available at `http://localhost:5000/` (root endpoint).
 
 ### Frontend
 
@@ -60,6 +62,7 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 
 ### Public
 
+- `GET /` - API documentation (root endpoint)
 - `GET /api/health` - Health check endpoint
 - `GET /api/images/random` (type: `normal`, `survey`, `attention`)
 - `GET /api/images/<image_id>`
@@ -70,7 +73,8 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 - `POST /api/submit` - Submit description/rating
 - `GET /api/submissions/<participant_id>`
 - `GET /api/security/info`
-- `GET /api/docs` - API documentation
+- `GET /api/reward/<participant_id>` - Get reward status
+- `POST /api/reward/select/<participant_id>` - Check reward eligibility
 
 ## Images
 
@@ -85,9 +89,35 @@ Add or replace images in:
 - **SQLite database:** `backend/COGNIT.db`
 - Stores participants, consent records, submissions, audit logs, and performance metrics.
 
+## Application Flow
+
+1. **Consent Form**: Participants read and acknowledge consent
+2. **User Details**: Demographics and contact information collection
+3. **Survey Trials**: Initial image set for practice/warmup
+4. **Main Trials**: Primary image description phase with attention checks
+5. **Completion**: Reward eligibility check and completion confirmation
+
 ## Security Highlights
 
 - CORS restrictions with explicit origins
 - Rate limiting on all endpoints
 - Security headers (CSP, HSTS, X-Frame-Options, etc.)
 - IP hashing for privacy-preserving analytics
+- Input validation and sanitization
+- Comprehensive audit logging
+
+## Research Purpose
+
+C.O.G.N.I.T. collects human image descriptions to advance AI model training for:
+- Better image-text understanding
+- Improved visual content generation
+- Enhanced cognitive modeling of visual processing
+- Research in multimodal AI systems
+
+## Support
+
+For questions about the study or API usage, contact the development team.
+
+---
+
+**C.O.G.N.I.T.: Cognitive Network for Image & Text Modeling**
