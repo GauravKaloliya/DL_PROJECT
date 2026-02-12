@@ -103,6 +103,7 @@ export default function UserDetailsPage({
           <label>Username *</label>
           <input
             type="text"
+            className={errors.username ? 'error-input' : ''}
             placeholder="Enter your username"
             value={demographics.username || ''}
             onChange={(e) => updateField('username', e.target.value)}
@@ -114,6 +115,7 @@ export default function UserDetailsPage({
           <label>Email *</label>
           <input
             type="email"
+            className={errors.email ? 'error-input' : ''}
             placeholder="Enter your email"
             value={demographics.email || ''}
             onChange={(e) => updateField('email', e.target.value)}
@@ -125,6 +127,7 @@ export default function UserDetailsPage({
           <label>Phone Number *</label>
           <input
             type="tel"
+            className={errors.phone ? 'error-input' : ''}
             placeholder="Enter your phone number"
             value={demographics.phone || ''}
             onChange={(e) => updateField('phone', e.target.value)}
@@ -135,6 +138,7 @@ export default function UserDetailsPage({
         <div className={`form-field ${errors.gender ? 'error' : ''}`}>
           <label>Gender *</label>
           <select
+            className={errors.gender ? 'error-input' : ''}
             value={demographics.gender || ''}
             onChange={(e) => updateField('gender', e.target.value)}
           >
@@ -152,6 +156,7 @@ export default function UserDetailsPage({
           <label>Age *</label>
           <input
             type="number"
+            className={errors.age ? 'error-input' : ''}
             min="1"
             max="120"
             placeholder="Enter your age"
@@ -165,6 +170,7 @@ export default function UserDetailsPage({
           <label>Place/Location *</label>
           <input
             type="text"
+            className={errors.place ? 'error-input' : ''}
             placeholder="e.g., India"
             value={demographics.place || ''}
             onChange={(e) => updateField('place', e.target.value)}
@@ -175,6 +181,7 @@ export default function UserDetailsPage({
         <div className={`form-field ${errors.native_language ? 'error' : ''}`}>
           <label>Native Language *</label>
           <select
+            className={errors.native_language ? 'error-input' : ''}
             value={demographics.native_language || ''}
             onChange={(e) => updateField('native_language', e.target.value)}
           >
@@ -198,6 +205,7 @@ export default function UserDetailsPage({
         <div className={`form-field ${errors.prior_experience ? 'error' : ''}`}>
           <label>Prior Experience *</label>
           <select
+            className={errors.prior_experience ? 'error-input' : ''}
             value={demographics.prior_experience || ''}
             onChange={(e) => updateField('prior_experience', e.target.value)}
           >

@@ -100,7 +100,7 @@ export default function ApiDocs() {
           <div>
             <h1 style={{ margin: 0, color: 'var(--primary)' }}>C.O.G.N.I.T. API Reference</h1>
             <p style={{ color: 'var(--muted)', margin: '8px 0 0' }}>
-              Version 3.0.0
+              Version {docs?.version || '3.5.0'}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
