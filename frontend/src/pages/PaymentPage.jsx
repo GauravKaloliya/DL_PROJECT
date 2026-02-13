@@ -164,7 +164,7 @@ export default function PaymentPage({
             }}>
               <strong>How to get priority status:</strong>
               <ul style={{ margin: '8px 0 0', paddingLeft: '20px' }}>
-                <li>Write detailed descriptions (500+ words total)</li>
+                <li>Write detailed descriptions (120+ words total)</li>
                 <li>Complete more survey rounds (3+ rounds)</li>
               </ul>
             </div>
@@ -193,7 +193,7 @@ export default function PaymentPage({
         }}>
           <h3 style={{ marginTop: '0', color: 'var(--success)' }}>Reward Payment Details</h3>
           <ul style={{ paddingLeft: '20px', marginBottom: '0' }}>
-            <li>Reward amount: <strong>₹10</strong> per selected participant</li>
+            <li>Reward amount: <strong>₹10</strong> to selected participants</li>
             <li>Payment method: <strong>UPI transfer</strong> to your registered UPI ID</li>
             <li>Processing time: Within <strong>24-48 hours</strong> of study completion</li>
             <li>No minimum threshold - winners get paid immediately</li>
@@ -233,8 +233,7 @@ export default function PaymentPage({
         </div>
 
         <div className="banner info" style={{ marginTop: '20px' }}>
-          <strong>Note:</strong> This is a simulated payment interface for research purposes.
-          In a production environment, you would be redirected to a secure payment gateway.
+          <strong>Note:</strong> ₹1 processing charge – non-refundable
         </div>
       </div>
       
