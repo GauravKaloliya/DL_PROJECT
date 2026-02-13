@@ -34,7 +34,7 @@ if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # Website URL for CORS and documentation
-WEBSITE_URL = os.getenv("WEBSITE_URL", "http://localhost:5173")
+WEBSITE_URL = os.getenv("WEBSITE_URL", "").strip()
 
 app = Flask(__name__)
 
@@ -62,11 +62,11 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
-    # Default to localhost for development, but also include WEBSITE_URL if set
-    website_url = os.getenv("WEBSITE_URL", "").strip()
+    if not WEBSITE_URL:
+        return "*"
     origins = ["http://localhost:5173"]
-    if website_url and website_url not in origins:
-        origins.append(website_url)
+    if WEBSITE_URL not in origins:
+        origins.append(WEBSITE_URL)
     return origins
 
 
@@ -951,6 +951,7 @@ def get_participant_submissions(participant_id):
 @track_performance
 def security_info():
     """Get comprehensive security information"""
+    cors_origins = _get_cors_origins()
     return jsonify({
         "security": {
             "version": "3.5.0",
@@ -963,7 +964,7 @@ def security_info():
                 "api_docs": "30 per minute"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
+                "allowed_origins": cors_origins,
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,
@@ -1059,7 +1060,7 @@ def _get_api_documentation():
                 "implementation": "Per-IP based rate limiting using flask-limiter"
             },
             "cors_configuration": {
-                "allowed_origins": ["http://localhost:5173", WEBSITE_URL],
+                "allowed_origins": _get_cors_origins(),
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
                 "allowed_headers": ["Content-Type", "Authorization", "X-Requested-With"],
                 "supports_credentials": False,

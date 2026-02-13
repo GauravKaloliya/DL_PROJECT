@@ -21,8 +21,11 @@ export const API_BASE = normalizeApiBase(
 export const getApiUrl = (endpoint) => {
   // Ensure endpoint starts with /
   const normalizedEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
-  
+
   if (API_BASE) {
+    if (API_BASE.endsWith("/api") && normalizedEndpoint.startsWith("/api/")) {
+      return `${API_BASE}${normalizedEndpoint.slice(4)}`;
+    }
     return `${API_BASE}${normalizedEndpoint}`;
   }
   // If API_BASE is empty, use relative URL (same origin - works in production)
