@@ -97,7 +97,7 @@ def add_security_headers(response):
     response.headers['X-Permitted-Cross-Domain-Policies'] = 'none'
     response.headers['X-Download-Options'] = 'noopen'
     response.headers['X-DNS-Prefetch-Control'] = 'off'
-    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https: http:; font-src 'self'; connect-src 'self'; frame-src 'none'; object-src 'none'; base-uri 'self'; form-action 'self'"
     response.headers['Strict-Transport-Security'] = 'max-age=63072000; includeSubDomains; preload'
     response.headers['Referrer-Policy'] = 'no-referrer'
     response.headers['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=(), payment=()'
@@ -766,6 +766,9 @@ def random_image():
 
 @app.route("/api/images/<path:image_id>")
 def serve_image(image_id):
+    # Set proper Content-Type for SVG files
+    if image_id.endswith('.svg'):
+        return send_from_directory(IMAGES_DIR, image_id, mimetype='image/svg+xml')
     return send_from_directory(IMAGES_DIR, image_id)
 
 
