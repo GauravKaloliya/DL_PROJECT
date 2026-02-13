@@ -62,8 +62,12 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
-    # Default to localhost for development
-    return ["http://localhost:5173"]
+    # Default to localhost for development, but also include WEBSITE_URL if set
+    website_url = os.getenv("WEBSITE_URL", "").strip()
+    origins = ["http://localhost:5173"]
+    if website_url and website_url not in origins:
+        origins.append(website_url)
+    return origins
 
 
 # CORS Configuration with enhanced security
