@@ -217,6 +217,7 @@ export default function UserDetailsPage({
             onChange={(e) => updateField('native_language', e.target.value)}
           >
             <option value="">Select native language</option>
+            <option value="English">English</option>
             <option value="Hindi">Hindi (हिन्दी)</option>
             <option value="Bengali">Bengali (বাংলা)</option>
             <option value="Telugu">Telugu (తెలుగు)</option>
@@ -253,14 +254,11 @@ export default function UserDetailsPage({
             <optgroup label="General Skills">
               <option value="Writing/Content Creation">Writing/Content Creation</option>
               <option value="Public Speaking">Public Speaking</option>
-              <option value="Teaching/Training">Teaching/Training</option>
               <option value="Photography">Photography</option>
               <option value="Art/Design/Creative">Art/Design/Creative</option>
               <option value="Music/Performance">Music/Performance</option>
               <option value="Sports/Athletics">Sports/Athletics</option>
               <option value="Cooking/Culinary">Cooking/Culinary</option>
-              <option value="Crafts/Handicrafts">Crafts/Handicrafts</option>
-              <option value="Gardening/Agriculture">Gardening/Agriculture</option>
             </optgroup>
             <option value="None">None of the above</option>
           </select>
