@@ -87,6 +87,12 @@ export default function TrialPage({
       return;
     }
 
+    // Additional validation before submit
+    if (!trial || !trial.image_id) {
+      setSubmitError("Image not loaded properly. Please wait or refresh.");
+      return;
+    }
+
     setSubmitting(true);
     setSubmitError("");
     const timeSpentSeconds = Math.round((Date.now() - trialStartTime.current) / 1000);
@@ -129,7 +135,17 @@ export default function TrialPage({
     return "Submit your response";
   };
 
-  const imageSrc = trial ? getApiUrl(trial.image_url) : "";
+  const imageSrc = trial?.image_url ? getApiUrl(trial.image_url) : "";
+
+  // Show loading state if we're waiting for trial data
+  if (!trial || !trial.image_id) {
+    return (
+      <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
+        <div className="spinner" style={{ margin: '20px auto' }}></div>
+        <p>Loading image...</p>
+      </div>
+    );
+  }
 
   if (isSurvey && surveyFeedbackReady) {
     return (
@@ -186,15 +202,6 @@ export default function TrialPage({
             </button>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (!trial) {
-    return (
-      <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
-        <div className="spinner" style={{ margin: '20px auto' }}></div>
-        <p>Loading trial...</p>
       </div>
     );
   }

@@ -485,15 +485,39 @@ def create_participant():
     if errors:
         return jsonify({"error": "Validation failed", "details": errors}), 400
     
-    # Validate email format if provided
-    email = data.get('email', '').strip()
-    if email and not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
-        return jsonify({"error": "Invalid email format"}), 400
     
-    # Validate phone format if provided (basic validation)
+    # Validate username - no spaces, no special chars except underscore
+    username = data.get('username', '').strip()
+    if username and not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return jsonify({"error": "Username can only contain letters, numbers, and underscores"}), 400
+    
+    # Validate email - only Gmail, Microsoft (Outlook/Hotmail), Apple (iCloud)
+    allowed_email_domains = ['gmail.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'me.com', 'mac.com']
+    email = data.get('email', '').strip().lower()
+    if email:
+        if not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', email):
+            return jsonify({"error": "Invalid email format"}), 400
+        domain = email.split('@')[1]
+        if domain not in allowed_email_domains:
+            return jsonify({"error": "Only Gmail, Outlook, Hotmail, and iCloud email addresses are allowed"}), 400
+    
+    # Validate phone - Indian numbers only (10 digits starting with 6-9)
     phone = data.get('phone', '').strip()
-    if phone and not re.match(r'^[\d\s\-\+\(\)]{7,20}$', phone):
-        return jsonify({"error": "Invalid phone number format"}), 400
+    if phone:
+        phone_digits = re.sub(r'\D', '', phone)
+        is_valid_indian = re.match(r'^[6-9]\d{9}$', phone_digits) or \
+                         (len(phone_digits) == 12 and phone_digits.startswith('91') and re.match(r'^[6-9]', phone_digits[2:]))
+        if not is_valid_indian:
+            return jsonify({"error": "Please enter a valid 10-digit Indian mobile number"}), 400
+    
+    # Validate age - 13 to 100 only
+    try:
+        age = int(data.get('age', 0))
+        if age < 13 or age > 100:
+            return jsonify({"error": "Age must be between 13 and 100"}), 400
+    except (ValueError, TypeError):
+        return jsonify({"error": "Age must be a valid number between 13 and 100"}), 400
+    
     
     try:
         db = get_db()
@@ -721,8 +745,21 @@ def random_image():
     if not images:
         return jsonify({"error": "No images available"}), 404
 
+    # Get excluded images from query parameter
+    exclude_param = request.args.get('exclude', '')
+    excluded_ids = set()
+    if exclude_param:
+        excluded_ids = set(exclude_param.split(','))
+    
+    # Filter out excluded images
+    available_images = [img for img in images if img["image_id"] not in excluded_ids]
+    
+    # If all images have been shown, reset and use all images
+    if not available_images:
+        available_images = images
+    
     # Ensure we get a new random image each time by not using any caching
-    image_data = random.choice(images)
+    image_data = random.choice(available_images)
     payload = build_image_payload(image_data["image_id"])
     return jsonify(payload)
 
@@ -1142,9 +1179,11 @@ def _get_api_documentation():
                     "optional": ["email", "phone"]
                 },
                 "validation": {
-                    "email": "Valid email format if provided",
-                    "phone": "Valid phone format if provided",
-                    "age": "Integer between 1-120"
+                    "username": "Only letters, numbers, and underscores allowed (no spaces or special characters)",
+                    "email": "Required - only Gmail, Outlook, Hotmail, and iCloud domains allowed",
+                    "phone": "Required - valid 10-digit Indian mobile number (starts with 6, 7, 8, or 9)",
+                    "age": "Integer between 13-100",
+                    "native_language": "One of 9 Indian languages: Hindi, Bengali, Telugu, Marathi, Tamil, Urdu, Gujarati, Kannada, Malayalam"
                 },
                 "response": {
                     "status": "success|error",
@@ -1205,9 +1244,12 @@ def _get_api_documentation():
             "random_image": {
                 "path": "/api/images/random",
                 "method": "GET",
-                "description": "Get a random image",
+                "description": "Get a random image, optionally excluding previously shown images",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
+                "query_params": {
+                    "exclude": "Optional - comma-separated list of image_ids to exclude from selection"
+                },
                 "response": {
                     "image_id": "string",
                     "image_url": "string"

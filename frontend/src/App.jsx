@@ -120,6 +120,7 @@ export default function App() {
   const [surveyFeedbackReady, setSurveyFeedbackReady] = useState(false);
   const [readyForNext, setReadyForNext] = useState(false);
   const [fetchingImage, setFetchingImage] = useState(false);
+  const [shownImages, setShownImages] = useState(getStoredValue("shownImages", []));
   
   // UI state
   const [toasts, setToasts] = useState([]);
@@ -134,6 +135,7 @@ export default function App() {
   useEffect(() => { saveStoredValue("trial", trial); }, [trial]);
   useEffect(() => { saveStoredValue("surveyCompleted", surveyCompleted); }, [surveyCompleted]);
   useEffect(() => { saveStoredValue("mainCompleted", mainCompleted); }, [mainCompleted]);
+  useEffect(() => { saveStoredValue("shownImages", shownImages); }, [shownImages]);
   useEffect(() => { saveStoredValue("darkMode", darkMode); document.body.classList.toggle("dark", darkMode); }, [darkMode]);
   
   // Online/offline detection
@@ -288,7 +290,13 @@ export default function App() {
     setSurveyFeedbackReady(false);
 
     try {
-      const response = await fetch(getApiUrl(`/api/images/random?session_id=${sessionId}`));
+      // Build URL with excluded images to prevent duplicates
+      let url = getApiUrl(`/api/images/random?session_id=${sessionId}`);
+      if (shownImages.length > 0) {
+        url += `&exclude=${encodeURIComponent(shownImages.join(','))}`;
+      }
+      
+      const response = await fetch(url);
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Unable to fetch image");
@@ -310,6 +318,8 @@ export default function App() {
         is_attention: isAttentionCheck
       };
 
+      // Track this image as shown
+      setShownImages(prev => [...prev, data.image_id]);
       setTrial(trialData);
     } catch (error) {
       addToast(error.message || "Failed to load image", "error");

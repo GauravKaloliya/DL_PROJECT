@@ -17,26 +17,57 @@ export default function UserDetailsPage({
   const validateForm = () => {
     const newErrors = {};
     
+    // Username validation - no spaces, no special chars except underscore
     if (!demographics.username || demographics.username.trim().length < 2) {
       newErrors.username = "Username is required (min 2 characters)";
+    } else if (!/^[a-zA-Z0-9_]+$/.test(demographics.username)) {
+      newErrors.username = "Username can only contain letters, numbers, and underscores (no spaces or special characters)";
     }
     
-    // Email validation (now required)
-    if (!demographics.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(demographics.email)) {
-      newErrors.email = "Email is required and must be valid";
+    // Email validation - only Gmail, Microsoft (Outlook/Hotmail), Apple (iCloud)
+    const allowedEmailDomains = ['gmail.com', 'outlook.com', 'hotmail.com', 'icloud.com', 'me.com', 'mac.com'];
+    if (!demographics.email) {
+      newErrors.email = "Email is required";
+    } else {
+      const emailLower = demographics.email.toLowerCase().trim();
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(emailLower)) {
+        newErrors.email = "Please enter a valid email address";
+      } else {
+        const domain = emailLower.split('@')[1];
+        if (!allowedEmailDomains.includes(domain)) {
+          newErrors.email = "Only Gmail, Outlook, Hotmail, and iCloud email addresses are allowed";
+        }
+      }
     }
     
-    // Phone validation (now required)
-    if (!demographics.phone || !/^[\d\s\-\+\\(\)]{7,20}$/.test(demographics.phone)) {
-      newErrors.phone = "Phone number is required and must be valid";
+    // Phone validation - Indian numbers only (10 digits, starts with 6-9)
+    if (!demographics.phone) {
+      newErrors.phone = "Phone number is required";
+    } else {
+      // Remove all non-digit characters
+      const phoneDigits = demographics.phone.replace(/\D/g, '');
+      // Indian mobile numbers: 10 digits starting with 6, 7, 8, or 9
+      // Also handle +91 prefix (12 digits total)
+      const isValidIndian = /^[6-9]\d{9}$/.test(phoneDigits) || 
+                            (phoneDigits.length === 12 && phoneDigits.startsWith('91') && /^[6-9]/.test(phoneDigits.slice(2)));
+      if (!isValidIndian) {
+        newErrors.phone = "Please enter a valid 10-digit Indian mobile number";
+      }
     }
     
     if (!demographics.gender) {
       newErrors.gender = "Gender is required";
     }
     
-    if (!demographics.age || isNaN(demographics.age) || demographics.age < 1 || demographics.age > 120) {
-      newErrors.age = "Please enter a valid age (1-120)";
+    // Age validation - 13 to 100 only
+    if (!demographics.age) {
+      newErrors.age = "Age is required";
+    } else {
+      const ageNum = parseInt(demographics.age);
+      if (isNaN(ageNum) || ageNum < 13 || ageNum > 100) {
+        newErrors.age = "Age must be between 13 and 100";
+      }
     }
     
     if (!demographics.place || demographics.place.trim().length < 2) {
@@ -157,9 +188,9 @@ export default function UserDetailsPage({
           <input
             type="number"
             className={errors.age ? 'error-input' : ''}
-            min="1"
-            max="120"
-            placeholder="Enter your age"
+            min="13"
+            max="100"
+            placeholder="Enter your age (13-100)"
             value={demographics.age || ''}
             onChange={(e) => updateField('age', e.target.value)}
           />
@@ -186,18 +217,15 @@ export default function UserDetailsPage({
             onChange={(e) => updateField('native_language', e.target.value)}
           >
             <option value="">Select native language</option>
-            <option value="English">English</option>
-            <option value="Spanish">Spanish</option>
-            <option value="French">French</option>
-            <option value="German">German</option>
-            <option value="Chinese">Chinese</option>
-            <option value="Japanese">Japanese</option>
-            <option value="Hindi">Hindi</option>
-            <option value="Korean">Korean</option>
-            <option value="Portuguese">Portuguese</option>
-            <option value="Italian">Italian</option>
-            <option value="Russian">Russian</option>
-            <option value="Other">Other</option>
+            <option value="Hindi">Hindi (हिन्दी)</option>
+            <option value="Bengali">Bengali (বাংলা)</option>
+            <option value="Telugu">Telugu (తెలుగు)</option>
+            <option value="Marathi">Marathi (मराठी)</option>
+            <option value="Tamil">Tamil (தமிழ்)</option>
+            <option value="Urdu">Urdu (اردو)</option>
+            <option value="Gujarati">Gujarati (ગુજરાતી)</option>
+            <option value="Kannada">Kannada (ಕನ್ನಡ)</option>
+            <option value="Malayalam">Malayalam (മലയാളം)</option>
           </select>
           {errors.native_language && <span className="error-text">{errors.native_language}</span>}
         </div>
@@ -210,17 +238,31 @@ export default function UserDetailsPage({
             onChange={(e) => updateField('prior_experience', e.target.value)}
           >
             <option value="">Select prior experience</option>
-            <option value="Photography">Photography</option>
-            <option value="Art/Design">Art/Design</option>
-            <option value="Computer Vision">Computer Vision</option>
-            <option value="Image Processing">Image Processing</option>
-            <option value="Graphic Design">Graphic Design</option>
-            <option value="Video Editing">Video Editing</option>
-            <option value="3D Modeling">3D Modeling</option>
-            <option value="UI/UX Design">UI/UX Design</option>
-            <option value="Animation">Animation</option>
-            <option value="Other">Other</option>
-            <option value="None">None</option>
+            <optgroup label="Technical Skills">
+              <option value="Programming/Software Development">Programming/Software Development</option>
+              <option value="Data Science/Machine Learning">Data Science/Machine Learning</option>
+              <option value="Web Development">Web Development</option>
+              <option value="Mobile App Development">Mobile App Development</option>
+              <option value="Database Administration">Database Administration</option>
+              <option value="Cloud Computing/AWS/Azure">Cloud Computing/AWS/Azure</option>
+              <option value="Cybersecurity">Cybersecurity</option>
+              <option value="Network Administration">Network Administration</option>
+              <option value="DevOps/CI-CD">DevOps/CI-CD</option>
+              <option value="Computer Vision/AI">Computer Vision/AI</option>
+            </optgroup>
+            <optgroup label="General Skills">
+              <option value="Writing/Content Creation">Writing/Content Creation</option>
+              <option value="Public Speaking">Public Speaking</option>
+              <option value="Teaching/Training">Teaching/Training</option>
+              <option value="Photography">Photography</option>
+              <option value="Art/Design/Creative">Art/Design/Creative</option>
+              <option value="Music/Performance">Music/Performance</option>
+              <option value="Sports/Athletics">Sports/Athletics</option>
+              <option value="Cooking/Culinary">Cooking/Culinary</option>
+              <option value="Crafts/Handicrafts">Crafts/Handicrafts</option>
+              <option value="Gardening/Agriculture">Gardening/Agriculture</option>
+            </optgroup>
+            <option value="None">None of the above</option>
           </select>
           {errors.prior_experience && <span className="error-text">{errors.prior_experience}</span>}
         </div>
