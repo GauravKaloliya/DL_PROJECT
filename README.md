@@ -78,7 +78,7 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 | `TOO_FAST_SECONDS` | `5` | Flags submissions as too fast below this duration |
 | `IP_HASH_SALT` | `local-salt` | Salt for anonymizing IP addresses |
 | `SECRET_KEY` | auto-generated | Flask session secret |
-| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated list of allowed origins |
+| `CORS_ORIGINS` | `http://localhost:5173` + `WEBSITE_URL` | Comma-separated list of allowed origins. If not set, defaults to localhost + WEBSITE_URL |
 
 ### Frontend
 
@@ -206,8 +206,9 @@ C.O.G.N.I.T. collects human image descriptions to advance AI model training for:
 
 ### Frontend-Backend Connection
 
-- Verify CORS_ORIGINS includes your frontend URL
-- Check VITE_API_BASE points to correct backend URL
+- **"Unable to connect to the server" error**: This is typically a CORS issue. The backend now automatically includes `WEBSITE_URL` in allowed origins when `CORS_ORIGINS` is not explicitly set. Make sure `WEBSITE_URL` is set to your frontend domain (e.g., `https://www.cognit.online`).
+- If you need to explicitly set origins, use `CORS_ORIGINS=https://www.cognit.online,https://app.cognit.online`
+- Check `VITE_API_BASE` points to correct backend URL (leave empty for same-origin requests)
 - Ensure backend is running and accessible
 
 ## Support
