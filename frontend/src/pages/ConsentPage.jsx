@@ -53,96 +53,107 @@ export default function ConsentPage({
       <div className="welcome-info">
         <h3>Purpose of This Study</h3>
         <p>
-          Welcome to the C.O.G.N.I.T. research study. This study aims to advance our understanding 
-          of how humans perceive, interpret, and describe visual content. Your responses will help 
-          researchers and AI developers improve image understanding systems and natural language 
-          generation models. This research is conducted in accordance with ethical guidelines for 
-          human subjects research.
+          Welcome to the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research study. 
+          This study aims to advance our understanding of how humans perceive, interpret, and describe 
+          visual content. Your detailed image descriptions will help researchers and AI developers 
+          improve image understanding systems, natural language generation models, and cognitive 
+          computing research. This study is conducted in accordance with ethical guidelines for 
+          human subjects research with a focus on Indian participants.
         </p>
 
         <h3>Study Procedures</h3>
-        <p>If you choose to participate, you will be asked to:</p>
+        <p>If you choose to participate, you will complete the following steps:</p>
         <ul>
-          <li>Provide basic demographic information (age, gender, language background)</li>
-          <li>View a series of images presented one at a time on your screen</li>
-          <li>Write detailed, descriptive responses for each image (minimum 60 words per description)</li>
-          <li>Rate each image on a complexity scale from 1 to 10</li>
-          <li>Share brief feedback about your experience after each image</li>
-          <li>Complete a practice survey set before proceeding to main trials</li>
-          <li>Participate in occasional attention-check tasks with simple instructions</li>
+          <li><strong>Registration:</strong> Create an account with a valid Indian mobile number and supported email (Gmail, Outlook, Hotmail, or iCloud)</li>
+          <li><strong>Demographics:</strong> Provide basic information including age (13-100 years), gender, location in India, and native Indian language</li>
+          <li><strong>Entry:</strong> Pay a nominal ₹1 participation fee to unlock your chance to win ₹10 (10x reward)</li>
+          <li><strong>Practice Survey:</strong> Complete practice trials to familiarize yourself with the task</li>
+          <li><strong>Main Task:</strong> View images one at a time and write detailed descriptions (minimum 60 words each)</li>
+          <li><strong>Rating & Feedback:</strong> Rate each image's complexity (1-10) and provide brief feedback</li>
+          <li><strong>Attention Checks:</strong> Complete simple attention-check tasks to ensure data quality</li>
         </ul>
 
         <h3>Duration & Participation</h3>
         <p>
           The entire session typically takes <strong>15-20 minutes</strong> to complete. 
           You may take breaks between images as needed. Participation is entirely voluntary, 
-          and you may withdraw at any point without penalty or loss of benefits. If you choose 
-          to withdraw, any data collected up to that point may be retained for research purposes 
-          unless you specifically request its deletion.
+          and you may withdraw at any point without penalty. If you withdraw before completing 
+          the study, you will forfeit entry into the reward selection, but your data may be 
+          retained for research purposes unless you specifically request deletion.
         </p>
 
-        <h3>Compensation & Rewards</h3>
-        <p>
-          Upon completion, you will be entered into a random selection for a <strong>₹10 reward</strong>. 
-          Active participants who provide detailed, thoughtful descriptions may be added to a 
-          priority pool for increased chances of selection in future studies. Rewards are distributed 
-          via UPI transfer within 24-48 hours of selection.
-        </p>
+        <h3>Compensation & Rewards Program</h3>
+        <ul>
+          <li><strong>Entry Fee:</strong> ₹1 non-refundable participation fee</li>
+          <li><strong>Reward:</strong> Chance to win <strong>₹10</strong> (10x your entry fee)</li>
+          <li><strong>Selection:</strong> Winners are randomly selected with priority given to active participants</li>
+          <li><strong>Priority Pool:</strong> Participants who provide detailed descriptions (500+ total words) or complete multiple rounds (3+) get priority status for higher winning chances</li>
+          <li><strong>Payment:</strong> Rewards distributed via UPI transfer within 24-48 hours of selection</li>
+        </ul>
 
         <h3>Data Privacy & Protection</h3>
         <ul>
-          <li>Your responses are stored securely without directly identifying information</li>
-          <li>IP addresses are cryptographically hashed with a salt for privacy protection</li>
-          <li>Data is used exclusively for academic research, AI model training, and improving cognitive understanding</li>
-          <li>Aggregated results may be published in research papers, presentations, or shared with the scientific community</li>
+          <li>Your responses are stored securely with anonymized identifiers</li>
+          <li>IP addresses are cryptographically hashed for privacy protection</li>
+          <li>Personal contact information is stored separately from research data</li>
+          <li>Data is used exclusively for academic research and AI model training</li>
+          <li>Aggregated results may be published in research papers and shared with the scientific community</li>
           <li>All data is protected using industry-standard encryption and security practices</li>
-          <li>Your personal contact information (if provided for rewards) is stored separately from your research data</li>
+          <li>We collect: username, email, phone, age, gender, location, native language, and prior experience</li>
+        </ul>
+
+        <h3>Eligibility Requirements</h3>
+        <p>By proceeding, you confirm that you meet the following criteria:</p>
+        <ul>
+          <li>You are between <strong>13 and 100 years</strong> of age</li>
+          <li>You have a valid <strong>Indian mobile number</strong> (10 digits starting with 6, 7, 8, or 9)</li>
+          <li>You have an email address from <strong>Gmail, Outlook, Hotmail, or iCloud</strong></li>
+          <li>You are currently located in India</li>
+          <li>You speak one of the listed Indian languages as your native language</li>
+          <li>You have read and understood this consent form</li>
+          <li>You are participating of your own free will</li>
+          <li>You understand that your anonymized responses will be used for research purposes</li>
         </ul>
 
         <h3>Risks & Benefits</h3>
         <p>
           <strong>Risks:</strong> The risks associated with this study are minimal. You may 
-          experience mild fatigue from writing descriptions. There are no known physical, psychological, 
-          or social risks.
+          experience mild fatigue from writing detailed descriptions. There are no known physical, 
+          psychological, or social risks. The ₹1 entry fee is non-refundable.
         </p>
         <p>
           <strong>Benefits:</strong> While you may not receive direct personal benefit, your 
           participation contributes to scientific knowledge about human cognition and helps improve 
-          AI systems. You will also have the opportunity to win a monetary reward.
+          AI systems. You will have the opportunity to win a monetary reward, and active participants 
+          gain priority status for future study opportunities.
         </p>
 
         <h3>Voluntary Participation & Right to Withdraw</h3>
         <p>
           Your participation is completely voluntary. You are free to decline participation or 
-          withdraw at any time without penalty, prejudice, or loss of benefits. If you withdraw 
-          before completing the study, you will forfeit entry into the reward selection.
+          withdraw at any time without penalty or prejudice. If you withdraw before completing 
+          the study, you will forfeit entry into the reward selection but will not be penalized 
+          in any way.
         </p>
 
         <h3>Contact Information</h3>
         <p>
-          If you have any questions about this study, your rights as a participant, or wish to 
-          request deletion of your data, please contact:
+          If you have any questions about this study, your rights as a participant, experience 
+          technical issues, or wish to request deletion of your data, please contact:
         </p>
         <p>
           <strong>Research Team:</strong> research@cognit.org
         </p>
 
-        <h3>Eligibility Requirements</h3>
-        <p>By proceeding, you confirm that:</p>
-        <ul>
-          <li>You are at least 18 years of age</li>
-          <li>You have read and understood this consent form</li>
-          <li>You have the capacity to consent to participate</li>
-          <li>You are participating of your own free will</li>
-          <li>You understand that your anonymized responses will be used for research purposes</li>
-        </ul>
-
         <h3>Consent Statement</h3>
         <p>
           By checking the box below and clicking "Continue," you acknowledge that you have read 
           this consent form, understand its contents, and agree to participate in this research 
-          study voluntarily. You understand that your participation is voluntary and that you 
-          are free to withdraw at any time without penalty.
+          study voluntarily. You confirm that you meet the eligibility requirements, understand 
+          the ₹1 entry fee is non-refundable, and agree that your anonymized responses may be 
+          used for research purposes including potential publication of aggregated findings. 
+          You understand your participation is voluntary and you may withdraw at any time without 
+          penalty.
         </p>
       </div>
       
@@ -165,10 +176,12 @@ export default function ConsentPage({
         <label htmlFor="consent-check">
           <strong>I consent to participate in this research study</strong>
           <p style={{ margin: '8px 0 0', fontSize: '13px', color: 'var(--muted)', fontWeight: '400' }}>
-            I confirm that I am 18 years or older, I have read and understood this informed consent form, 
-            and I voluntarily agree to participate in the C.O.G.N.I.T. research study. I understand my 
-            responses will be collected anonymously and used for research purposes, including potential 
-            publication of aggregated findings. I understand I may withdraw at any time without penalty.
+            I confirm that I am between 13-100 years old, I have read and understood this informed consent form, 
+            and I voluntarily agree to participate in the C.O.G.N.I.T. research study. I confirm I have a valid 
+            Indian mobile number and supported email address (Gmail, Outlook, Hotmail, or iCloud). I understand 
+            the ₹1 entry fee is non-refundable. I understand my responses will be collected anonymously and used 
+            for research purposes, including potential publication of aggregated findings. I understand I may 
+            withdraw at any time without penalty.
           </p>
         </label>
       </div>
