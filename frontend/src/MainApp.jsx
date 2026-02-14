@@ -13,15 +13,17 @@ function MainApp() {
       setError(event.error);
     };
 
-    window.addEventListener('error', handleError);
-    window.addEventListener('unhandledrejection', (event) => {
+    const handleUnhandledRejection = (event) => {
       console.error('Unhandled promise rejection:', event.reason);
       setError(event.reason);
-    });
+    };
+
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
 
     return () => {
       window.removeEventListener('error', handleError);
-      window.removeEventListener('unhandledrejection', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
     };
   }, []);
 
