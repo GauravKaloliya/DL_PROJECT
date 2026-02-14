@@ -1,0 +1,10 @@
+# Ignore backup files
+backup_*.sql
+*.sql.gz
+*.dump
+
+# Ignore test databases
+test_*.sql
+
+# Ignore logs
+*.log
