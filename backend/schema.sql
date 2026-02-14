@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS participants (
 
 CREATE TABLE IF NOT EXISTS images (
     image_id VARCHAR(200) PRIMARY KEY,
+    image_url VARCHAR(500) NOT NULL,
     difficulty_score DOUBLE PRECISION,
     object_count INTEGER,
     width INTEGER,

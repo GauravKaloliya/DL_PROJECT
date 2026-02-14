@@ -137,7 +137,9 @@ export default function TrialPage({
     return "Submit your response";
   };
 
-  const imageSrc = trial?.image_url ? getApiUrl(trial.image_url) : "";
+  const imageSrc = trial?.image_url
+    ? (trial.image_url.startsWith('http') ? trial.image_url : getApiUrl(trial.image_url))
+    : "";
 
   // Show loading state if we're waiting for trial data
   if (!trial || !trial.image_id) {
