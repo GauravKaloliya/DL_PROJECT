@@ -46,12 +46,6 @@ export default function ErrorPage({ error, resetError }) {
               Go Home
             </button>
           </div>
-          <div style={{ textAlign: 'center', marginTop: '24px', color: 'var(--muted)', fontSize: '14px' }}>
-            Created by Gaurav Kaloliya
-          </div>
-          <div style={{ textAlign: 'center', marginTop: '8px', color: 'var(--muted)', fontSize: '14px' }}>
-            <strong>Gaurav Kaloliya</strong> - Innovating Cognitive Research Tools
-          </div>
         </div>
       </div>
     </div>
