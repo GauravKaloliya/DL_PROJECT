@@ -14,7 +14,7 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from sqlalchemy import create_engine, text, event, Column, Integer, String, Boolean, Float, TIMESTAMP, CheckConstraint, ForeignKey
 from sqlalchemy.orm import sessionmaker, scoped_session, declarative_base
-from sqlalchemy.pool import QueuePool
+from sqlalchemy.pool import QueuePool, NullPool
 
 BASE_DIR = Path(__file__).resolve().parent
 IMAGES_DIR = BASE_DIR / "images"
@@ -42,6 +42,7 @@ if DATABASE_URL.startswith("postgres://"):
 
 # Website URL for CORS and documentation
 WEBSITE_URL = os.getenv("WEBSITE_URL", "").strip()
+IS_VERCEL = os.getenv("VERCEL_ENV") is not None
 
 app = Flask(__name__)
 
@@ -56,12 +57,19 @@ app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1 MB max request size
 # SQLAlchemy configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-    'pool_size': 10,
-    'pool_recycle': 3600,
-    'pool_pre_ping': True,
-    'max_overflow': 20
-}
+if IS_VERCEL:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_pre_ping': True,
+        'poolclass': NullPool
+    }
+else:
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 10,
+        'pool_recycle': 3600,
+        'pool_pre_ping': True,
+        'max_overflow': 20,
+        'poolclass': QueuePool
+    }
 
 def _get_cors_origins():
     env_origins = os.getenv("CORS_ORIGINS", "").strip()
@@ -70,9 +78,10 @@ def _get_cors_origins():
         if "*" in origins:
             return "*"
         return origins
+    is_production = os.getenv("FLASK_ENV") == "production" or os.getenv("VERCEL_ENV") == "production"
     if not WEBSITE_URL:
         # Never allow "*" in production
-        if os.getenv("FLASK_ENV") == "production":
+        if is_production:
             raise ValueError("WEBSITE_URL required in production")
         return "*"
     origins = ["http://localhost:5173"]
@@ -103,22 +112,10 @@ env_storage_uri = os.getenv("RATELIMIT_STORAGE_URI", "").strip()
 if env_storage_uri:
     # Parse the URI and force database 0
     if env_storage_uri.startswith("redis://") or env_storage_uri.startswith("rediss://"):
-        # Remove any existing database specification and force /0
-        import urllib.parse
-        parsed = urllib.parse.urlparse(env_storage_uri)
-        # Reconstruct with database 0
-        netloc = parsed.netloc
-        if "@" in netloc:
-            auth, host = netloc.rsplit("@", 1)
-        else:
-            auth, host = None, netloc
-        
-        if host.endswith("/0") or host.endswith("/1") or host.endswith("/2"):
-            # Remove existing database number
-            host = host.rsplit("/", 1)[0]
-        
-        # Force database 0
-        storage_uri = f"{parsed.scheme}://{auth + '@' if auth else ''}{host}/0"
+        from urllib.parse import urlparse, urlunparse
+
+        parsed = urlparse(env_storage_uri)
+        storage_uri = urlunparse(parsed._replace(path="/0"))
         app.logger.info(f"Using Redis with forced database 0: {storage_uri}")
     else:
         storage_uri = env_storage_uri
@@ -171,14 +168,21 @@ def add_security_headers(response):
 
 
 # Database connection setup using SQLAlchemy
-engine = create_engine(
-    DATABASE_URL,
-    poolclass=QueuePool,
-    pool_size=10,
-    max_overflow=20,
-    pool_pre_ping=True,
-    echo=False
-)
+engine_options = {
+    "pool_pre_ping": True,
+    "echo": False
+}
+if IS_VERCEL:
+    engine_options["poolclass"] = NullPool
+else:
+    engine_options.update({
+        "poolclass": QueuePool,
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_recycle": 3600
+    })
+
+engine = create_engine(DATABASE_URL, **engine_options)
 
 SessionLocal = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
@@ -1146,6 +1150,7 @@ def submit():
     attention_row = attention_result.fetchone()
     is_attention = attention_row is not None
     attention_passed = None
+    current_attention_score = None
     
     if is_attention:
         expected_word = attention_row[0].strip().lower()
