@@ -539,9 +539,12 @@ export default function App() {
     <ErrorBoundary onError={() => addToast("Unexpected error occurred.", "error")}>
       <div className="app">
         <header className="header">
-          <div>
-            <h1>C.O.G.N.I.T.</h1>
-            <p className="subtitle">Describe each image with as much detail as possible</p>
+          <div className="header-left">
+            <img src="/cognit_logo.png" alt="C.O.G.N.I.T. Logo" className="logo" />
+            <div>
+              <h1>C.O.G.N.I.T.</h1>
+              <p className="subtitle">Describe each image with as much detail as possible</p>
+            </div>
           </div>
           <div className="header-actions">
             <button

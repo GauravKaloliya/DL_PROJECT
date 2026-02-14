@@ -15,6 +15,9 @@ export default function ErrorPage({ error, resetError }) {
   return (
     <div className="app">
       <div className="panel">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+          <img src="/cognit_logo.png" alt="C.O.G.N.I.T. Logo" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+        </div>
         <div className="page-hero">
           <h1 style={{ color: 'var(--warning)', fontSize: '48px', marginBottom: '16px' }}>Oops!</h1>
           <h2 style={{ marginBottom: '16px' }}>Something went wrong</h2>
@@ -25,10 +28,10 @@ export default function ErrorPage({ error, resetError }) {
           {error?.stack && import.meta.env.DEV && (
             <details style={{ marginBottom: '32px', textAlign: 'left' }}>
               <summary style={{ cursor: 'pointer', marginBottom: '16px' }}>Error Details (Development)</summary>
-              <pre style={{ 
-                background: 'var(--bg)', 
-                padding: '16px', 
-                borderRadius: '8px', 
+              <pre style={{
+                background: 'var(--bg)',
+                padding: '16px',
+                borderRadius: '8px',
                 overflow: 'auto',
                 fontSize: '12px',
                 maxHeight: '300px'
