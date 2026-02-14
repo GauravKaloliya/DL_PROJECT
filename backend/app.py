@@ -30,10 +30,9 @@ RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
 razorpay_client = None
 
-# Get database URL from environment variables (supports multiple provider naming conventions)
-DATABASE_URL = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRES_PRISMA_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is required (alternatives: POSTGRES_URL, POSTGRES_PRISMA_URL)")
+    raise ValueError("DATABASE_URL environment variable is required")
 
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
