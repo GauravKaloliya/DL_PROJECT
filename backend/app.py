@@ -1370,7 +1370,6 @@ def _get_api_documentation():
             }
         },
         "changelog": {
-            "4.0.0": "Implemented backend-controlled attention check system with attention_checks and attention_stats tables, removed frontend attention logic, added quality control with participant flagging, updated reward eligibility to require attention_score >= 0.75",
             "3.5.0": "Migrated from SQLite to PostgreSQL for production deployment compatibility",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
@@ -1386,7 +1385,7 @@ def _get_api_documentation():
 def serve_api_docs():
     """Serve API documentation at root path"""
     return render_template("api_docs.html", 
-                         version="4.0.0", 
+                         version="3.5.0", 
                          base_url="/api")
 
 @app.route("/api/docs")

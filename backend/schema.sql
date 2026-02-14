@@ -287,7 +287,7 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 
 INSERT INTO database_metadata (key, value)
 VALUES
-    ('version', '4.0.0'),
+    ('version', '3.2.0'),
     ('schema_updated', CURRENT_TIMESTAMP::text),
     ('description', 'C.O.G.N.I.T. Research Platform Database')
 ON CONFLICT (key) DO NOTHING;
