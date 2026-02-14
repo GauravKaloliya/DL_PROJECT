@@ -5,14 +5,18 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
 RUN npm install
 
-# Copy source code
+# Copy source
 COPY . .
 
-# Expose port
-EXPOSE 5173
+# Build for production
+RUN npm run build
 
-# Development command
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Install lightweight static server
+RUN npm install -g serve
+
+EXPOSE 10000
+
+# Render provides PORT env variable
+CMD ["sh", "-c", "serve -s dist -l $PORT"]
