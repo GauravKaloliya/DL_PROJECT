@@ -2,12 +2,16 @@ FROM node:18-slim
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy package files first for better caching
+COPY package.json package-lock.json ./
 
-RUN npm install
+# Verify package files exist before npm install
+RUN ls -la *.json || echo "No package files found"
 
-# Copy source
+# Install all dependencies (including devDependencies needed for build)
+RUN npm ci
+
+# Copy source code
 COPY . .
 
 # Build for production
