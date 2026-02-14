@@ -8,8 +8,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from contextlib import contextmanager
 
-import razorpay
-
 from flask import Flask, jsonify, request, send_from_directory, abort, g, render_template
 from flask_cors import CORS
 from flask_limiter import Limiter
@@ -30,9 +28,8 @@ RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
 RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET")
 
+# Lazy-loaded razorpay client - will be initialized when first payment endpoint is called
 razorpay_client = None
-if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
-    razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 # PostgreSQL Database URL - must be set via environment variable
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -148,6 +145,20 @@ def close_db(exception):
     if db is not None:
         db.close()
         SessionLocal.remove()
+
+
+def get_razorpay_client():
+    """Lazily initialize and return razorpay client"""
+    global razorpay_client
+    if razorpay_client is None:
+        if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+            try:
+                import razorpay
+                razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+            except Exception as e:
+                app.logger.error(f"Failed to initialize Razorpay client: {e}")
+                return None
+    return razorpay_client
 
 
 # Database schema is managed via SQL editor in Neon DB - no DDL code here
@@ -756,7 +767,11 @@ def create_order():
     if not participant_id:
         return jsonify({"error": "participant_id required"}), 400
 
-    if not razorpay_client or not RAZORPAY_KEY_ID:
+    if not RAZORPAY_KEY_ID:
+        return jsonify({"error": "Payment gateway not configured"}), 500
+
+    client = get_razorpay_client()
+    if not client:
         return jsonify({"error": "Payment gateway not configured"}), 500
 
     amount = 100
@@ -769,7 +784,7 @@ def create_order():
         return jsonify({"error": "Participant not found"}), 400
 
     try:
-        order = razorpay_client.order.create({
+        order = client.order.create({
             "amount": amount,
             "currency": "INR",
             "receipt": f"receipt_{participant_id}",
@@ -808,11 +823,13 @@ def verify_payment():
     if missing_fields:
         return jsonify({"error": "Missing payment fields", "fields": missing_fields}), 400
 
-    if not razorpay_client:
+    client = get_razorpay_client()
+    if not client:
         return jsonify({"error": "Payment gateway not configured"}), 500
 
     try:
-        razorpay_client.utility.verify_payment_signature(data)
+        import razorpay
+        client.utility.verify_payment_signature(data)
     except razorpay.errors.SignatureVerificationError:
         return jsonify({"error": "Invalid signature"}), 400
 
@@ -836,8 +853,12 @@ def verify_payment():
 @app.route("/api/payment/webhook", methods=["POST"])
 @track_performance
 def payment_webhook():
-    if not razorpay_client or not RAZORPAY_WEBHOOK_SECRET:
+    if not RAZORPAY_WEBHOOK_SECRET:
         return jsonify({"error": "Payment webhook not configured"}), 500
+
+    client = get_razorpay_client()
+    if not client:
+        return jsonify({"error": "Payment gateway not configured"}), 500
 
     payload = request.get_data()
     signature = request.headers.get("X-Razorpay-Signature")
@@ -846,7 +867,8 @@ def payment_webhook():
         return jsonify({"error": "Missing webhook signature"}), 400
 
     try:
-        razorpay_client.utility.verify_webhook_signature(
+        import razorpay
+        client.utility.verify_webhook_signature(
             payload,
             signature,
             RAZORPAY_WEBHOOK_SECRET
