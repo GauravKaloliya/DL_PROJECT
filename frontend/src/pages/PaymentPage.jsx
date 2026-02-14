@@ -80,6 +80,12 @@ export default function PaymentPage({
         order_id: data.order_id,
         name: "C.O.G.N.I.T.",
         description: "Research participation fee",
+        method: {
+          upi: true,
+          card: true,
+          netbanking: true,
+          wallet: true
+        },
         config: {
           display: {
             preferences: {

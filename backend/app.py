@@ -71,6 +71,9 @@ def _get_cors_origins():
             return "*"
         return origins
     if not WEBSITE_URL:
+        # Never allow "*" in production
+        if os.getenv("FLASK_ENV") == "production":
+            raise ValueError("WEBSITE_URL required in production")
         return "*"
     origins = ["http://localhost:5173"]
     if WEBSITE_URL not in origins:
@@ -840,6 +843,24 @@ def create_order():
     if not participant_row:
         return jsonify({"error": "Participant not found"}), 400
 
+    # Check for existing unpaid order to prevent duplicates
+    existing_order = db.execute(text("""
+        SELECT razorpay_order_id, status
+        FROM payments
+        WHERE participant_id = :participant_id
+        ORDER BY created_at DESC
+        LIMIT 1
+    """), {"participant_id": participant_id}).fetchone()
+
+    if existing_order and existing_order[1] != 'paid':
+        # Return existing unpaid order instead of creating new one
+        return jsonify({
+            "order_id": existing_order[0],
+            "key": RAZORPAY_KEY_ID,
+            "amount": amount,
+            "currency": "INR"
+        })
+
     try:
         receipt_value = generate_receipt(participant_id)
         order = client.order.create({
@@ -896,13 +917,25 @@ def verify_payment():
     db.execute(text("""
         UPDATE payments
         SET razorpay_payment_id = :payment_id,
-            razorpay_signature = :signature
+            razorpay_signature = :signature,
+            status = 'paid',
+            paid_at = CURRENT_TIMESTAMP
         WHERE razorpay_order_id = :order_id
     """), {
         "payment_id": data["razorpay_payment_id"],
         "signature": data["razorpay_signature"],
         "order_id": data["razorpay_order_id"]
     })
+
+    # Also update participant payment_status
+    db.execute(text("""
+        UPDATE participants
+        SET payment_status = 'paid'
+        WHERE participant_id = (
+            SELECT participant_id FROM payments
+            WHERE razorpay_order_id = :order_id
+        )
+    """), {"order_id": data["razorpay_order_id"]})
 
     db.commit()
 
@@ -945,27 +978,30 @@ def payment_webhook():
         if order_id and payment_id:
             db = get_db()
 
-            db.execute(text("""
+            result = db.execute(text("""
                 UPDATE payments
                 SET status = 'paid',
                     razorpay_payment_id = :payment_id,
                     paid_at = CURRENT_TIMESTAMP
                 WHERE razorpay_order_id = :order_id
+                  AND status != 'paid'
             """), {
                 "payment_id": payment_id,
                 "order_id": order_id
             })
 
-            db.execute(text("""
-                UPDATE participants
-                SET payment_status = 'paid'
-                WHERE participant_id = (
-                    SELECT participant_id FROM payments
-                    WHERE razorpay_order_id = :order_id
-                )
-            """), {"order_id": order_id})
+            # If rowcount == 0, payment was already processed (idempotency)
+            if result.rowcount > 0:
+                db.execute(text("""
+                    UPDATE participants
+                    SET payment_status = 'paid'
+                    WHERE participant_id = (
+                        SELECT participant_id FROM payments
+                        WHERE razorpay_order_id = :order_id
+                    )
+                """), {"order_id": order_id})
 
-            db.commit()
+                db.commit()
 
     return jsonify({"status": "ok"})
 
@@ -1336,9 +1372,7 @@ def security_info():
                 "reward_selection": "10 per minute per IP, 60 seconds cooldown per participant"
             },
             "rate_limit_storage": {
-                "current_backend": "memory" if actual_storage_uri == "memory://" else "redis",
-                "configured_uri": storage_uri,
-                "actual_uri": actual_storage_uri,
+                "configured_backend": "redis" if actual_storage_uri != "memory://" else "memory",
                 "fallback_behavior": "Automatically falls back to memory storage if configured Redis backend is unavailable"
             },
             "content_length_limit": "1 MB (1048576 bytes)",
