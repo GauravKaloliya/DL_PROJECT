@@ -8,7 +8,7 @@ Usage:
   python init_db.py <connection-url>   # Initialize with provided connection URL
 
 Environment Variables:
-  DATABASE_URL or POSTGRES_URL - PostgreSQL connection string
+  DATABASE_URL - PostgreSQL connection string
 """
 
 import os
@@ -21,9 +21,8 @@ def get_database_url():
     if len(sys.argv) > 1:
         return sys.argv[1]
     
-    # Try multiple environment variable names (Neon uses different names)
-    url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL") or os.getenv("POSTGRES_PRISMA_URL")
-    
+    url = os.getenv("DATABASE_URL")
+
     if not url:
         print("Error: DATABASE_URL environment variable is required")
         sys.exit(1)
