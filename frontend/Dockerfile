@@ -2,7 +2,7 @@ FROM node:18-slim
 
 WORKDIR /app
 
-COPY . .
+COPY frontend/ .
 
 RUN npm install
 RUN npm run build
