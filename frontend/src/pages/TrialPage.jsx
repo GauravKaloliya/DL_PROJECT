@@ -31,7 +31,8 @@ export default function TrialPage({
   onSurveyContinue,
   onSurveyFinish,
   fetchError = null,
-  onRetry
+  onRetry,
+  surveyCompleted = 0
 }) {
   const [description, setDescription] = useState("");
   const [rating, setRating] = useState(0);
@@ -191,7 +192,8 @@ export default function TrialPage({
           </div>
           <h2 style={{ color: 'var(--success)', marginBottom: '20px', marginTop: '0' }}>Survey Complete!</h2>
           <p style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
-            Great job on your survey trial! You can now choose to continue with more survey 
+            Great job on your survey trial! You have completed {surveyCompleted} survey
+            {surveyCompleted === 1 ? ' trial' : ' trials'}. You can now choose to continue with more survey 
             images or finish the study.
           </p>
           <div style={{

@@ -117,7 +117,7 @@ export default function App() {
   const [trial, setTrial] = useState(getStoredValue("trial", null));
   const [surveyCompleted, setSurveyCompleted] = useState(getStoredValue("surveyCompleted", 0));
   const [mainCompleted, setMainCompleted] = useState(getStoredValue("mainCompleted", 0));
-  const [surveyFeedbackReady, setSurveyFeedbackReady] = useState(false);
+  const [surveyFeedbackReady, setSurveyFeedbackReady] = useState(getStoredValue("surveyFeedbackReady", false));
   const [readyForNext, setReadyForNext] = useState(false);
   const [fetchingImage, setFetchingImage] = useState(false);
   const [shownImages, setShownImages] = useState(getStoredValue("shownImages", []));
@@ -136,6 +136,7 @@ export default function App() {
   useEffect(() => { saveStoredValue("trial", trial); }, [trial]);
   useEffect(() => { saveStoredValue("surveyCompleted", surveyCompleted); }, [surveyCompleted]);
   useEffect(() => { saveStoredValue("mainCompleted", mainCompleted); }, [mainCompleted]);
+  useEffect(() => { saveStoredValue("surveyFeedbackReady", surveyFeedbackReady); }, [surveyFeedbackReady]);
   useEffect(() => { saveStoredValue("shownImages", shownImages); }, [shownImages]);
   useEffect(() => { saveStoredValue("darkMode", darkMode); document.body.classList.toggle("dark", darkMode); }, [darkMode]);
   
@@ -275,6 +276,7 @@ export default function App() {
   // Handle payment completion
   const handlePaymentComplete = async () => {
     setStage("survey");
+    setSurveyFeedbackReady(false); // Reset feedback state for new survey session
     try {
       await fetchImage();
       addToast("Payment completed successfully", "success");
@@ -395,7 +397,9 @@ export default function App() {
     setTimeout(() => setShowConfetti(false), 1200);
 
     if (trial.is_survey) {
+      // Update survey completed count
       setSurveyCompleted((prev) => prev + 1);
+      // Show feedback screen after survey submission
       setSurveyFeedbackReady(true);
     } else {
       setMainCompleted((prev) => prev + 1);
@@ -428,7 +432,7 @@ export default function App() {
     setStage("finished");
   };
 
-  // Handle survey continue
+  // Handle survey continue - fetch next survey image
   const handleSurveyContinue = async () => {
     setSurveyFeedbackReady(false);
     await fetchImage();
@@ -436,6 +440,7 @@ export default function App() {
 
   // Handle survey finish
   const handleSurveyFinish = () => {
+    setSurveyFeedbackReady(false); // Reset feedback state
     setStage("finished");
   };
 
@@ -511,6 +516,7 @@ export default function App() {
             onSurveyFinish={handleSurveyFinish}
             fetchError={imageError}
             onRetry={fetchImage}
+            surveyCompleted={surveyCompleted}
           />
         );
       
