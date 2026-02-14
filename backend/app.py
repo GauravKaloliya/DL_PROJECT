@@ -123,6 +123,24 @@ else:
     storage_uri = "memory://"
     app.logger.info("Using memory storage for rate limiting")
 
+
+def _validate_rate_limit_storage(uri: str) -> str:
+    if uri.startswith(("redis://", "rediss://", "redis+unix://", "valkey://", "valkeys://", "valkey+unix://")):
+        try:
+            from limits.storage import storage_from_string
+
+            storage = storage_from_string(uri)
+            if hasattr(storage, "get_connection"):
+                storage.get_connection().ping()
+            return uri
+        except Exception as exc:
+            app.logger.warning(f"Rate limit storage unavailable ({exc}); using memory storage")
+            return "memory://"
+    return uri
+
+
+storage_uri = _validate_rate_limit_storage(storage_uri)
+
 # Try to initialize limiter with the configured storage
 try:
     limiter = Limiter(
