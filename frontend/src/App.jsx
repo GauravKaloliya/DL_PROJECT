@@ -346,9 +346,7 @@ export default function App() {
       rating: formData.rating,
       feedback: formData.comments,
       time_spent_seconds: formData.timeSpentSeconds,
-      is_survey: trial.is_survey || false,
-      is_attention: trial.is_attention || false,
-      attention_expected: formData.attentionExpected
+      is_survey: trial.is_survey || false
     };
 
     const response = await fetch(getApiUrl('/api/submit'), {
