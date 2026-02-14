@@ -7,6 +7,9 @@ export default function NotFound() {
   return (
     <div className="app">
       <div className="panel">
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '24px' }}>
+          <img src="/cognit_logo.png" alt="C.O.G.N.I.T. Logo" style={{ width: '80px', height: '80px', objectFit: 'contain' }} />
+        </div>
         <div className="page-hero">
           <div className="not-found-dog">
             <svg viewBox="0 0 200 240" role="img" aria-label="Cute full body dog illustration">

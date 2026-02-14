@@ -71,6 +71,18 @@ body {
   box-shadow: var(--shadow);
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo {
+  width: 50px;
+  height: 50px;
+  object-fit: contain;
+}
+
 .header h1 {
   margin: 0;
   font-weight: 700;

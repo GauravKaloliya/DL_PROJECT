@@ -780,6 +780,11 @@ def serve_image(image_id):
     return send_from_directory(IMAGES_DIR, image_id)
 
 
+@app.route("/cognit_logo.png")
+def serve_logo():
+    return send_from_directory(BASE_DIR, "cognit_logo.png")
+
+
 @app.route("/api/submit", methods=["POST"])
 @limiter.limit("60 per minute")
 @track_performance
