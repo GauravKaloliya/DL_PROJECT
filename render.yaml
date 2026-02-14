@@ -16,22 +16,17 @@ services:
     # Note: Set DATABASE_URL and SECRET_KEY via Render Dashboard
     # DATABASE_URL will be automatically available when connecting a PostgreSQL database
     healthCheckPath: /api/health
-    
-  # Frontend Static Site
-  - type: static
+
+  # Frontend Web Service (Docker)
+  - type: web
     name: cognit-frontend
-    buildCommand: "cd frontend && npm install && npm run build"
-    staticPublishPath: ./frontend/dist
-    headers:
-      - path: /*
-        name: X-Content-Type-Options
-        value: nosniff
-      - path: /*
-        name: X-Frame-Options
-        value: DENY
-      - path: /*
-        name: X-XSS-Protection
-        value: 1; mode=block
+    env: docker
+    plan: starter
+    dockerContext: ./frontend
+    dockerfilePath: ./frontend/Dockerfile
+    envVars:
+      - key: PORT
+        value: 10000
 
 # PostgreSQL Database (create separately in Render Dashboard)
 # After creating, connect it to the backend service

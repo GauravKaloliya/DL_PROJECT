@@ -17,7 +17,7 @@ C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) is a full-stack resea
 - **Frontend:** React 18 + Vite 5 (SPA)
 - **Backend:** Python Flask 3 (REST API)
 - **Storage:** PostgreSQL database for participants, consent, submissions, and audit logs
-- **Deployment:** Vercel + Neon PostgreSQL, Render.com compatible
+- **Deployment:** Render.com
 
 ## Repository Structure
 
@@ -88,39 +88,18 @@ The frontend runs on `http://localhost:5173` and connects to the backend API. Se
 
 ## Deployment
 
-### Vercel + Neon PostgreSQL (Recommended)
-
-For serverless deployment with Neon PostgreSQL:
-
-**Quick Start:**
-See [VERCEL_QUICKSTART.md](./VERCEL_QUICKSTART.md) for a condensed deployment guide.
-
-**Detailed Guide:**
-See [VERCEL_DEPLOYMENT.md](./VERCEL_DEPLOYMENT.md) for comprehensive step-by-step instructions.
-
-**Key Steps:**
-1. Create a Neon PostgreSQL database ([neon.tech](https://neon.tech))
-2. Deploy backend to Vercel (root directory: `backend`)
-3. Deploy frontend to Vercel (root directory: `frontend`)
-4. Initialize database: `python backend/init_db.py <database-url>`
-5. Configure CORS and environment variables
-
-**Helper Script:**
-```bash
-./scripts/vercel-setup.sh  # Verify setup before deployment
-```
-
-### Render.com (Alternative)
+### Render.com
 
 For traditional server-based deployment:
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Render.com deployment instructions.
 
 **Quick Steps:**
 1. Create PostgreSQL database on Render
 2. Deploy backend as Web Service (from `backend/` directory)
 3. Deploy frontend as Static Site (from `frontend/` directory)
 4. Database initializes automatically on first backend start
+
+**Configuration:**
+The project includes `render.yaml` for automated deployment. Simply connect your repository to Render and it will detect the configuration automatically.
 
 ## Key Endpoints
 
@@ -193,7 +172,7 @@ C.O.G.N.I.T. collects human image descriptions to advance AI model training for:
 - Uses SQLAlchemy ORM for database operations
 - Implements connection pooling for performance
 - Database migrations handled via SQL scripts
-- Compatible with Render.com deployment platform
+- Deployed on Render.com
 
 ## Troubleshooting
 
