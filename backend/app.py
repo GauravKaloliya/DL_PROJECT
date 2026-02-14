@@ -93,12 +93,29 @@ CORS(app, resources={
 # Use memory storage with URI to avoid production warning
 # For distributed deployments, consider Redis: redis://host:port
 storage_uri = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
-limiter = Limiter(
-    app=app,
-    key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"],
-    storage_uri=storage_uri
-)
+
+# Try to initialize limiter with the configured storage
+try:
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri=storage_uri
+    )
+    # Track the actual backend being used
+    actual_storage_uri = storage_uri
+except Exception as e:
+    # Fallback to memory storage if the configured storage fails (e.g., Redis not available)
+    app.logger.warning(f"Failed to initialize rate limiter with storage URI '{storage_uri}': {e}")
+    app.logger.warning("Falling back to memory storage for rate limiting")
+    limiter = Limiter(
+        app=app,
+        key_func=get_remote_address,
+        default_limits=["200 per day", "50 per hour"],
+        storage_uri="memory://"
+    )
+    # Track that we fell back to memory
+    actual_storage_uri = "memory://"
 
 # Security headers middleware
 @app.after_request
@@ -1279,6 +1296,12 @@ def security_info():
                 "submission": "60 per minute",
                 "api_docs": "30 per minute",
                 "reward_selection": "10 per minute per IP, 60 seconds cooldown per participant"
+            },
+            "rate_limit_storage": {
+                "current_backend": "memory" if actual_storage_uri == "memory://" else "redis",
+                "configured_uri": storage_uri,
+                "actual_uri": actual_storage_uri,
+                "fallback_behavior": "Automatically falls back to memory storage if configured Redis backend is unavailable"
             },
             "content_length_limit": "1 MB (1048576 bytes)",
             "cors_configuration": {
