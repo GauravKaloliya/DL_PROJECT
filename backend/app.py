@@ -788,7 +788,7 @@ def create_order():
     if not participant_id:
         return jsonify({"error": "participant_id required"}), 400
 
-    if not RAZORPAY_KEY_ID:
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
         return jsonify({"error": "Payment gateway not configured"}), 500
 
     client = get_razorpay_client()
@@ -812,6 +812,7 @@ def create_order():
             "payment_capture": 1
         })
     except Exception as e:
+        app.logger.error(f"Razorpay order creation failed: {e}")
         return jsonify({"error": "Failed to create payment order", "details": str(e)}), 500
 
     db.execute(text("""
