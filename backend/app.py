@@ -814,7 +814,7 @@ def submit():
 
     is_survey = bool(payload.get("is_survey"))
     
-    # Check if image is an attention trial (backend-controlled)
+    # Check if image is an attention check (backend-controlled)
     attention_result = db.execute(text("""
         SELECT expected_word, strict
         FROM attention_checks
@@ -877,24 +877,24 @@ def submit():
     
     # Insert into database
     try:
-        trial_index = payload.get("trial_index", 0)
+        survey_index = payload.get("survey_index", 0)
         try:
-            trial_index = int(trial_index)
+            survey_index = int(survey_index)
         except (TypeError, ValueError):
-            trial_index = 0
+            survey_index = 0
         
         db.execute(text('''
             INSERT INTO submissions 
-            (participant_id, session_id, image_id, image_url, trial_index, description, word_count, rating, 
+            (participant_id, session_id, image_id, image_url, survey_index, description, word_count, rating, 
              feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, user_agent, ip_hash)
-            VALUES (:participant_id, :session_id, :image_id, :image_url, :trial_index, :description, :word_count, :rating, 
+            VALUES (:participant_id, :session_id, :image_id, :image_url, :survey_index, :description, :word_count, :rating, 
              :feedback, :time_spent_seconds, :is_survey, :is_attention, :attention_passed, :too_fast_flag, :user_agent, :ip_hash)
         '''), {
             "participant_id": participant_id,
             "session_id": payload.get("session_id", ""),
             "image_id": image_id,
             "image_url": payload.get("image_url", f"/api/images/{image_id}"),
-            "trial_index": trial_index,
+            "survey_index": survey_index,
             "description": description,
             "word_count": word_count,
             "rating": rating,
@@ -910,7 +910,7 @@ def submit():
         
         db.commit()
         
-        # Update attention stats if this was an attention trial
+        # Update attention stats if this was an attention check
         if is_attention:
             stats = db.execute(text("""
                 SELECT total_checks, passed_checks, failed_checks
@@ -984,7 +984,7 @@ def get_participant_submissions(participant_id):
     db = get_db()
     
     result = db.execute(text('''
-        SELECT id, image_id, trial_index, description, word_count, rating, feedback, 
+        SELECT id, image_id, survey_index, description, word_count, rating, feedback, 
                time_spent_seconds, is_survey, is_attention, attention_passed, created_at
         FROM submissions 
         WHERE participant_id = :participant_id
@@ -998,7 +998,7 @@ def get_participant_submissions(participant_id):
         submissions.append({
             "id": row[0],
             "image_id": row[1],
-            "trial_index": row[2],
+            "survey_index": row[2],
             "description": row[3],
             "word_count": row[4],
             "rating": row[5],
@@ -1302,15 +1302,15 @@ def _get_api_documentation():
                 "rate_limit": "60 per minute",
                 "request_body": {
                     "required": ["participant_id", "image_id", "description", "rating", "feedback", "time_spent_seconds"],
-                    "optional": ["session_id", "image_url", "trial_index", "is_survey"]
+                    "optional": ["session_id", "image_url", "survey_index", "is_survey"]
                 },
                 "validation": {
                     "description": f"Minimum {MIN_WORD_COUNT} words required",
                     "rating": "Integer between 1-10",
                     "feedback": "Minimum 5 characters",
                     "participant_consent": "Participant must have given consent",
-                    "trial_index": "Optional trial sequence number (integer, defaults to 0)",
-                    "attention_checks": "Attention trials are determined server-side based on the image ID"
+                    "survey_index": "Optional survey sequence number (integer, defaults to 0)",
+                    "attention_checks": "Attention checks are determined server-side based on the image ID"
                 },
                 "response": {
                     "status": "ok|error",
@@ -1373,7 +1373,7 @@ def _get_api_documentation():
             "3.5.0": "Migrated from SQLite to PostgreSQL for production deployment compatibility",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
-            "3.2.0": "Added images table, trial_index column to submissions, Data Quality Score view, and Image Coverage view",
+            "3.2.0": "Added images table, survey_index column to submissions, Data Quality Score view, and Image Coverage view",
             "3.1.0": "Updated documentation to reflect only working routes, added detailed validation info, improved error handling section"
         }
     }

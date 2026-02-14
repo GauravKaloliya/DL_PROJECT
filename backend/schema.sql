@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS submissions (
     session_id VARCHAR(100) NOT NULL,
     image_id VARCHAR(200) NOT NULL,
     image_url VARCHAR(500),
-    trial_index INTEGER NOT NULL,
+    survey_index INTEGER NOT NULL,
     description TEXT NOT NULL CHECK (length(description) <= 10000),
     word_count INTEGER CHECK (word_count BETWEEN 0 AND 10000),
     rating INTEGER CHECK (rating BETWEEN 1 AND 10),
