@@ -80,9 +80,12 @@ export default function PaymentPage({
         order_id: data.order_id,
         name: "C.O.G.N.I.T.",
         description: "Research participation fee",
-        method: { upi: true },
-        prefill: {
-          vpa: "success@razorpay"
+        config: {
+          display: {
+            preferences: {
+              show_default_blocks: true
+            }
+          }
         },
         handler: async function (paymentResponse) {
           try {
