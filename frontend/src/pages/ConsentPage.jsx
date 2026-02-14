@@ -68,7 +68,7 @@ export default function ConsentPage({
           <li>View a sequence of everyday and abstract images</li>
           <li>Write detailed, natural descriptions for each image (minimum 60 words)</li>
           <li>Indicate perceived image complexity on a 1–10 scale</li>
-          <li>Respond to a small number of instruction-verification items designed to ensure attentive participation</li>
+          <li>Respond to a small number of attention-verification items (quality control measures)</li>
         </ul>
         <p><strong>Estimated duration:</strong> 15–20 minutes.</p>
         <p>You may pause or discontinue at any time. If platform functionality allows, you may resume later.</p>
