@@ -89,11 +89,15 @@ CORS(app, resources={
     }
 })
 
-# Rate Limiting
+# Rate Limiting with storage backend configuration
+# Use memory storage with URI to avoid production warning
+# For distributed deployments, consider Redis: redis://host:port
+storage_uri = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
 limiter = Limiter(
     app=app,
     key_func=get_remote_address,
-    default_limits=["200 per day", "50 per hour"]
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri=storage_uri
 )
 
 # Security headers middleware
