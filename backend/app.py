@@ -139,55 +139,6 @@ def close_db(exception):
         SessionLocal.remove()
 
 
-def _populate_images():
-    """Populate images table with all images from the images folder"""
-    if not IMAGES_DIR.exists():
-        app.logger.warning(f"Images directory not found at {IMAGES_DIR}")
-        return
-
-    image_files = []
-
-    # Find all SVG files in the images directory and subdirectories
-    for image_path in IMAGES_DIR.rglob("*.svg"):
-        # Create image_id relative to images directory
-        rel_path = image_path.relative_to(IMAGES_DIR)
-        image_id = str(rel_path)
-
-        image_files.append({
-            "image_id": image_id,
-            "difficulty_score": 5.0,
-            "object_count": 1,
-            "width": 800,
-            "height": 600
-        })
-
-    if not image_files:
-        app.logger.warning("No image files found in images directory")
-        return
-
-    app.logger.info(f"Found {len(image_files)} image files")
-
-    # Insert images into database
-    with engine.connect() as conn:
-        inserted = 0
-
-        for image_data in image_files:
-            try:
-                conn.execute(text('''
-                    INSERT INTO images
-                    (image_id, difficulty_score, object_count, width, height)
-                    VALUES (:image_id, :difficulty_score, :object_count, :width, :height)
-                    ON CONFLICT (image_id) DO NOTHING
-                '''), image_data)
-                inserted += 1
-            except Exception as e:
-                app.logger.error(f"Failed to insert {image_data['image_id']}: {e}")
-
-        conn.commit()
-        app.logger.info(f"Inserted {inserted} images into database")
-
-
-
 # Database schema is managed via SQL editor in Neon DB - no DDL code here
 
 def get_ip_hash():
@@ -721,21 +672,20 @@ def get_images_from_db():
 
     try:
         result = db.execute(text('''
-            SELECT image_id
+            SELECT image_id, image_url
             FROM images
         '''))
 
-        return [{"image_id": row[0]} for row in result.fetchall()]
+        return [{"image_id": row[0], "image_url": row[1]} for row in result.fetchall()]
     except Exception as e:
         app.logger.error(f"Error querying images from database: {e}")
         return []
 
 
-def build_image_payload(image_id: str):
-    image_url = f"/api/images/{image_id}"
+def build_image_payload(image_data: dict):
     return {
-        "image_id": image_id,
-        "image_url": image_url
+        "image_id": image_data["image_id"],
+        "image_url": image_data["image_url"]
     }
 
 
@@ -760,7 +710,7 @@ def random_image():
     
     # Ensure we get a new random image each time by not using any caching
     image_data = random.choice(available_images)
-    payload = build_image_payload(image_data["image_id"])
+    payload = build_image_payload(image_data)
     return jsonify(payload)
 
 

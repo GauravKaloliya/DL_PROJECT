@@ -29,7 +29,9 @@ export default function TrialPage({
   isSurvey = false,
   surveyFeedbackReady = false,
   onSurveyContinue,
-  onSurveyFinish
+  onSurveyFinish,
+  fetchError = null,
+  onRetry
 }) {
   const [description, setDescription] = useState("");
   const [rating, setRating] = useState(0);
@@ -135,14 +137,35 @@ export default function TrialPage({
     return "Submit your response";
   };
 
-  const imageSrc = trial?.image_url ? getApiUrl(trial.image_url) : "";
+  const imageSrc = trial?.image_url
+    ? (trial.image_url.startsWith('http') ? trial.image_url : getApiUrl(trial.image_url))
+    : "";
 
   // Show loading state if we're waiting for trial data
   if (!trial || !trial.image_id) {
     return (
       <div className="panel" style={{ textAlign: 'center', padding: '40px' }}>
-        <div className="spinner" style={{ margin: '20px auto' }}></div>
-        <p>Loading image...</p>
+        {fetchError ? (
+          <div className="image-error">
+            <p style={{ color: 'var(--error)', marginBottom: '16px' }}>
+              {fetchError}
+            </p>
+            {onRetry && (
+              <button
+                className="primary"
+                onClick={onRetry}
+                style={{ padding: '10px 20px' }}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="spinner" style={{ margin: '20px auto' }}></div>
+            <p>Loading image...</p>
+          </>
+        )}
       </div>
     );
   }

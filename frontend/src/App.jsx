@@ -121,6 +121,7 @@ export default function App() {
   const [readyForNext, setReadyForNext] = useState(false);
   const [fetchingImage, setFetchingImage] = useState(false);
   const [shownImages, setShownImages] = useState(getStoredValue("shownImages", []));
+  const [imageError, setImageError] = useState(null);
   
   // UI state
   const [toasts, setToasts] = useState([]);
@@ -243,7 +244,7 @@ export default function App() {
         await recordConsent();
       }
       setStage("payment");
-      addToast("Details saved successfully", "success");
+      addToast("Details submitted successfully", "success");
     } catch (err) {
       // If participant already exists (409), that's okay - just continue
       if (err.message && err.message.includes("already exists")) {
@@ -256,7 +257,7 @@ export default function App() {
           }
         }
         setStage("payment");
-        addToast("Details saved successfully", "success");
+        addToast("Details submitted successfully", "success");
       } else {
         addToast(err.message, "error");
         throw err;
@@ -288,6 +289,7 @@ export default function App() {
     setFetchingImage(true);
     setReadyForNext(false);
     setSurveyFeedbackReady(false);
+    setImageError(null);
 
     try {
       // Build URL with excluded images to prevent duplicates
@@ -322,8 +324,9 @@ export default function App() {
       setShownImages(prev => [...prev, data.image_id]);
       setTrial(trialData);
     } catch (error) {
-      addToast(error.message || "Failed to load image", "error");
-      // Don't set trial to null, keep previous state or set to empty object
+      const errorMessage = error.message || "Failed to load image";
+      addToast(errorMessage, "error");
+      setImageError(errorMessage);
       setTrial(null);
     } finally {
       setFetchingImage(false);
@@ -506,6 +509,8 @@ export default function App() {
             surveyFeedbackReady={surveyFeedbackReady}
             onSurveyContinue={handleSurveyContinue}
             onSurveyFinish={handleSurveyFinish}
+            fetchError={imageError}
+            onRetry={fetchImage}
           />
         );
       
@@ -520,6 +525,8 @@ export default function App() {
             onFinish={handleFinish}
             showNext={readyForNext}
             isSurvey={false}
+            fetchError={imageError}
+            onRetry={fetchImage}
           />
         );
       
