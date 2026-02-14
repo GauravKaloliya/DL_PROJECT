@@ -191,6 +191,12 @@ def get_ip_hash():
     return digest
 
 
+def generate_receipt(participant_id: str) -> str:
+    base = f"{participant_id}_{int(time.time())}"
+    short_hash = hashlib.sha256(base.encode()).hexdigest()[:24]
+    return f"rcpt_{short_hash}"
+
+
 def _update_participant_stats_internal(db, participant_id, word_count, is_survey, attention_score=None):
     """Internal version: Update participant stats within existing transaction (does not commit)"""
     try:
@@ -805,10 +811,11 @@ def create_order():
         return jsonify({"error": "Participant not found"}), 400
 
     try:
+        receipt_value = generate_receipt(participant_id)
         order = client.order.create({
             "amount": amount,
             "currency": "INR",
-            "receipt": f"receipt_{participant_id}",
+            "receipt": receipt_value,
             "payment_capture": 1
         })
     except Exception as e:
