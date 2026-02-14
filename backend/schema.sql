@@ -192,6 +192,15 @@ CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_time
 
 CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at);
 
+CREATE INDEX IF NOT EXISTS idx_attention_checks_image ON attention_checks(image_id);
+CREATE INDEX IF NOT EXISTS idx_attention_checks_active ON attention_checks(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_attention_stats_participant ON attention_stats(participant_id);
+CREATE INDEX IF NOT EXISTS idx_attention_stats_flagged ON attention_stats(is_flagged);
+
+CREATE INDEX IF NOT EXISTS idx_participant_stats_participant ON participant_stats(participant_id);
+CREATE INDEX IF NOT EXISTS idx_participant_stats_priority ON participant_stats(priority_eligible);
+
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_participant ON audit_log(participant_id);
@@ -278,7 +287,7 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 
 INSERT INTO database_metadata (key, value)
 VALUES
-    ('version', '3.2.0'),
+    ('version', '4.0.0'),
     ('schema_updated', CURRENT_TIMESTAMP::text),
     ('description', 'C.O.G.N.I.T. Research Platform Database')
 ON CONFLICT (key) DO NOTHING;
