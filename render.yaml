@@ -13,6 +13,8 @@ services:
         value: "60"
       - key: TOO_FAST_SECONDS
         value: "5"
+      - key: CORS_ORIGINS
+        value: "https://cognit-frontend.onrender.com"
     # Note: Set DATABASE_URL and SECRET_KEY via Render Dashboard
     # DATABASE_URL will be automatically available when connecting a PostgreSQL database
     healthCheckPath: /api/health
@@ -27,6 +29,8 @@ services:
     envVars:
       - key: PORT
         value: 10000
+      - key: VITE_API_BASE
+        value: https://cognit-backend.onrender.com
 
 # PostgreSQL Database (create separately in Render Dashboard)
 # After creating, connect it to the backend service
