@@ -69,7 +69,7 @@ export default function FinishedPage({ surveyCompleted, participantId }) {
       <div style={{ textAlign: 'center' }}>
         <h2>Thank you for completing the C.O.G.N.I.T. survey</h2>
         <p className="page-subtitle">
-          You have completed {surveyCompleted} survey trials!
+          You have completed {surveyCompleted} survey{surveyCompleted !== 1 ? 's' : ''}!
           Your responses have been recorded.
         </p>
         
