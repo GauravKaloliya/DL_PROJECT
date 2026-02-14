@@ -1,6 +1,6 @@
 -- =====================================================
 -- C.O.G.N.I.T. PostgreSQL Schema
--- Version: 3.2.0 (PostgreSQL Edition)
+-- Version: 3.5.0 (PostgreSQL Edition)
 -- =====================================================
 
 -- =====================================================
@@ -71,7 +71,12 @@ CREATE TABLE IF NOT EXISTS attention_stats (
     passed_checks INT DEFAULT 0,
     failed_checks INT DEFAULT 0,
     attention_score FLOAT DEFAULT 1.0,
-    is_flagged BOOLEAN DEFAULT FALSE
+    is_flagged BOOLEAN DEFAULT FALSE,
+
+    CONSTRAINT fk_attention_stats_participant
+        FOREIGN KEY (participant_id)
+        REFERENCES participants(participant_id)
+        ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -287,7 +292,7 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 
 INSERT INTO database_metadata (key, value)
 VALUES
-    ('version', '3.2.0'),
+    ('version', '3.5.0'),
     ('schema_updated', CURRENT_TIMESTAMP::text),
     ('description', 'C.O.G.N.I.T. Research Platform Database')
 ON CONFLICT (key) DO NOTHING;

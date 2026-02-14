@@ -659,10 +659,12 @@
   "rating": "integer (required, 1-10)",
   "feedback": "string (required, min 5 chars)",
   "time_spent_seconds": "number (required)",
-  "is_survey": "boolean",
-  "is_attention": "boolean",
-  "attention_expected": "string (for attention checks)"
+  "is_survey": "boolean"
 }</pre></div>
+                        <p style="color: var(--muted); font-size: 14px; margin-top: 8px;">
+                          Attention checks are determined server-side based on the image ID. The response only includes
+                          <code>attention_passed</code> when applicable.
+                        </p>
                         <h4>Response</h4>
                         <div class="code-block small"><pre>{
   "status": "ok",
