@@ -1,6 +1,12 @@
 -- =====================================================
 -- C.O.G.N.I.T. PostgreSQL Schema
--- Version: 3.5.0 (PostgreSQL Edition)
+-- Version: 3.7.0 (PostgreSQL Edition - Enhanced)
+-- =====================================================
+-- 
+-- IMPORTANT NOTES:
+-- - participants.participant_id (VARCHAR) is used as FK throughout
+-- - participants.id (BIGINT) is the surrogate PK (future FK target)
+-- - See migrations/ folder for upgrade path from previous versions
 -- =====================================================
 
 -- =====================================================
@@ -35,6 +41,10 @@ CREATE TABLE IF NOT EXISTS participants (
         ip_hash IS NULL OR length(ip_hash) = 64
     )
 );
+
+COMMENT ON TABLE participants IS 'Core participants table. participant_id is the business key (VARCHAR), id is the surrogate PK (BIGINT).';
+COMMENT ON COLUMN participants.participant_id IS 'Business/human-readable participant identifier (used as FK in other tables)';
+COMMENT ON COLUMN participants.id IS 'Surrogate primary key (BIGINT). Future migrations should use this as FK.';
 
 -- =====================================================
 -- Payments Table
@@ -76,22 +86,25 @@ CREATE TABLE IF NOT EXISTS images (
 
 CREATE TABLE IF NOT EXISTS attention_checks (
     id SERIAL PRIMARY KEY,
-    image_id TEXT UNIQUE NOT NULL,
+    image_id VARCHAR(200) UNIQUE NOT NULL,
     expected_word TEXT NOT NULL,
     strict BOOLEAN DEFAULT TRUE,
     is_active BOOLEAN DEFAULT TRUE
 );
+
+COMMENT ON TABLE attention_checks IS 'Attention check configuration. Expected words for specific images.';
+COMMENT ON COLUMN attention_checks.image_id IS 'Must match images.image_id type (VARCHAR(200))';
 
 -- =====================================================
 -- Attention Stats Table
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS attention_stats (
-    participant_id TEXT PRIMARY KEY,
+    participant_id VARCHAR(100) PRIMARY KEY,
     total_checks INT DEFAULT 0 CHECK (total_checks >= 0),
     passed_checks INT DEFAULT 0 CHECK (passed_checks >= 0),
     failed_checks INT DEFAULT 0 CHECK (failed_checks >= 0),
-    attention_score FLOAT DEFAULT 1.0,
+    attention_score FLOAT DEFAULT 1.0 CHECK (attention_score >= 0 AND attention_score <= 1),
     is_flagged BOOLEAN DEFAULT FALSE,
 
     CONSTRAINT fk_attention_stats_participant
@@ -114,17 +127,17 @@ CREATE TABLE IF NOT EXISTS submissions (
     image_id VARCHAR(200) NOT NULL,
     image_url VARCHAR(500),
     survey_index INTEGER NOT NULL,
-    description TEXT NOT NULL CHECK (length(description) <= 10000),
+    description TEXT NOT NULL CHECK (char_length(description) <= 10000 AND char_length(description) > 0),
     word_count INTEGER NOT NULL CHECK (word_count BETWEEN 0 AND 10000),
     rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 10),
-    feedback TEXT NOT NULL CHECK (length(feedback) <= 2000),
+    feedback TEXT NOT NULL CHECK (char_length(feedback) <= 2000),
     time_spent_seconds DOUBLE PRECISION CHECK (time_spent_seconds >= 0),
     is_survey BOOLEAN DEFAULT FALSE,
     is_attention BOOLEAN DEFAULT FALSE,
     attention_passed BOOLEAN,
     too_fast_flag BOOLEAN DEFAULT FALSE,
-    attention_score_at_submission FLOAT,
-    quality_score FLOAT,
+    attention_score_at_submission FLOAT CHECK (attention_score_at_submission IS NULL OR (attention_score_at_submission >= 0 AND attention_score_at_submission <= 1)),
+    quality_score FLOAT CHECK (quality_score IS NULL OR (quality_score >= 0 AND quality_score <= 1)),
     ai_suspected BOOLEAN DEFAULT FALSE,
     user_agent VARCHAR(500),
     ip_hash CHAR(64),
@@ -140,8 +153,14 @@ CREATE TABLE IF NOT EXISTS submissions (
         REFERENCES images(image_id),
 
     CONSTRAINT unique_participant_survey_index
-        UNIQUE (participant_id, survey_index)
+        UNIQUE (participant_id, survey_index),
+    
+    CONSTRAINT check_ai_suspected_requires_quality_score
+        CHECK (ai_suspected = FALSE OR quality_score IS NOT NULL)
 );
+
+COMMENT ON CONSTRAINT check_ai_suspected_requires_quality_score ON submissions 
+    IS 'Soft invariant: ai_suspected=TRUE requires quality_score to be set';
 
 -- =====================================================
 -- Consent Records
@@ -149,7 +168,7 @@ CREATE TABLE IF NOT EXISTS submissions (
 
 CREATE TABLE IF NOT EXISTS consent_records (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    participant_id VARCHAR(100) UNIQUE NOT NULL,
+    participant_id VARCHAR(100) NOT NULL,
     consent_given BOOLEAN DEFAULT FALSE,
     consent_timestamp TIMESTAMPTZ,
     ip_hash CHAR(64),
@@ -161,17 +180,22 @@ CREATE TABLE IF NOT EXISTS consent_records (
         ON DELETE CASCADE
 );
 
+COMMENT ON TABLE consent_records IS 'Audit trail for consent events. May contain multiple entries per participant for history.';
+COMMENT ON COLUMN consent_records.participant_id IS 'References participants.participant_id (not participants.id)';
+
+-- Note: Removed UNIQUE constraint to allow multiple consent records per participant for audit history
+
 -- =====================================================
 -- Participant Stats Table
 -- =====================================================
 
 CREATE TABLE IF NOT EXISTS participant_stats (
-    participant_id TEXT PRIMARY KEY,
-    total_words INT DEFAULT 0,
-    total_submissions INT DEFAULT 0,
-    survey_rounds INT DEFAULT 0,
+    participant_id VARCHAR(100) PRIMARY KEY,
+    total_words INT DEFAULT 0 CHECK (total_words >= 0),
+    total_submissions INT DEFAULT 0 CHECK (total_submissions >= 0),
+    survey_rounds INT DEFAULT 0 CHECK (survey_rounds >= 0),
     priority_eligible BOOLEAN DEFAULT FALSE,
-    attention_score FLOAT DEFAULT 1.0,
+    attention_score FLOAT DEFAULT 1.0 CHECK (attention_score >= 0 AND attention_score <= 1),
     last_reward_attempt_at TIMESTAMPTZ,
 
     CONSTRAINT fk_participant_stats_participant
@@ -186,7 +210,7 @@ CREATE TABLE IF NOT EXISTS participant_stats (
 
 CREATE TABLE IF NOT EXISTS reward_winners (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    participant_id TEXT NOT NULL,
+    participant_id VARCHAR(100) NOT NULL,
     reward_amount INTEGER NOT NULL CHECK (reward_amount > 0),
     status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'cancelled')),
     selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -200,6 +224,8 @@ CREATE TABLE IF NOT EXISTS reward_winners (
     CONSTRAINT unique_reward_participant
         UNIQUE (participant_id)
 );
+
+COMMENT ON TABLE reward_winners IS 'One reward per participant (enforced by UNIQUE constraint on participant_id)';
 
 -- =====================================================
 -- Audit Log
@@ -216,7 +242,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
     status_code INTEGER,
     ip_hash CHAR(64),
     user_agent VARCHAR(500),
-    details TEXT CHECK (length(details) <= 2000)
+    details TEXT CHECK (details IS NULL OR char_length(details) <= 2000)
 );
 
 -- =====================================================
@@ -237,16 +263,27 @@ CREATE TABLE IF NOT EXISTS performance_metrics (
 -- Indexes
 -- =====================================================
 
-CREATE INDEX IF NOT EXISTS idx_participants_id ON participants(participant_id);
+-- Participants indexes
 CREATE INDEX IF NOT EXISTS idx_participants_session ON participants(session_id);
 CREATE INDEX IF NOT EXISTS idx_participants_created ON participants(created_at);
 CREATE INDEX IF NOT EXISTS idx_participants_consent ON participants(consent_given);
 CREATE INDEX IF NOT EXISTS idx_participants_payment_status ON participants(payment_status);
 
+-- Partial indexes for frequent filters on participants
+CREATE INDEX IF NOT EXISTS idx_participants_payment_paid 
+    ON participants(participant_id) 
+    WHERE payment_status = 'paid';
+
+CREATE INDEX IF NOT EXISTS idx_participants_payment_pending 
+    ON participants(participant_id) 
+    WHERE payment_status = 'pending';
+
+-- Payments indexes
 CREATE INDEX IF NOT EXISTS idx_payments_participant ON payments(participant_id);
 CREATE INDEX IF NOT EXISTS idx_payments_order ON payments(razorpay_order_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
 
+-- Submissions indexes
 CREATE INDEX IF NOT EXISTS idx_submissions_participant ON submissions(participant_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_session ON submissions(session_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_created ON submissions(created_at);
@@ -257,30 +294,82 @@ CREATE INDEX IF NOT EXISTS idx_submissions_quality ON submissions(quality_score)
 CREATE INDEX IF NOT EXISTS idx_submissions_ai_suspected ON submissions(ai_suspected);
 CREATE INDEX IF NOT EXISTS idx_submissions_survey_index ON submissions(participant_id, survey_index);
 
+-- Composite index for common queries
+CREATE INDEX IF NOT EXISTS idx_submissions_participant_recent 
+    ON submissions(participant_id, created_at DESC);
+
+-- Partial indexes for submissions
+CREATE INDEX IF NOT EXISTS idx_submissions_ai_suspected_true 
+    ON submissions(id, participant_id, created_at) 
+    WHERE ai_suspected = TRUE;
+
+COMMENT ON INDEX idx_submissions_ai_suspected_true IS 'Partial index for quickly finding AI-suspected submissions';
+
+CREATE INDEX IF NOT EXISTS idx_submissions_too_fast_true 
+    ON submissions(id, participant_id, created_at) 
+    WHERE too_fast_flag = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_submissions_attention_check 
+    ON submissions(image_id, is_attention, attention_passed) 
+    WHERE is_attention = TRUE;
+
+-- Consent indexes
 CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id);
 CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp);
 
+-- Images indexes
 CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at);
 
+-- Attention checks indexes
 CREATE INDEX IF NOT EXISTS idx_attention_checks_image ON attention_checks(image_id);
 CREATE INDEX IF NOT EXISTS idx_attention_checks_active ON attention_checks(is_active);
 
+CREATE INDEX IF NOT EXISTS idx_attention_checks_active_true 
+    ON attention_checks(image_id) 
+    WHERE is_active = TRUE;
+
+-- Attention stats indexes
 CREATE INDEX IF NOT EXISTS idx_attention_stats_participant ON attention_stats(participant_id);
 CREATE INDEX IF NOT EXISTS idx_attention_stats_flagged ON attention_stats(is_flagged);
 
+CREATE INDEX IF NOT EXISTS idx_attention_stats_flagged_true 
+    ON attention_stats(participant_id, attention_score) 
+    WHERE is_flagged = TRUE;
+
+COMMENT ON INDEX idx_attention_stats_flagged_true IS 'Partial index for quickly finding flagged participants';
+
+-- Participant stats indexes
 CREATE INDEX IF NOT EXISTS idx_participant_stats_participant ON participant_stats(participant_id);
 CREATE INDEX IF NOT EXISTS idx_participant_stats_priority ON participant_stats(priority_eligible);
 CREATE INDEX IF NOT EXISTS idx_participant_stats_reward_attempt ON participant_stats(last_reward_attempt_at);
 
+CREATE INDEX IF NOT EXISTS idx_participant_stats_priority_true 
+    ON participant_stats(participant_id, attention_score) 
+    WHERE priority_eligible = TRUE;
+
+CREATE INDEX IF NOT EXISTS idx_participant_stats_reward_eligibility 
+    ON participant_stats(participant_id, attention_score, last_reward_attempt_at);
+
+-- Reward winners indexes
 CREATE INDEX IF NOT EXISTS idx_reward_winners_participant ON reward_winners(participant_id);
 CREATE INDEX IF NOT EXISTS idx_reward_winners_status ON reward_winners(status);
 CREATE INDEX IF NOT EXISTS idx_reward_winners_selected_at ON reward_winners(selected_at);
 
+CREATE INDEX IF NOT EXISTS idx_reward_winners_pending 
+    ON reward_winners(participant_id, selected_at) 
+    WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS idx_reward_winners_paid 
+    ON reward_winners(participant_id, paid_at) 
+    WHERE status = 'paid';
+
+-- Audit log indexes
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_participant ON audit_log(participant_id);
 CREATE INDEX IF NOT EXISTS idx_audit_endpoint ON audit_log(endpoint);
 
+-- Performance metrics indexes
 CREATE INDEX IF NOT EXISTS idx_performance_timestamp ON performance_metrics(timestamp);
 CREATE INDEX IF NOT EXISTS idx_performance_endpoint ON performance_metrics(endpoint);
 
@@ -303,7 +392,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trg_participant_insert_audit
+CREATE OR REPLACE TRIGGER trg_participant_insert_audit
 AFTER INSERT ON participants
 FOR EACH ROW
 EXECUTE FUNCTION fn_participant_insert_audit();
@@ -324,7 +413,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trg_consent_insert_audit
+CREATE OR REPLACE TRIGGER trg_consent_insert_audit
 AFTER INSERT ON consent_records
 FOR EACH ROW
 EXECUTE FUNCTION fn_consent_insert_audit();
@@ -345,7 +434,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER IF NOT EXISTS trg_submission_insert_audit
+CREATE OR REPLACE TRIGGER trg_submission_insert_audit
 AFTER INSERT ON submissions
 FOR EACH ROW
 EXECUTE FUNCTION fn_submission_insert_audit();
@@ -362,9 +451,38 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 
 INSERT INTO database_metadata (key, value)
 VALUES
-    ('version', '3.6.0'),
+    ('version', '3.7.0'),
     ('schema_updated', CURRENT_TIMESTAMP::text),
-    ('description', 'C.O.G.N.I.T. Research Platform Database - Enhanced with quality metrics and security improvements')
+    ('description', 'C.O.G.N.I.T. Research Platform Database - Enhanced with score constraints, partial indexes, and type fixes')
 ON CONFLICT (key) DO UPDATE SET
     value = EXCLUDED.value,
     updated_at = CURRENT_TIMESTAMP;
+
+-- =====================================================
+-- Schema Validation Queries
+-- =====================================================
+-- 
+-- Run these to verify schema integrity:
+--
+-- 1. Check for orphaned records:
+--    SELECT 'payments' as table_name, COUNT(*) as orphans
+--    FROM payments p
+--    WHERE NOT EXISTS (SELECT 1 FROM participants WHERE participant_id = p.participant_id)
+--    UNION ALL
+--    SELECT 'submissions', COUNT(*)
+--    FROM submissions s
+--    WHERE NOT EXISTS (SELECT 1 FROM participants WHERE participant_id = s.participant_id);
+--
+-- 2. Verify score ranges:
+--    SELECT 'attention_stats' as table_name, 
+--           MIN(attention_score) as min_score, 
+--           MAX(attention_score) as max_score
+--    FROM attention_stats
+--    UNION ALL
+--    SELECT 'submissions', MIN(quality_score), MAX(quality_score)
+--    FROM submissions WHERE quality_score IS NOT NULL;
+--
+-- 3. Check constraint violations (should be empty):
+--    SELECT * FROM submissions WHERE ai_suspected = TRUE AND quality_score IS NULL;
+--
+-- =====================================================
