@@ -80,6 +80,10 @@ export default function PaymentPage({
         order_id: data.order_id,
         name: "C.O.G.N.I.T.",
         description: "Research participation fee",
+        method: { upi: true },
+        prefill: {
+          vpa: "success@razorpay"
+        },
         handler: async function (paymentResponse) {
           try {
             const verifyResponse = await fetch(getApiUrl("/api/payment/verify"), {

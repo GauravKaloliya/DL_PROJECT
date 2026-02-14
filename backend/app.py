@@ -90,9 +90,38 @@ CORS(app, resources={
 })
 
 # Rate Limiting with storage backend configuration
-# Use memory storage with URI to avoid production warning
-# For distributed deployments, consider Redis: redis://host:port
-storage_uri = os.getenv("RATELIMIT_STORAGE_URI", "memory://")
+# Use Redis database 0 only for global rate limiting
+# Fall back to memory storage if Redis is not available
+
+# Check if Redis URI is provided in environment
+env_storage_uri = os.getenv("RATELIMIT_STORAGE_URI", "").strip()
+
+# If Redis URI is provided, ensure it uses database 0 only
+if env_storage_uri:
+    # Parse the URI and force database 0
+    if env_storage_uri.startswith("redis://") or env_storage_uri.startswith("rediss://"):
+        # Remove any existing database specification and force /0
+        import urllib.parse
+        parsed = urllib.parse.urlparse(env_storage_uri)
+        # Reconstruct with database 0
+        netloc = parsed.netloc
+        if "@" in netloc:
+            auth, host = netloc.rsplit("@", 1)
+        else:
+            auth, host = None, netloc
+        
+        if host.endswith("/0") or host.endswith("/1") or host.endswith("/2"):
+            # Remove existing database number
+            host = host.rsplit("/", 1)[0]
+        
+        # Force database 0
+        storage_uri = f"{parsed.scheme}://{auth + '@' if auth else ''}{host}/0"
+        app.logger.info(f"Using Redis with forced database 0: {storage_uri}")
+    else:
+        storage_uri = env_storage_uri
+else:
+    storage_uri = "memory://"
+    app.logger.info("Using memory storage for rate limiting")
 
 # Try to initialize limiter with the configured storage
 try:
@@ -104,6 +133,7 @@ try:
     )
     # Track the actual backend being used
     actual_storage_uri = storage_uri
+    app.logger.info(f"Rate limiter initialized with storage: {actual_storage_uri}")
 except Exception as e:
     # Fallback to memory storage if the configured storage fails (e.g., Redis not available)
     app.logger.warning(f"Failed to initialize rate limiter with storage URI '{storage_uri}': {e}")
