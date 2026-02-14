@@ -50,6 +50,31 @@ CREATE TABLE IF NOT EXISTS images (
 );
 
 -- =====================================================
+-- Attention Checks Table
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS attention_checks (
+    id SERIAL PRIMARY KEY,
+    image_id TEXT UNIQUE NOT NULL,
+    expected_word TEXT NOT NULL,
+    strict BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+-- =====================================================
+-- Attention Stats Table
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS attention_stats (
+    participant_id TEXT PRIMARY KEY,
+    total_checks INT DEFAULT 0,
+    passed_checks INT DEFAULT 0,
+    failed_checks INT DEFAULT 0,
+    attention_score FLOAT DEFAULT 1.0,
+    is_flagged BOOLEAN DEFAULT FALSE
+);
+
+-- =====================================================
 -- Submissions Table
 -- =====================================================
 
@@ -99,6 +124,19 @@ CREATE TABLE IF NOT EXISTS consent_records (
     FOREIGN KEY (participant_id)
         REFERENCES participants(participant_id)
         ON DELETE CASCADE
+);
+
+-- =====================================================
+-- Participant Stats Table
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS participant_stats (
+    participant_id TEXT PRIMARY KEY,
+    total_words INT DEFAULT 0,
+    total_submissions INT DEFAULT 0,
+    survey_rounds INT DEFAULT 0,
+    priority_eligible BOOLEAN DEFAULT FALSE,
+    attention_score FLOAT DEFAULT 1.0
 );
 
 -- =====================================================
@@ -153,6 +191,15 @@ CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participan
 CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp);
 
 CREATE INDEX IF NOT EXISTS idx_images_created ON images(created_at);
+
+CREATE INDEX IF NOT EXISTS idx_attention_checks_image ON attention_checks(image_id);
+CREATE INDEX IF NOT EXISTS idx_attention_checks_active ON attention_checks(is_active);
+
+CREATE INDEX IF NOT EXISTS idx_attention_stats_participant ON attention_stats(participant_id);
+CREATE INDEX IF NOT EXISTS idx_attention_stats_flagged ON attention_stats(is_flagged);
+
+CREATE INDEX IF NOT EXISTS idx_participant_stats_participant ON participant_stats(participant_id);
+CREATE INDEX IF NOT EXISTS idx_participant_stats_priority ON participant_stats(priority_eligible);
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);

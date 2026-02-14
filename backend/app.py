@@ -148,14 +148,14 @@ def get_ip_hash():
     return digest
 
 
-def update_participant_stats(participant_id, word_count, is_survey):
+def update_participant_stats(participant_id, word_count, is_survey, attention_score=None):
     """Update participant engagement stats for reward eligibility"""
     try:
         db = get_db()
         
         # Get current stats
         result = db.execute(text('''
-            SELECT total_words, total_submissions, survey_rounds 
+            SELECT total_words, total_submissions, survey_rounds, attention_score 
             FROM participant_stats 
             WHERE participant_id = :participant_id
         '''), {"participant_id": participant_id})
@@ -165,29 +165,33 @@ def update_participant_stats(participant_id, word_count, is_survey):
             new_words = row[0] + word_count
             new_submissions = row[1] + 1
             new_survey_rounds = row[2] + (1 if is_survey else 0)
+            current_attention_score = attention_score if attention_score is not None else row[3]
         else:
             new_words = word_count
             new_submissions = 1
             new_survey_rounds = 1 if is_survey else 0
+            current_attention_score = attention_score if attention_score is not None else 1.0
         
-        # Priority eligibility: more words or more survey rounds increases chance
-        priority_eligible = new_words >= 500 or new_survey_rounds >= 3
+        # Priority eligibility: more words or more survey rounds increases chance, but requires good attention
+        priority_eligible = (new_words >= 500 or new_survey_rounds >= 3) and current_attention_score >= 0.75
         
         db.execute(text('''
             INSERT INTO participant_stats 
-            (participant_id, total_words, total_submissions, survey_rounds, priority_eligible)
-            VALUES (:participant_id, :total_words, :total_submissions, :survey_rounds, :priority_eligible)
+            (participant_id, total_words, total_submissions, survey_rounds, priority_eligible, attention_score)
+            VALUES (:participant_id, :total_words, :total_submissions, :survey_rounds, :priority_eligible, :attention_score)
             ON CONFLICT(participant_id) DO UPDATE SET
             total_words = EXCLUDED.total_words,
             total_submissions = EXCLUDED.total_submissions,
             survey_rounds = EXCLUDED.survey_rounds,
-            priority_eligible = EXCLUDED.priority_eligible
+            priority_eligible = EXCLUDED.priority_eligible,
+            attention_score = EXCLUDED.attention_score
         '''), {
             "participant_id": participant_id,
             "total_words": new_words,
             "total_submissions": new_submissions,
             "survey_rounds": new_survey_rounds,
-            "priority_eligible": priority_eligible
+            "priority_eligible": priority_eligible,
+            "attention_score": current_attention_score
         })
         
         db.commit()
@@ -256,17 +260,19 @@ def select_reward_winner(participant_id):
         if result.fetchone():
             return {"selected": False, "already_winner": True}
         
-        # Get participant's priority status
+        # Get participant's priority status and attention score
         result = db.execute(text('''
-            SELECT priority_eligible FROM participant_stats WHERE participant_id = :participant_id
+            SELECT priority_eligible, attention_score FROM participant_stats WHERE participant_id = :participant_id
         '''), {"participant_id": participant_id})
         stats_row = result.fetchone()
         priority_eligible = bool(stats_row[0]) if stats_row else False
+        attention_score = stats_row[1] if stats_row and stats_row[1] is not None else 1.0
         
-        # Weighted random selection
+        # Weighted random selection - now requires good attention score
         base_probability = 0.05  # 5%
         priority_boost = 0.10 if priority_eligible else 0.0
-        selection_probability = base_probability + priority_boost
+        attention_penalty = 0.0 if attention_score >= 0.75 else -0.15  # Reduce chance for low attention
+        selection_probability = max(0.01, base_probability + priority_boost + attention_penalty)  # Minimum 1% chance
         
         if random.random() < selection_probability:
             db.execute(text('''
@@ -735,6 +741,19 @@ def submit():
     if not participant_id:
         return jsonify({"error": "participant_id is required"}), 400
     
+    # Check if participant is flagged for low attention quality
+    db = get_db()
+    flag_check = db.execute(text("""
+        SELECT is_flagged
+        FROM attention_stats
+        WHERE participant_id = :participant_id
+    """), {"participant_id": participant_id}).fetchone()
+
+    if flag_check and flag_check[0]:
+        return jsonify({
+            "error": "Account flagged for low attention quality"
+        }), 403
+    
     # Verify participant exists and has given consent
     db = get_db()
     result = db.execute(text("SELECT consent_given FROM participants WHERE participant_id = :participant_id"), {"participant_id": participant_id})
@@ -795,12 +814,32 @@ def submit():
         return jsonify({"error": "Feedback contains invalid characters"}), 403
 
     is_survey = bool(payload.get("is_survey"))
-    is_attention = bool(payload.get("is_attention"))
+    
+    # Check if image is an attention trial (backend-controlled)
+    attention_result = db.execute(text("""
+        SELECT expected_word, strict
+        FROM attention_checks
+        WHERE image_id = :image_id AND is_active = TRUE
+    """), {"image_id": image_id})
 
-    attention_expected = (payload.get("attention_expected") or "").strip().lower()
+    attention_row = attention_result.fetchone()
+    is_attention = attention_row is not None
     attention_passed = None
+    
     if is_attention:
-        attention_passed = attention_expected in description.lower() if attention_expected else False
+        expected_word = attention_row[0].strip().lower()
+        strict = attention_row[1]
+
+        description_lower = description.lower()
+
+        if strict:
+            # Whole word match
+            import re
+            pattern = rf"\b{re.escape(expected_word)}\b"
+            attention_passed = bool(re.search(pattern, description_lower))
+        else:
+            # Allow substring
+            attention_passed = expected_word in description_lower
 
     too_fast_flag = False
     try:
@@ -872,8 +911,48 @@ def submit():
         
         db.commit()
         
+        # Update attention stats if this was an attention trial
+        if is_attention:
+            stats = db.execute(text("""
+                SELECT total_checks, passed_checks, failed_checks
+                FROM attention_stats
+                WHERE participant_id = :participant_id
+            """), {"participant_id": participant_id}).fetchone()
+
+            if stats:
+                total = stats[0] + 1
+                passed = stats[1] + (1 if attention_passed else 0)
+                failed = stats[2] + (0 if attention_passed else 1)
+            else:
+                total = 1
+                passed = 1 if attention_passed else 0
+                failed = 0 if attention_passed else 1
+
+            attention_score = passed / total
+            is_flagged = attention_score < 0.6 and total >= 3
+
+            db.execute(text("""
+                INSERT INTO attention_stats
+                (participant_id, total_checks, passed_checks, failed_checks, attention_score, is_flagged)
+                VALUES (:participant_id, :total, :passed, :failed, :score, :flagged)
+                ON CONFLICT(participant_id) DO UPDATE SET
+                total_checks = :total,
+                passed_checks = :passed,
+                failed_checks = :failed,
+                attention_score = :score,
+                is_flagged = :flagged
+            """), {
+                "participant_id": participant_id,
+                "total": total,
+                "passed": passed,
+                "failed": failed,
+                "score": attention_score,
+                "flagged": is_flagged
+            })
+            db.commit()
+        
         # Update participant stats for reward eligibility
-        update_participant_stats(participant_id, word_count, is_survey)
+        update_participant_stats(participant_id, word_count, is_survey, attention_score if is_attention else None)
         
         return jsonify({
             "status": "ok", 

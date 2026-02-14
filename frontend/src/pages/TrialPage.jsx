@@ -3,21 +3,6 @@ import { getApiUrl } from "../utils/apiBase";
 
 const MIN_WORDS = 60;
 
-const attentionInstruction = {
-  "survey/attention-red.svg": {
-    text: "Special task: Include the word \"red\" in your description!",
-    expected: "red"
-  },
-  "survey/attention-circle.svg": {
-    text: "Special task: Include the word \"circle\" in your description!",
-    expected: "circle"
-  },
-  "survey/attention-ocean.svg": {
-    text: "Special task: Include the word \"ocean\" in your description!",
-    expected: "ocean"
-  }
-};
-
 export default function TrialPage({
   trial,
   participantId,
@@ -31,7 +16,8 @@ export default function TrialPage({
   onSurveyContinue,
   onSurveyFinish,
   fetchError = null,
-  onRetry
+  onRetry,
+  surveyCompleted = 0
 }) {
   const [description, setDescription] = useState("");
   const [rating, setRating] = useState(0);
@@ -48,7 +34,6 @@ export default function TrialPage({
   const charCount = description.length;
   const commentsValid = comments.trim().length >= 5;
   const canSubmit = wordCount >= MIN_WORDS && rating !== 0 && commentsValid && !submitting;
-  const currentInstruction = trial?.is_attention ? attentionInstruction[trial.image_id] : null;
 
   const handleRetryImage = () => {
     setImageError(false);
@@ -104,8 +89,7 @@ export default function TrialPage({
         description,
         rating,
         comments,
-        timeSpentSeconds,
-        attentionExpected: currentInstruction?.expected || ""
+        timeSpentSeconds
       });
 
       // Reset form after successful submission
@@ -191,7 +175,8 @@ export default function TrialPage({
           </div>
           <h2 style={{ color: 'var(--success)', marginBottom: '20px', marginTop: '0' }}>Survey Complete!</h2>
           <p style={{ fontSize: '16px', lineHeight: '1.8', marginBottom: '32px', maxWidth: '500px', margin: '0 auto 32px' }}>
-            Great job on your survey trial! You can now choose to continue with more survey 
+            Great job on your survey! You have completed {surveyCompleted} survey
+            {surveyCompleted === 1 ? '' : 's'}. You can now choose to continue with more survey 
             images or finish the study.
           </p>
           <div style={{
