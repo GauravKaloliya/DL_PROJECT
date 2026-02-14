@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+README.md
+LICENSE
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Backend specific
+backend/__pycache__/
+backend/*.pyc
+backend/.pytest_cache/
+backend/coverage.xml
+backend/htmlcov/
+
+# Frontend specific (we'll copy what we need)
+frontend/node_modules/
+frontend/.git/
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Root files not needed in build
+scripts/
+test_changes.md
+IMAGE_CATEGORIZATION_REMOVAL.md
+render.yaml
+cognit_logo.png
