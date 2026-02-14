@@ -82,9 +82,9 @@ export default function PaymentPage({
         description: "Research participation fee",
         method: {
           upi: true,
-          card: true,
-          netbanking: true,
-          wallet: true
+          card: false,
+          netbanking: false,
+          wallet: false
         },
         prefill: {
           vpa: "success@razorpay"
