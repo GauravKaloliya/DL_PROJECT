@@ -44,6 +44,7 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
+app.config['MAX_CONTENT_LENGTH'] = 1 * 1024 * 1024  # 1 MB max request size
 
 # SQLAlchemy configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
@@ -148,12 +149,9 @@ def get_ip_hash():
     return digest
 
 
-def update_participant_stats(participant_id, word_count, is_survey, attention_score=None):
-    """Update participant engagement stats for reward eligibility"""
+def _update_participant_stats_internal(db, participant_id, word_count, is_survey, attention_score=None):
+    """Internal version: Update participant stats within existing transaction (does not commit)"""
     try:
-        db = get_db()
-        
-        # Get current stats
         result = db.execute(text('''
             SELECT total_words, total_submissions, survey_rounds, attention_score 
             FROM participant_stats 
@@ -172,7 +170,6 @@ def update_participant_stats(participant_id, word_count, is_survey, attention_sc
             new_survey_rounds = 1 if is_survey else 0
             current_attention_score = attention_score if attention_score is not None else 1.0
         
-        # Priority eligibility: more words or more survey rounds increases chance, but requires good attention
         priority_eligible = (new_words >= 500 or new_survey_rounds >= 3) and current_attention_score >= 0.75
         
         db.execute(text('''
@@ -193,10 +190,17 @@ def update_participant_stats(participant_id, word_count, is_survey, attention_sc
             "priority_eligible": priority_eligible,
             "attention_score": current_attention_score
         })
-        
+    except Exception as e:
+        pass
+
+
+def update_participant_stats(participant_id, word_count, is_survey, attention_score=None):
+    """Update participant engagement stats for reward eligibility"""
+    try:
+        db = get_db()
+        _update_participant_stats_internal(db, participant_id, word_count, is_survey, attention_score)
         db.commit()
     except Exception as e:
-        # Don't let stats update failures break the main functionality
         pass
 
 
@@ -260,13 +264,38 @@ def select_reward_winner(participant_id):
         if result.fetchone():
             return {"selected": False, "already_winner": True}
         
-        # Get participant's priority status and attention score
+        # Check for cooldown period (60 seconds between attempts per participant)
         result = db.execute(text('''
-            SELECT priority_eligible, attention_score FROM participant_stats WHERE participant_id = :participant_id
+            SELECT last_reward_attempt_at FROM participant_stats WHERE participant_id = :participant_id
         '''), {"participant_id": participant_id})
         stats_row = result.fetchone()
+        
+        if stats_row and stats_row[0]:
+            from datetime import datetime, timezone
+            last_attempt = stats_row[0]
+            if isinstance(last_attempt, str):
+                last_attempt = datetime.fromisoformat(last_attempt.replace('Z', '+00:00'))
+            cooldown_seconds = 60
+            time_since_last = (datetime.now(timezone.utc) - last_attempt).total_seconds()
+            if time_since_last < cooldown_seconds:
+                return {"selected": False, "cooldown_active": True, "retry_after": cooldown_seconds - int(time_since_last)}
+        
+        # Get participant's priority status and attention score
         priority_eligible = bool(stats_row[0]) if stats_row else False
-        attention_score = stats_row[1] if stats_row and stats_row[1] is not None else 1.0
+        
+        result = db.execute(text('''
+            SELECT attention_score FROM participant_stats WHERE participant_id = :participant_id
+        '''), {"participant_id": participant_id})
+        attention_row = result.fetchone()
+        attention_score = attention_row[0] if attention_row and attention_row[0] is not None else 1.0
+        
+        # Update last attempt timestamp
+        db.execute(text('''
+            INSERT INTO participant_stats (participant_id, last_reward_attempt_at)
+            VALUES (:participant_id, CURRENT_TIMESTAMP)
+            ON CONFLICT(participant_id) DO UPDATE SET
+            last_reward_attempt_at = CURRENT_TIMESTAMP
+        '''), {"participant_id": participant_id})
         
         # Weighted random selection - now requires good attention score
         base_probability = 0.05  # 5%
@@ -282,14 +311,49 @@ def select_reward_winner(participant_id):
             db.commit()
             return {"selected": True, "reward_amount": 10}
         
+        db.commit()
         return {"selected": False, "priority_eligible": priority_eligible}
     except Exception as e:
+        db.rollback()
         return {"selected": False, "error": str(e)}
 
 
 def count_words(text: str):
     """Count words in text"""
     return len([word for word in text.strip().split() if word])
+
+
+def calculate_quality_score(word_count: int, attention_passed: bool, time_spent_seconds: float, feedback: str) -> float:
+    """
+    Calculate submission quality score based on multiple factors.
+    
+    Formula:
+    - 40% normalized word count (target: 150 words = full score)
+    - 30% attention check pass
+    - 20% time validity (not too fast)
+    - 10% feedback length (target: 50 chars = full score)
+    """
+    # Normalize word count (target 150 words for full score, cap at 1.0)
+    word_score = min(word_count / 150.0, 1.0)
+    
+    # Attention check (1.0 if passed or not an attention check, 0.0 if failed)
+    attention_score = 1.0 if attention_passed is not False else 0.0
+    
+    # Time validity (1.0 if not too fast, 0.5 if too fast)
+    time_score = 0.5 if time_spent_seconds and time_spent_seconds < TOO_FAST_SECONDS else 1.0
+    
+    # Feedback length (target 50 chars for full score, cap at 1.0)
+    feedback_score = min(len(feedback) / 50.0, 1.0)
+    
+    # Weighted sum
+    quality_score = (
+        0.4 * word_score +
+        0.3 * attention_score +
+        0.2 * time_score +
+        0.1 * feedback_score
+    )
+    
+    return round(quality_score, 3)
 
 
 def _log_audit_event(db, event_type, participant_id=None, user_id=None, endpoint=None, 
@@ -790,27 +854,6 @@ def submit():
     feedback = (payload.get("feedback") or "").strip()
     if len(feedback) < 5:
         return jsonify({"error": "comments must be at least 5 characters"}), 400
-    
-    # Security validation - prevent potential injection
-    if any(char in description for char in ['<', '>', '&', ';', '--', '/*', '*/', 'exec', 'union', 'select', 'insert', 'update', 'delete']):
-        _log_audit_event(db, 
-                       event_type='security_violation',
-                       participant_id=participant_id,
-                       endpoint='/api/submit',
-                       method='POST',
-                       status_code=403,
-                       details='Potential injection attempt in description')
-        return jsonify({"error": "Description contains invalid characters"}), 403
-    
-    if any(char in feedback for char in ['<', '>', '&', ';', '--', '/*', '*/', 'exec', 'union', 'select', 'insert', 'update', 'delete']):
-        _log_audit_event(db, 
-                       event_type='security_violation',
-                       participant_id=participant_id,
-                       endpoint='/api/submit',
-                       method='POST',
-                       status_code=403,
-                       details='Potential injection attempt in feedback')
-        return jsonify({"error": "Feedback contains invalid characters"}), 403
 
     is_survey = bool(payload.get("is_survey"))
     
@@ -849,24 +892,18 @@ def submit():
 
     # Ensure image exists in images table (for foreign key constraint)
     try:
-        # Check if image exists in database
         image_result = db.execute(text('''
             SELECT image_id FROM images WHERE image_id = :image_id
         '''), {"image_id": image_id})
 
         if not image_result.fetchone():
-            # Image doesn't exist, insert it with basic metadata
             db.execute(text('''
                 INSERT INTO images
                 (image_id, difficulty_score, object_count, width, height)
                 VALUES (:image_id, 5.0, 1, 800, 600)
                 ON CONFLICT (image_id) DO NOTHING
-            '''), {
-                "image_id": image_id
-            })
-            db.commit()
+            '''), {"image_id": image_id})
     except Exception as e:
-        # If we can't insert the image, log it but don't fail the submission
         _log_audit_event(db,
                        event_type='image_insert_failed',
                        participant_id=participant_id,
@@ -875,7 +912,7 @@ def submit():
                        status_code=200,
                        details=f'Failed to insert image {image_id}: {str(e)}')
     
-    # Insert into database
+    # Insert into database - all operations in single transaction
     try:
         survey_index = payload.get("survey_index", 0)
         try:
@@ -883,12 +920,26 @@ def submit():
         except (TypeError, ValueError):
             survey_index = 0
         
+        # Calculate quality score
+        quality_score = calculate_quality_score(word_count, attention_passed, time_spent_seconds, feedback)
+        
+        # Get current attention score for snapshot (before updating)
+        attention_score_snapshot = None
+        if is_attention:
+            stats_result = db.execute(text("""
+                SELECT attention_score FROM attention_stats WHERE participant_id = :participant_id
+            """), {"participant_id": participant_id}).fetchone()
+            attention_score_snapshot = stats_result[0] if stats_result else 1.0
+        
+        # Insert submission with quality metrics
         db.execute(text('''
             INSERT INTO submissions 
             (participant_id, session_id, image_id, image_url, survey_index, description, word_count, rating, 
-             feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, user_agent, ip_hash)
+             feedback, time_spent_seconds, is_survey, is_attention, attention_passed, too_fast_flag, 
+             attention_score_at_submission, quality_score, user_agent, ip_hash)
             VALUES (:participant_id, :session_id, :image_id, :image_url, :survey_index, :description, :word_count, :rating, 
-             :feedback, :time_spent_seconds, :is_survey, :is_attention, :attention_passed, :too_fast_flag, :user_agent, :ip_hash)
+             :feedback, :time_spent_seconds, :is_survey, :is_attention, :attention_passed, :too_fast_flag, 
+             :attention_score_at_submission, :quality_score, :user_agent, :ip_hash)
         '''), {
             "participant_id": participant_id,
             "session_id": payload.get("session_id", ""),
@@ -904,11 +955,11 @@ def submit():
             "is_attention": is_attention,
             "attention_passed": attention_passed,
             "too_fast_flag": too_fast_flag,
+            "attention_score_at_submission": attention_score_snapshot,
+            "quality_score": quality_score,
             "user_agent": request.headers.get("User-Agent", ""),
             "ip_hash": get_ip_hash()
         })
-        
-        db.commit()
         
         # Update attention stats if this was an attention check
         if is_attention:
@@ -927,8 +978,8 @@ def submit():
                 passed = 1 if attention_passed else 0
                 failed = 0 if attention_passed else 1
 
-            attention_score = passed / total
-            is_flagged = attention_score < 0.6 and total >= 3
+            current_attention_score = passed / total
+            is_flagged = current_attention_score < 0.6 and total >= 3
 
             db.execute(text("""
                 INSERT INTO attention_stats
@@ -945,21 +996,26 @@ def submit():
                 "total": total,
                 "passed": passed,
                 "failed": failed,
-                "score": attention_score,
+                "score": current_attention_score,
                 "flagged": is_flagged
             })
-            db.commit()
         
-        # Update participant stats for reward eligibility
-        update_participant_stats(participant_id, word_count, is_survey, attention_score if is_attention else None)
+        # Update participant stats for reward eligibility (within same transaction)
+        _update_participant_stats_internal(db, participant_id, word_count, is_survey, 
+                                           current_attention_score if is_attention else None)
+        
+        # Single commit for all operations
+        db.commit()
         
         return jsonify({
             "status": "ok", 
             "word_count": word_count, 
-            "attention_passed": attention_passed
+            "attention_passed": attention_passed,
+            "quality_score": quality_score
         })
         
     except Exception as e:
+        db.rollback()
         return jsonify({"error": "Failed to save submission", "details": str(e)}), 500
 
 
@@ -985,7 +1041,8 @@ def get_participant_submissions(participant_id):
     
     result = db.execute(text('''
         SELECT id, image_id, survey_index, description, word_count, rating, feedback, 
-               time_spent_seconds, is_survey, is_attention, attention_passed, created_at
+               time_spent_seconds, is_survey, is_attention, attention_passed, 
+               attention_score_at_submission, quality_score, ai_suspected, created_at
         FROM submissions 
         WHERE participant_id = :participant_id
         ORDER BY created_at DESC
@@ -1007,7 +1064,10 @@ def get_participant_submissions(participant_id):
             "is_survey": bool(row[8]),
             "is_attention": bool(row[9]),
             "attention_passed": row[10],
-            "created_at": str(row[11])
+            "attention_score_at_submission": row[11],
+            "quality_score": row[12],
+            "ai_suspected": bool(row[13]) if row[13] is not None else False,
+            "created_at": str(row[14])
         })
     
     return jsonify(submissions)
@@ -1022,15 +1082,17 @@ def security_info():
     cors_origins = _get_cors_origins()
     return jsonify({
         "security": {
-            "version": "3.5.0",
+            "version": "3.6.0",
             "last_updated": datetime.now(timezone.utc).isoformat(),
             "rate_limits": {
                 "default": "200 per day, 50 per hour",
                 "participant_creation": "30 per minute",
                 "consent_recording": "20 per minute",
                 "submission": "60 per minute",
-                "api_docs": "30 per minute"
+                "api_docs": "30 per minute",
+                "reward_selection": "10 per minute per IP, 60 seconds cooldown per participant"
             },
+            "content_length_limit": "1 MB (1048576 bytes)",
             "cors_configuration": {
                 "allowed_origins": cors_origins,
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
@@ -1111,7 +1173,7 @@ def _get_api_documentation():
     """Get API documentation object - available at /"""
     return {
         "title": "C.O.G.N.I.T. API Documentation",
-        "version": "3.5.0",
+        "version": "3.6.0",
         "description": "Complete and verified API documentation for the C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling) research platform. This RESTful API provides endpoints for participant management, image retrieval, data submission, and reward system with comprehensive security features.",
         "base_url": "/api",
         "security": {
@@ -1123,10 +1185,11 @@ def _get_api_documentation():
                     "consent_recording": "20 per minute",
                     "submission": "60 per minute",
                     "api_docs": "30 per minute",
-                    "reward_selection": "10 per minute"
+                    "reward_selection": "10 per minute per IP, 60 seconds cooldown per participant"
                 },
-                "implementation": "Per-IP based rate limiting using flask-limiter"
+                "implementation": "Per-IP based rate limiting using flask-limiter with additional per-participant cooldowns"
             },
+            "content_length_limit": "1 MB (1048576 bytes)",
             "cors_configuration": {
                 "allowed_origins": _get_cors_origins(),
                 "allowed_methods": ["GET", "POST", "OPTIONS"],
@@ -1315,16 +1378,33 @@ def _get_api_documentation():
                 "response": {
                     "status": "ok|error",
                     "word_count": "integer",
-                    "attention_passed": "boolean|null (only set for attention checks)"
+                    "attention_passed": "boolean|null (only set for attention checks)",
+                    "quality_score": "float (0.0-1.0) - computed quality metric based on word count, attention, time, and feedback"
                 }
             },
             "get_submissions": {
                 "path": "/api/submissions/<participant_id>",
                 "method": "GET",
-                "description": "Get all submissions for a specific participant",
+                "description": "Get all submissions for a specific participant with quality metrics",
                 "auth_required": False,
                 "rate_limit": "200 per day, 50 per hour",
-                "response": "Array of submission objects with details"
+                "response": {
+                    "id": "integer",
+                    "image_id": "string",
+                    "survey_index": "integer",
+                    "description": "string",
+                    "word_count": "integer",
+                    "rating": "integer (1-10)",
+                    "feedback": "string",
+                    "time_spent_seconds": "float",
+                    "is_survey": "boolean",
+                    "is_attention": "boolean",
+                    "attention_passed": "boolean|null",
+                    "attention_score_at_submission": "float|null - participant's attention score at time of submission",
+                    "quality_score": "float|null - computed quality score (0.0-1.0)",
+                    "ai_suspected": "boolean - flag for potential AI-generated content",
+                    "created_at": "timestamp"
+                }
             },
             "get_reward_status": {
                 "path": "/api/reward/<participant_id>",
@@ -1344,14 +1424,16 @@ def _get_api_documentation():
             "select_reward_winner": {
                 "path": "/api/reward/select/<participant_id>",
                 "method": "POST",
-                "description": "Check and select participant as reward winner (random selection, higher chances for priority participants)",
+                "description": "Check and select participant as reward winner (random selection, higher chances for priority participants). Per-participant cooldown: 60 seconds between attempts.",
                 "auth_required": False,
-                "rate_limit": "10 per minute",
+                "rate_limit": "10 per minute per IP, 60 seconds cooldown per participant",
                 "response": {
                     "selected": "boolean - whether participant was selected",
                     "reward_amount": "integer|null - amount if selected",
                     "already_winner": "boolean|null - if already selected before",
-                    "priority_eligible": "boolean|null - priority status"
+                    "priority_eligible": "boolean|null - priority status",
+                    "cooldown_active": "boolean|null - true if participant must wait before retry",
+                    "retry_after": "integer|null - seconds remaining in cooldown"
                 }
             }
         },
@@ -1370,6 +1452,7 @@ def _get_api_documentation():
             }
         },
         "changelog": {
+            "3.6.0": "Schema enhancements: added quality_score, attention_score_at_submission, ai_suspected columns to submissions; added reward_winners table with FK constraints; added per-participant cooldown for reward selection; wrapped submission operations in single transaction; added quality score calculation; removed manual SQL injection filtering (relying on parameterized queries); added MAX_CONTENT_LENGTH security limit",
             "3.5.0": "Migrated from SQLite to PostgreSQL for production deployment compatibility",
             "3.4.0": "Updated application name to C.O.G.N.I.T. (Cognitive Network for Image & Text Modeling), regenerated consent form, removed CSV functionality, moved API documentation to root endpoint (/), updated README.md",
             "3.3.0": "Added reward system with participant_stats and reward_winners tables, priority-based selection, and reward endpoints",
@@ -1385,7 +1468,7 @@ def _get_api_documentation():
 def serve_api_docs():
     """Serve API documentation at root path"""
     return render_template("api_docs.html", 
-                         version="3.5.0", 
+                         version="3.6.0", 
                          base_url="/api")
 
 @app.route("/api/docs")
