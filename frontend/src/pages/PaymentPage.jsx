@@ -47,14 +47,74 @@ export default function PaymentPage({
       return;
     }
 
+    if (!participantId) {
+      setError("Participant details are missing. Please restart the study.");
+      return;
+    }
+
     setError(null);
     setSubmitting(true);
 
     try {
-      await onPaymentComplete();
+      const response = await fetch(getApiUrl("/api/payment/create-order"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ participant_id: participantId })
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Unable to initialize payment");
+      }
+
+      const data = await response.json();
+
+      if (!window.Razorpay) {
+        throw new Error("Payment gateway failed to load. Please refresh and try again.");
+      }
+
+      const options = {
+        key: data.key,
+        amount: data.amount,
+        currency: data.currency || "INR",
+        order_id: data.order_id,
+        name: "C.O.G.N.I.T.",
+        description: "Research participation fee",
+        handler: async function (paymentResponse) {
+          try {
+            const verifyResponse = await fetch(getApiUrl("/api/payment/verify"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(paymentResponse)
+            });
+
+            if (!verifyResponse.ok) {
+              const verifyData = await verifyResponse.json().catch(() => ({}));
+              throw new Error(verifyData.error || "Payment verification failed");
+            }
+
+            await onPaymentComplete();
+          } catch (err) {
+            setError(err.message || "Payment processing failed. Please try again.");
+          } finally {
+            setSubmitting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setSubmitting(false);
+          }
+        }
+      };
+
+      const razorpay = new window.Razorpay(options);
+      razorpay.on("payment.failed", () => {
+        setError("Payment failed. Please try again.");
+        setSubmitting(false);
+      });
+      razorpay.open();
     } catch (err) {
       setError(err.message || "Payment processing failed. Please try again.");
-    } finally {
       setSubmitting(false);
     }
   };
