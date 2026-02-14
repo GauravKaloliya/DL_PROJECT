@@ -270,7 +270,6 @@ export default function TrialPage({
 
       <div className="meta">
         <span className="timer">Time: {elapsed}s</span>
-        {trial.is_attention && <span className="tag attention">Attention check</span>}
       </div>
 
       <div className="field">

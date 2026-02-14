@@ -755,7 +755,6 @@ def submit():
         }), 403
     
     # Verify participant exists and has given consent
-    db = get_db()
     result = db.execute(text("SELECT consent_given FROM participants WHERE participant_id = :participant_id"), {"participant_id": participant_id})
     db_result = result.fetchone()
     
@@ -1303,19 +1302,20 @@ def _get_api_documentation():
                 "rate_limit": "60 per minute",
                 "request_body": {
                     "required": ["participant_id", "image_id", "description", "rating", "feedback", "time_spent_seconds"],
-                    "optional": ["session_id", "image_url", "trial_index", "is_survey", "is_attention", "attention_expected"]
+                    "optional": ["session_id", "image_url", "trial_index", "is_survey"]
                 },
                 "validation": {
                     "description": f"Minimum {MIN_WORD_COUNT} words required",
                     "rating": "Integer between 1-10",
                     "feedback": "Minimum 5 characters",
                     "participant_consent": "Participant must have given consent",
-                    "trial_index": "Optional trial sequence number (integer, defaults to 0)"
+                    "trial_index": "Optional trial sequence number (integer, defaults to 0)",
+                    "attention_checks": "Attention trials are determined server-side based on the image ID"
                 },
                 "response": {
                     "status": "ok|error",
                     "word_count": "integer",
-                    "attention_passed": "boolean|null"
+                    "attention_passed": "boolean|null (only set for attention checks)"
                 }
             },
             "get_submissions": {

@@ -307,19 +307,10 @@ export default function App() {
       }
       const data = await response.json();
 
-      // Determine if this is an attention check based on image_id
-      const isAttentionCheck = data.image_id && (
-        data.image_id.includes('attention-') ||
-        data.image_id.startsWith('attention/') ||
-        data.image_id.includes('/attention-') ||
-        data.image_id.includes('/attention/')
-      );
-
-      // Add survey and attention flags based on current stage and image_id
+      // Add survey flag based on current stage
       const trialData = {
         ...data,
-        is_survey: stage === "survey",
-        is_attention: isAttentionCheck
+        is_survey: stage === "survey"
       };
 
       // Track this image as shown
@@ -385,7 +376,7 @@ export default function App() {
 
     const result = await response.json();
 
-    if (trial.is_attention && !result.attention_passed) {
+    if (result.attention_passed === false) {
       addToast("Please follow the special instructions next time!", "warning");
     } else {
       addToast("Your response was saved!", "success");
