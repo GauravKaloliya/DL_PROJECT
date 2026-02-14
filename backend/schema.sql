@@ -67,16 +67,19 @@ CREATE TABLE IF NOT EXISTS attention_checks (
 
 CREATE TABLE IF NOT EXISTS attention_stats (
     participant_id TEXT PRIMARY KEY,
-    total_checks INT DEFAULT 0,
-    passed_checks INT DEFAULT 0,
-    failed_checks INT DEFAULT 0,
+    total_checks INT DEFAULT 0 CHECK (total_checks >= 0),
+    passed_checks INT DEFAULT 0 CHECK (passed_checks >= 0),
+    failed_checks INT DEFAULT 0 CHECK (failed_checks >= 0),
     attention_score FLOAT DEFAULT 1.0,
     is_flagged BOOLEAN DEFAULT FALSE,
 
     CONSTRAINT fk_attention_stats_participant
         FOREIGN KEY (participant_id)
         REFERENCES participants(participant_id)
-        ON DELETE CASCADE
+        ON DELETE CASCADE,
+
+    CONSTRAINT valid_attention_counts
+        CHECK (total_checks >= passed_checks + failed_checks)
 );
 
 -- =====================================================
@@ -89,16 +92,19 @@ CREATE TABLE IF NOT EXISTS submissions (
     session_id VARCHAR(100) NOT NULL,
     image_id VARCHAR(200) NOT NULL,
     image_url VARCHAR(500),
-    trial_index INTEGER NOT NULL,
+    survey_index INTEGER NOT NULL,
     description TEXT NOT NULL CHECK (length(description) <= 10000),
-    word_count INTEGER CHECK (word_count BETWEEN 0 AND 10000),
-    rating INTEGER CHECK (rating BETWEEN 1 AND 10),
-    feedback TEXT CHECK (length(feedback) <= 2000),
+    word_count INTEGER NOT NULL CHECK (word_count BETWEEN 0 AND 10000),
+    rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 10),
+    feedback TEXT NOT NULL CHECK (length(feedback) <= 2000),
     time_spent_seconds DOUBLE PRECISION CHECK (time_spent_seconds >= 0),
     is_survey BOOLEAN DEFAULT FALSE,
     is_attention BOOLEAN DEFAULT FALSE,
     attention_passed BOOLEAN,
     too_fast_flag BOOLEAN DEFAULT FALSE,
+    attention_score_at_submission FLOAT,
+    quality_score FLOAT,
+    ai_suspected BOOLEAN DEFAULT FALSE,
     user_agent VARCHAR(500),
     ip_hash CHAR(64),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -110,7 +116,10 @@ CREATE TABLE IF NOT EXISTS submissions (
 
     CONSTRAINT fk_image
         FOREIGN KEY (image_id)
-        REFERENCES images(image_id)
+        REFERENCES images(image_id),
+
+    CONSTRAINT unique_participant_survey_index
+        UNIQUE (participant_id, survey_index)
 );
 
 -- =====================================================
@@ -141,7 +150,34 @@ CREATE TABLE IF NOT EXISTS participant_stats (
     total_submissions INT DEFAULT 0,
     survey_rounds INT DEFAULT 0,
     priority_eligible BOOLEAN DEFAULT FALSE,
-    attention_score FLOAT DEFAULT 1.0
+    attention_score FLOAT DEFAULT 1.0,
+    last_reward_attempt_at TIMESTAMPTZ,
+
+    CONSTRAINT fk_participant_stats_participant
+        FOREIGN KEY (participant_id)
+        REFERENCES participants(participant_id)
+        ON DELETE CASCADE
+);
+
+-- =====================================================
+-- Reward Winners Table
+-- =====================================================
+
+CREATE TABLE IF NOT EXISTS reward_winners (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    participant_id TEXT NOT NULL,
+    reward_amount INTEGER NOT NULL CHECK (reward_amount > 0),
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'cancelled')),
+    selected_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    paid_at TIMESTAMPTZ,
+
+    CONSTRAINT fk_reward_winners_participant
+        FOREIGN KEY (participant_id)
+        REFERENCES participants(participant_id)
+        ON DELETE CASCADE,
+
+    CONSTRAINT unique_reward_participant
+        UNIQUE (participant_id)
 );
 
 -- =====================================================
@@ -191,6 +227,9 @@ CREATE INDEX IF NOT EXISTS idx_submissions_created ON submissions(created_at);
 CREATE INDEX IF NOT EXISTS idx_submissions_image ON submissions(image_id);
 CREATE INDEX IF NOT EXISTS idx_submissions_survey ON submissions(is_survey);
 CREATE INDEX IF NOT EXISTS idx_submissions_attention ON submissions(is_attention);
+CREATE INDEX IF NOT EXISTS idx_submissions_quality ON submissions(quality_score);
+CREATE INDEX IF NOT EXISTS idx_submissions_ai_suspected ON submissions(ai_suspected);
+CREATE INDEX IF NOT EXISTS idx_submissions_survey_index ON submissions(participant_id, survey_index);
 
 CREATE INDEX IF NOT EXISTS idx_consent_participant ON consent_records(participant_id);
 CREATE INDEX IF NOT EXISTS idx_consent_timestamp ON consent_records(consent_timestamp);
@@ -205,6 +244,11 @@ CREATE INDEX IF NOT EXISTS idx_attention_stats_flagged ON attention_stats(is_fla
 
 CREATE INDEX IF NOT EXISTS idx_participant_stats_participant ON participant_stats(participant_id);
 CREATE INDEX IF NOT EXISTS idx_participant_stats_priority ON participant_stats(priority_eligible);
+CREATE INDEX IF NOT EXISTS idx_participant_stats_reward_attempt ON participant_stats(last_reward_attempt_at);
+
+CREATE INDEX IF NOT EXISTS idx_reward_winners_participant ON reward_winners(participant_id);
+CREATE INDEX IF NOT EXISTS idx_reward_winners_status ON reward_winners(status);
+CREATE INDEX IF NOT EXISTS idx_reward_winners_selected_at ON reward_winners(selected_at);
 
 CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log(timestamp);
 CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log(user_id);
@@ -292,7 +336,9 @@ CREATE TABLE IF NOT EXISTS database_metadata (
 
 INSERT INTO database_metadata (key, value)
 VALUES
-    ('version', '3.5.0'),
+    ('version', '3.6.0'),
     ('schema_updated', CURRENT_TIMESTAMP::text),
-    ('description', 'C.O.G.N.I.T. Research Platform Database')
-ON CONFLICT (key) DO NOTHING;
+    ('description', 'C.O.G.N.I.T. Research Platform Database - Enhanced with quality metrics and security improvements')
+ON CONFLICT (key) DO UPDATE SET
+    value = EXCLUDED.value,
+    updated_at = CURRENT_TIMESTAMP;
