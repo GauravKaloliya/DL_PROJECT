@@ -86,6 +86,9 @@ export default function PaymentPage({
           netbanking: true,
           wallet: true
         },
+        prefill: {
+          vpa: "success@razorpay"
+        },
         config: {
           display: {
             preferences: {
